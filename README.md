@@ -37,42 +37,42 @@ In case the latter are not present on your system these will be automatically in
 ### Installation
 To install all dependencies in one go on Arch-based distributions run the following command:
 
-'''
+```
 sudo pacman -S python python-setuptools python-pip python-pyqt5 python-dbus openvpn stunnel dnsutils geoip geoip-database python-psutil python-requests python-lxml python-beautifulsoup4 python-pycountry python-pexpect
-'''
+```
 
 
 The equivalent for Debian-based distributions is:
 
-'''
+```
 sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
-'''
+```
 
 
 To install Qomui, simply issue the following commands:
 
-'''
+```
 git clone https://github.com/corrad1nho/qomui.git
 cd ./
-'''
+```
 
 Arch:
 
-'''
+```
 sudo pip install ./
-'''
+```
 
 Debian:
 
-'''
+```
 sudo pip3 install ./
-'''
+```
 
 Alternatively:
 
-'''
+```
 sudo python setup.py install
-'''
+```
 
 ### General usage:
 Qomui contains two components: qomui-gui and qomui-service. The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service"). Be aware that if you choose to activate the firewall and enable qomui-service all internet connectivity will be blocked as long as no OpenVPN connection has been established whether or not the gui is running. 
