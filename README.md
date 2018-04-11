@@ -53,7 +53,7 @@ To install Qomui, simply issue the following commands:
 
 ```
 git clone https://github.com/corrad1nho/qomui.git
-cd ./
+cd ./qomui
 ```
 
 Arch:
