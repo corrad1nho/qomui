@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name = Qomui
+GenericName = Qomui
+Comment = Gui for OpenVPN
+Exec = qomui-gui
+Terminal = false
+Type = Application
+Categories = Network;
+Keywords = privacy;secret;censorship;geoblocking;
+Icon = /usr/share/qomui/qomui.png

@@ -1,0 +1,11 @@
+foreground = yes
+pid = /tmp/stunnel4.pid
+client = yes
+debug = 6
+
+[openvpn]
+accept = 127.0.0.1:1413
+connect 
+TIMEOUTclose = 0
+verify = 3
+CAfile = /usr/share/qomui/certs/stunnel.crt

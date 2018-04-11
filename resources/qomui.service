@@ -1,0 +1,11 @@
+[Unit]
+Description=qomui
+Wants=network-pre.target
+
+[Service]
+ExecStart=/usr/bin/env qomui-service
+Type=dbus
+BusName=org.qomui.service
+
+[Install]
+WantedBy=multi-user.target
