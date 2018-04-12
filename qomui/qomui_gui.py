@@ -201,12 +201,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.airvpn_server_list = QtWidgets.QListWidget(self.AirVPN_tab)
         self.airvpn_server_list.setObjectName(_fromUtf8("airvpn_server_list"))
         self.verticalLayout.addWidget(self.airvpn_server_list)
-        
         self.airvpn_hop_widget = HopSelect(self.AirVPN_tab)
         self.airvpn_hop_widget.setVisible(False)
         self.verticalLayout.addWidget(self.airvpn_hop_widget)
-        
-        
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -232,11 +229,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.mullvad_server_list = QtWidgets.QListWidget(self.Mullvad_tab)
         self.mullvad_server_list.setObjectName(_fromUtf8("mullvad_server_list"))
         self.verticalLayout_2.addWidget(self.mullvad_server_list)
-        
         self.mullvad_hop_widget = HopSelect(self.Mullvad_tab)
         self.mullvad_hop_widget.setVisible(False)
         self.verticalLayout_2.addWidget(self.mullvad_hop_widget)
-        
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName(_fromUtf8("horizontalLayout_2"))
         spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -257,11 +252,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.custom_server_list.setObjectName(_fromUtf8("custom_server_list"))
         self.custom_server_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.verticalLayout_4.addWidget(self.custom_server_list)
-        
         self.custom_hop_widget = HopSelect(self.custom_tab)
         self.custom_hop_widget.setVisible(False)
         self.verticalLayout_4.addWidget(self.custom_hop_widget)
-        
         self.horizontalLayout_5 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_5.setObjectName(_fromUtf8("horizontalLayout_5"))
         spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -440,15 +433,19 @@ class QomuiGui(QtWidgets.QWidget):
     def systemtray(self):
         self.trayicon = QtGui.QIcon("%s/qomui.png" % (ROOTDIR))
         self.tray = QtWidgets.QSystemTrayIcon()
-        self.tray.setIcon(self.trayicon)
-        self.tray_menu = QtWidgets.QMenu()
-        show = self.tray_menu.addAction("Show")
-        exit = self.tray_menu.addAction("Quit")
-        show.triggered.connect(self.show)
-        exit.triggered.connect(self.shutdown)
-        self.tray.setContextMenu(self.tray_menu)
-        self.tray.show()
-        self.tray.activated.connect(self.restoreUi)
+        if self.tray.isSystemTrayAvailable() == False:
+            self.setWindowState(QtCore.Qt.WindowActive)
+            self.showNormal()
+        else:    
+            self.tray.setIcon(self.trayicon)
+            self.tray_menu = QtWidgets.QMenu()
+            show = self.tray_menu.addAction("Show")
+            exit = self.tray_menu.addAction("Quit")
+            show.triggered.connect(self.show)
+            exit.triggered.connect(self.shutdown)
+            self.tray.setContextMenu(self.tray_menu)
+            self.tray.show()
+            self.tray.activated.connect(self.restoreUi)
     
     def shutdown(self):
         self.tray.hide()
@@ -457,15 +454,20 @@ class QomuiGui(QtWidgets.QWidget):
         
     def restoreUi(self, reason):
         if self.isVisible() is True:
-             self.hide()
+            self.hide()
         else:
-             self.showNormal()
+            self.setWindowState(QtCore.Qt.WindowActive)
+            self.showNormal()
 
     def changeEvent(self, event):
         if event.type() == QtCore.QEvent.WindowStateChange:
             if self.windowState() & QtCore.Qt.WindowMinimized:
-                event.accept()
+                if self.tray.isSystemTrayAvailable() == False:
+                    event.accept()
+                else:
+                    self.hide()
             elif self.windowState() & QtCore.Qt.WindowActive:
+                self.setWindowState(QtCore.Qt.WindowActive)
                 self.showNormal()
 
     def closeEvent(self, event):

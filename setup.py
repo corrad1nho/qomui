@@ -7,6 +7,7 @@ data_files = [
         ('/usr/share/applications/', ['resources/qomui.desktop']),
         ('/etc/systemd/system/', ['resources/qomui.service']),
         ('/etc/dbus-1/system.d/', ['resources/org.qomui.service.conf']),
+        ('/usr/share/icons/hicolor/scalable/apps/', ['resources/qomui.svg']),
         ('/usr/share/qomui/', ['resources/airvpn_config', 
                           'resources/config.json',
                           'resources/default_config.json',
@@ -37,7 +38,7 @@ class CustomInstall(install):
 
 
 setup(name="qomui",
-      version="0.1.0",
+      version="0.1.1",
       packages=['qomui'],
       include_package_data=True,
       install_requires=[

@@ -307,7 +307,7 @@ class QomuiDbus(dbus.service.Object):
             name = self.hop_dict["name"]
             self.logger.info("Establishing connection to %s - first hop" %name)
             last_ip = self.hop_dict["ip"]
-            cmd_ovpn = ['/usr/bin/openvpn',
+            cmd_ovpn = ['openvpn',
                         '--config', '%s' %(ovpn_file), 
                         '--route-nopull', 
                         '--script-security', '2', 
@@ -317,7 +317,7 @@ class QomuiDbus(dbus.service.Object):
             
         elif h == "2":
             self.logger.info("Establishing connection to %s - second hop" %name)
-            cmd_ovpn = ['/usr/bin/openvpn',
+            cmd_ovpn = ['openvpn',
                         '--config', '%s' %(ovpn_file), 
                         '--route-nopull', 
                         '--script-security', '2', 

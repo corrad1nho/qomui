@@ -277,6 +277,7 @@ class MullvadDownload(QtCore.QThread):
                     server = results[0].replace(" ", "") + ".mullvad.net"
                     dig_cmd = ["dig", "%s" %(server), "+short"]
                     ip = check_output(dig_cmd).decode("utf-8")
+                    ip = ip.split("\n")[0]
                     country_raw = results[1].strip()
                     if country_raw == "UK":
                         country = "United Kingdom"
