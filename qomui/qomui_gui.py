@@ -462,7 +462,7 @@ class QomuiGui(QtWidgets.QWidget):
     def changeEvent(self, event):
         if event.type() == QtCore.QEvent.WindowStateChange:
             if self.windowState() & QtCore.Qt.WindowMinimized:
-                if QtGui.QSystemTrayIcon.isSystemTrayAvailable() == False:
+                if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable() == False:
                     event.accept()
                 else:
                     self.hide()
