@@ -24,7 +24,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - openvpn, dnsutils and stunnel
 - geoip and geoip-database (optional: to identify server locations)
 
-  Additionally, the following python modules are required:
+Additionally, the following python modules are required:
 - psutil
 - requests
 - pycountry
