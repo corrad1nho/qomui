@@ -3,76 +3,76 @@
 Written in Python 3.6
 
 ### Description
-Qomui(Qt OpenVPN Management UI) is a easy-to-use OpenVPN Gui for GNU/Linux with some unique features such as provider-independent support for double-hop connections. Qomui supports multiple providers with added convenience when using AirVPN or Mullvad. 
+Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux with some unique features such as provider-independent support for double-hop connections. Qomui supports multiple providers with added convenience when using AirVPN or Mullvad. 
 
 ### Features
--should work with all VPN providers that offer OpenVPN config files 
--automatic download function for Mullvad and AirVPN 
--support for OpenVPN over SSL and SSH for AirVPN
--allows double-hop VPN connections (VPN chains) between different providers (currently tested with AirVPN, Mullvad and ProtonVPN). 
--Gui written in PyQt including option to minimze application to system tray
--security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
--protection against DNS leaks
--iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down 
+- should work with all VPN providers that offer OpenVPN config files 
+- automatic download function for Mullvad and AirVPN 
+- support for OpenVPN over SSL and SSH for AirVPN
+- allows double-hop VPN connections (VPN chains) between different providers (currently tested with AirVPN, Mullvad and ProtonVPN). 
+- Gui written in PyQt including option to minimize application to system tray
+- security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
+- protection against DNS leaks
+- iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down 
 
 
 ### Dependencies/Requirements
--Qomui should work on any GNU/Linux distribution.
--python(>=3.5)
--setuptools and (optionally) pip
--python-pyqt5, python-dbus, and python dbus.mainloop.pyqt5 
--openvpn, dnsutils, and stunnel
--geoip and geoip-database (optional: to identify server locations)
+- Qomui should work on any GNU/Linux distribution
+- python (>=3.5)
+- setuptools and (optionally) pip
+- python-pyqt5, python-dbus, and python-dbus.mainloop.pyqt5 
+- openvpn, dnsutils and stunnel
+- geoip and geoip-database (optional: to identify server locations)
 
 Additionally, the following python modules are required:
--psutil
--requests
--pycountry
--beautifulsoup4
--lxml
--pexpect
+- psutil
+- requests
+- pycountry
+- beautifulsoup4
+- lxml
+- pexpect
 
-In case the latter are not present on your system these will be automatically installed when running setup.py. I would recommend installing the following python packages with your distribution's package manager, though.
+In case the latter are not present on your system these will be automatically installed when running setup.py. I would recommend installing them with your distribution's package manager, though.
 
 ### Installation
 To install all dependencies in one go on Arch-based distributions run the following command:
 
-'''
+```
 sudo pacman -S python python-setuptools python-pip python-pyqt5 python-dbus openvpn stunnel dnsutils geoip geoip-database python-psutil python-requests python-lxml python-beautifulsoup4 python-pycountry python-pexpect
-'''
+```
 
 
-The equivalent for Debian-based distributions is:
+The equivalent for Debian/Ubuntu-based distributions is:
 
-'''
+```
 sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
-'''
+```
 
 
 To install Qomui, simply issue the following commands:
 
-'''
-git clone ########
-cd ./
-'''
+```
+git clone https://github.com/corrad1nho/qomui.git
+cd ./qomui
+```
 
 Arch:
 
-'''
+```
 sudo pip install ./
-'''
+```
 
-Debian:
+Debian/Ubuntu:
 
-'''
+```
 sudo pip3 install ./
-'''
+```
 
 Alternatively:
 
-'''
+```
 sudo python setup.py install
-'''
+```
 
 ### General usage:
 Qomui contains two components: qomui-gui and qomui-service. The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service"). Be aware that if you choose to activate the firewall and enable qomui-service all internet connectivity will be blocked as long as no OpenVPN connection has been established whether or not the gui is running. 
