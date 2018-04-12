@@ -32,7 +32,7 @@ Additionally, the following python modules are required:
 - lxml
 - pexpect
 
-In case the latter are not present on your system these will be automatically installed when running setup.py. I would recommend installing the following python packages with your distribution's package manager, though.
+In case the latter are not present on your system these will be automatically installed when running setup.py. I would recommend installing them with your distribution's package manager, though.
 
 ### Installation
 To install all dependencies in one go on Arch-based distributions run the following command:
@@ -42,7 +42,7 @@ sudo pacman -S python python-setuptools python-pip python-pyqt5 python-dbus open
 ```
 
 
-The equivalent for Debian-based distributions is:
+The equivalent for Debian/Ubuntu-based distributions is:
 
 ```
 sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
@@ -62,7 +62,7 @@ Arch:
 sudo pip install ./
 ```
 
-Debian:
+Debian/Ubuntu:
 
 ```
 sudo pip3 install ./
