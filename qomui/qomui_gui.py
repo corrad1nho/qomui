@@ -68,6 +68,7 @@ class QomuiGui(QtWidgets.QWidget):
         super(QomuiGui, self).__init__(parent)
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.DEBUG)
+        self.setWindowIcon(QtGui.QIcon.fromTheme("qomui"))
         self.setWindowState(QtCore.Qt.WindowMinimized)
         self.setupUi(self)
         self.dbus = dbus.SystemBus()
@@ -124,9 +125,6 @@ class QomuiGui(QtWidgets.QWidget):
         
         self.Load()
         self.systemtray()
-        
-    def hide_window(self):
-        self.hide()
         
     def receive_log(self, msg):
         self.logText.appendPlainText(msg)
