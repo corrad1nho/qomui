@@ -16,7 +16,7 @@ import dbus
 import dbus.service
 from dbus.mainloop.pyqt5 import DBusQtMainLoop
 
-from qomui import firewall 
+from qomui import firewall, bypass 
 
 OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
@@ -108,12 +108,15 @@ class QomuiDbus(dbus.service.Object):
     def disconnect(self):
         self.restore_default_dns()
         for i in self.pid_list:
-            if psutil.pid_exists(i):
-                try:
-                    self.logger.debug("OS: process %s killed" % (i)) 
-                    stop_processes = Popen(['kill', '%s' %(i)])
-                except:
-                    self.logger.debug("OS: process %s does not exist anymore" % (i)) 
+            self.kill_pid(i)
+    
+    def kill_pid(self, i):
+        if psutil.pid_exists(i[0]):
+            try:
+                self.logger.debug("OS: process %s killed - %s" % (i[0], i[1])) 
+                stop_processes = Popen(['kill', '%s' %i[0]])
+            except CalledProcessError:
+                self.logger.debug("OS: process %s does not exist anymore" % (i)) 
 
     @dbus.service.method(BUS_NAME, in_signature='s', out_signature='')
     def allowUpdate(self, provider): 
@@ -199,10 +202,41 @@ class QomuiDbus(dbus.service.Object):
        
     
     @dbus.service.method(BUS_NAME, in_signature='ss', out_signature='')
-    def update_dns(self, dns1, dns2):
+    def update_dns(self, dns1=None, dns2=None):
         dns = open("/etc/resolv.conf", "w")
-        dns.write("nameserver %s\nnameserver %s" % (dns1, dns2))
+        if dns2 is None:
+            dns.write("nameserver %s\n" %dns1)
+        else:
+            dns.write("nameserver %s\nnameserver %s" % (dns1, dns2))
         self.logger.info("DNS: Overwriting /etc/resolv.conf with %s and %s" %(dns1, dns2))
+        
+    @dbus.service.method(BUS_NAME, in_signature='ss', out_signature='')
+    def bypass(self, user, group):
+        try:
+            self.kill_pid(self.dnsmasq_pid)
+        except AttributeError:
+            pass
+        try:
+            default_route = check_output(["ip", "route", "show", "default"]).decode("utf-8")
+            parse_route = default_route.split(" ")
+            self.default_interface = parse_route[4]
+            default_gateway = parse_route[2]
+            try:
+                with open('%s/config.json' % (ROOTDIR), 'r') as c:
+                    config = json.load(c)
+                    if config["bypass"] == 1:
+                        pid = bypass.create_cgroup(user, group, self.default_interface, default_gateway)
+                        print("DNSMASQ PID = %s" %pid)
+                        self.dnsmasq_pid = (pid, "dnsmasq")
+                    elif config["bypass"] == 0:
+                        try:
+                            bypass.delete_cgroup(self.default_interface)
+                        except AttributeError:
+                            pass
+            except KeyError:
+                self.logger.warning('Could not read all values from config file')
+        except (CalledProcessError, IndexError):
+            self.logger.info('Could not create cgroup for bypass - no network connectivity')
         
     @dbus.service.signal(BUS_NAME, signature='s')
     def reply(self, msg):
@@ -329,7 +363,7 @@ class QomuiDbus(dbus.service.Object):
             cmd_ovpn = ['openvpn','%s' % ovpn_file]
         
         ovpn_exe = Popen(cmd_ovpn, stdout=PIPE, stderr=STDOUT, cwd=cwd_ovpn, bufsize=1, universal_newlines=True)
-        self.add_pid(ovpn_exe.pid)
+        self.add_pid((ovpn_exe.pid, "OpenVPN"))
         line = ovpn_exe.stdout.readline()
         while line.find("SIGTERM[hard,] received, process exiting") == -1:
                 line_format = ("OpenVPN:" + line.replace('%s' %(time.asctime()), '').replace('\n', ''))
@@ -340,6 +374,12 @@ class QomuiDbus(dbus.service.Object):
                     self.logger.info("Successfully connected to %s" %name)
                 elif line.find('TUN/TAP device') != -1:
                     self.tun = line_format.split(" ")[3]
+                elif line.find('PUSH: Received control message:') != -1:
+                    index = line_format.find('dhcp-option')
+                    option = line_format[index:].split(",")[0]
+                    self.dns = option.split(" ")[2]
+                    print("DNS = %s" %self.dns)
+                    self.update_dns(dns1=self.dns)
                 elif line.find("Restart pause, 10 second(s)") != -1:
                     self.reply("fail1")
                     self.logger.info("Connection attempt failed") 
@@ -348,8 +388,6 @@ class QomuiDbus(dbus.service.Object):
                     self.logger.info("Authentication error while trying to connect")
                 elif line == '':
                     break
-                #elif line.find("SIGTERM[hard,] received, process exiting") != -1:
-                 #break
                 line = ovpn_exe.stdout.readline()
         logging.info("OpenVPN:" + line.replace('%s' %(time.asctime()), '').replace('\n', ''))
         ovpn_exe.stdout.close()
@@ -363,7 +401,7 @@ class QomuiDbus(dbus.service.Object):
     def ssl(self, ip):
         cmd_ssl = ['stunnel','%s' % ("%s/temp.ssl" % (ROOTDIR))]
         ssl_exe = Popen(cmd_ssl, stdout=PIPE, stderr=STDOUT, bufsize=1, universal_newlines=True)
-        self.add_pid(ssl_exe.pid)
+        self.add_pid((ssl_exe.pid, "stunnel"))
         line = ssl_exe.stdout.readline()
         while line.find('SIGINT') == -1:
                 logging.info("Stunnel: " + line.replace('\n', ''))
@@ -379,7 +417,7 @@ class QomuiDbus(dbus.service.Object):
         ssh_exe = pexpect.spawn(cmd_ssh)
         ssh_newkey = b'Are you sure you want to continue connecting'
         ssh_success = 'Forced command'
-        self.add_pid(ssh_exe.pid)  
+        self.add_pid((ssh_exe.pid, "ssh"))  
         i = ssh_exe.expect([ssh_newkey, ssh_success])
         if i == 0:
             ssh_exe.sendline('yes')

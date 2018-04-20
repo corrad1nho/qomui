@@ -11,9 +11,27 @@ ip_cmd = ["iptables", "--wait",]
 ip6_cmd = ["ip6tables", "-w",]
 
 def add_rule(rule):
+    a = 1
     try:
-        apply_rule = check_call(ip_cmd + rule)
-        logging.debug("iptables: applied %s" %rule)
+        check = rule[:]
+        if check[0] == "-A":
+            check[0] = "-C"
+        elif check[0] == "-I":
+            check[0] = "-C"
+            check.pop(2)
+        elif check[2] == "-A":
+            check[2] = "-C"
+        apply_rule = check_call(ip_cmd + check)
+        logging.debug("iptables: rule already exists")
+        a = 0
+    except (IndexError, CalledProcessError):
+        pass
+            
+    try:
+        if a == 1:
+            apply_rule = check_call(ip_cmd + rule)
+            logging.debug("iptables: applied %s" %rule)
+        
     except CalledProcessError:
         logging.warning("iptables: failed to apply %s" %rule)
     

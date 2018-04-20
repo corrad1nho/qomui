@@ -12,9 +12,11 @@ import time
 import logging
 import psutil
 from dbus.mainloop.pyqt5 import DBusQtMainLoop
-from subprocess import CalledProcessError, check_call
+from subprocess import CalledProcessError, check_call, check_output, Popen
 import shutil
 import shlex
+import glob
+import configparser
 
 from qomui import update
 
@@ -63,6 +65,7 @@ class QomuiGui(QtWidgets.QWidget):
     hop_choice = 0
     log_count = 0
     hop_server_dict = None
+    bypass_app_list = {}
     
     def __init__(self, parent = None):
         super(QomuiGui, self).__init__(parent)
@@ -119,7 +122,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.logger.addHandler(handler)
         primary_screen_geometry = QtWidgets.QDesktopWidget().availableGeometry(QtWidgets.QDesktopWidget().primaryScreen())
         positioning = primary_screen_geometry.bottomRight()
-        self.setGeometry(QtCore.QRect(positioning.x(), positioning.y(), 450, 560))
+        self.setGeometry(QtCore.QRect(positioning.x(), positioning.y(), 500, 670))
         self.qomui_service.disconnect()
         self.qomui_service.save_default_dns()
         
@@ -178,6 +181,16 @@ class QomuiGui(QtWidgets.QWidget):
         self.tab_bt_group.addButton(self.log_tab_bt)
         self.log_tab_bt.setObjectName(_fromUtf8("log_tab_bt"))
         self.verticalLayout_3.addWidget(self.log_tab_bt)
+        
+        self.bypass_tab_bt = QtWidgets.QCommandLinkButton(Form)
+        self.bypass_tab_bt.setVisible(False)
+        self.bypass_tab_bt.setMinimumSize(QtCore.QSize(100, 0))
+        self.bypass_tab_bt.setMaximumSize(QtCore.QSize(100, 100))
+        self.bypass_tab_bt.setCheckable(True)
+        self.tab_bt_group.addButton(self.bypass_tab_bt)
+        self.bypass_tab_bt.setObjectName(_fromUtf8("bypass_tab_bt"))
+        self.verticalLayout_3.addWidget(self.bypass_tab_bt)
+        
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_3.addItem(spacerItem)
         self.gridLayout.addLayout(self.verticalLayout_3, 2, 0, 1, 1)
@@ -277,67 +290,90 @@ class QomuiGui(QtWidgets.QWidget):
         self.options_tab.setObjectName(_fromUtf8("options_tab"))
         self.verticalLayout_5 = QtWidgets.QVBoxLayout(self.options_tab)
         self.verticalLayout_5.setObjectName(_fromUtf8("verticalLayout_5"))
-        self.autoconnect_check = QtWidgets.QCheckBox(self.options_tab)
-        self.autoconnect_check.setObjectName(_fromUtf8("autoconnect_check"))
-        self.verticalLayout_5.addWidget(self.autoconnect_check)
-        self.minimize_check = QtWidgets.QCheckBox(self.options_tab)
-        self.minimize_check.setObjectName(_fromUtf8("minimize_check"))
-        self.verticalLayout_5.addWidget(self.minimize_check)
-        self.ipv6_check = QtWidgets.QCheckBox(self.options_tab)
-        self.ipv6_check.setObjectName(_fromUtf8("ipv6_check"))
-        self.verticalLayout_5.addWidget(self.ipv6_check)
-        self.horizontalLayout_9 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_9.setObjectName(_fromUtf8("horizontalLayout_9"))
-        self.firewall_check = QtWidgets.QCheckBox(self.options_tab)
-        self.firewall_check.setObjectName(_fromUtf8("firewall_check"))
-        self.horizontalLayout_9.addWidget(self.firewall_check)
-        self.firewall_edit_bt = QtWidgets.QPushButton(self.options_tab)
-        #self.firewall_edit_bt.setFlat(True)
-        self.firewall_edit_bt.setObjectName(_fromUtf8("firewall_edit_bt"))
-        self.horizontalLayout_9.addWidget(self.firewall_edit_bt)
-        spacerItem9 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout_9.addItem(spacerItem9)
-        self.verticalLayout_5.addLayout(self.horizontalLayout_9)
-        self.airdns_lbl = QtWidgets.QLabel(self.options_tab)
         font = QtGui.QFont()
         font.setBold(True)
         font.setWeight(75)
         font.setKerning(False)
-        self.airdns_lbl.setFont(font)
-        self.airdns_lbl.setObjectName(_fromUtf8("airdns_lbl"))
-        self.verticalLayout_5.addWidget(self.airdns_lbl)
-        self.airdns_edit1 = QtWidgets.QLineEdit(self.options_tab)
-        self.airdns_edit1.setObjectName(_fromUtf8("airdns_edit1"))
-        self.verticalLayout_5.addWidget(self.airdns_edit1)
-        self.airdns_edit2 = QtWidgets.QLineEdit(self.options_tab)
-        self.airdns_edit2.setObjectName(_fromUtf8("airdns_edit2"))
-        self.verticalLayout_5.addWidget(self.airdns_edit2)
-        self.mulldns_lbl = QtWidgets.QLabel(self.options_tab)
+        self.autoconnect_check = QtWidgets.QCheckBox(self.options_tab)
+        self.autoconnect_check.setObjectName(_fromUtf8("autoconnect_check"))
+        self.autoconnect_check.setFont(font)
+        self.verticalLayout_5.addWidget(self.autoconnect_check)
+        self.autoconnect_label = QtWidgets.QLabel(self.options_tab)
+        self.autoconnect_label.setObjectName(_fromUtf8("autoconnect_check"))
+        self.autoconnect_label.setWordWrap(True)
+        self.autoconnect_label.setIndent(20)
+        cfont = QtGui.QFont()
+        cfont.setItalic(True)
+        self.autoconnect_label.setFont(cfont)
+        self.verticalLayout_5.addWidget(self.autoconnect_label)
+        self.minimize_check = QtWidgets.QCheckBox(self.options_tab)
+        self.minimize_check.setFont(font)
+        self.minimize_check.setObjectName(_fromUtf8("minimize_check"))
+        self.verticalLayout_5.addWidget(self.minimize_check)
+        self.minimize_label = QtWidgets.QLabel(self.options_tab)
+        self.minimize_label.setObjectName(_fromUtf8("minimize_check"))
+        self.minimize_label.setWordWrap(True)
+        self.minimize_label.setIndent(20)
+        self.minimize_label.setFont(cfont)
+        self.verticalLayout_5.addWidget(self.minimize_label)
+        self.ipv6_check = QtWidgets.QCheckBox(self.options_tab)
+        self.ipv6_check.setFont(font)
+        self.ipv6_check.setObjectName(_fromUtf8("ipv6_check"))
+        self.verticalLayout_5.addWidget(self.ipv6_check)
+        self.ipv6_label = QtWidgets.QLabel(self.options_tab)
+        self.ipv6_label.setObjectName(_fromUtf8("ipv6_check"))
+        self.ipv6_label.setWordWrap(True)
+        self.ipv6_label.setIndent(20)
+        self.ipv6_label.setFont(cfont)
+        self.verticalLayout_5.addWidget(self.ipv6_label)
+        self.bypass_check = QtWidgets.QCheckBox(self.options_tab)
+        self.bypass_check.setFont(font)
+        self.bypass_check.setObjectName(_fromUtf8("bypass_check"))
+        self.verticalLayout_5.addWidget(self.bypass_check)
+        self.bypass_label = QtWidgets.QLabel(self.options_tab)
+        self.bypass_label.setObjectName(_fromUtf8("bypass_check"))
+        self.bypass_label.setWordWrap(True)
+        self.bypass_label.setIndent(20)
+        self.bypass_label.setFont(cfont)
+        self.verticalLayout_5.addWidget(self.bypass_label)
+        self.horizontalLayout_9 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_9.setObjectName(_fromUtf8("horizontalLayout_9"))
+        self.firewall_check = QtWidgets.QCheckBox(self.options_tab)
+        self.firewall_check.setFont(font)
+        self.firewall_check.setObjectName(_fromUtf8("firewall_check"))
+        self.horizontalLayout_9.addWidget(self.firewall_check)
+        self.firewall_edit_bt = QtWidgets.QPushButton(self.options_tab)
+        self.firewall_edit_bt.setObjectName(_fromUtf8("firewall_edit_bt"))
+        self.horizontalLayout_9.addWidget(self.firewall_edit_bt)
+        spacerItem9 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_9.addItem(spacerItem9)
+        self.horizontalLayout_9.setObjectName(_fromUtf8("horizontalLayout_9"))
+        self.verticalLayout_5.addLayout(self.horizontalLayout_9)
+        self.firewall_label = QtWidgets.QLabel(self.options_tab)
+        self.firewall_label.setObjectName(_fromUtf8("firewall_check"))
+        self.firewall_label.setWordWrap(True)
+        self.firewall_label.setIndent(20)
+        self.firewall_label.setFont(cfont)
+        self.verticalLayout_5.addWidget(self.firewall_label)
+        self.alt_dns_lbl = QtWidgets.QLabel(self.options_tab)
         font = QtGui.QFont()
         font.setBold(True)
         font.setWeight(75)
-        self.mulldns_lbl.setFont(font)
-        self.mulldns_lbl.setObjectName(_fromUtf8("mulldns_lbl"))
-        self.verticalLayout_5.addWidget(self.mulldns_lbl)
-        self.mulldns_edit1 = QtWidgets.QLineEdit(self.options_tab)
-        self.mulldns_edit1.setObjectName(_fromUtf8("mulldns_edit1"))
-        self.verticalLayout_5.addWidget(self.mulldns_edit1)
-        self.mulldns_edit2 = QtWidgets.QLineEdit(self.options_tab)
-        self.mulldns_edit2.setObjectName(_fromUtf8("mulldns_edit2"))
-        self.verticalLayout_5.addWidget(self.mulldns_edit2)
-        self.customdns_lbl = QtWidgets.QLabel(self.options_tab)
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        self.customdns_lbl.setFont(font)
-        self.customdns_lbl.setObjectName(_fromUtf8("customdns_lbl"))
-        self.verticalLayout_5.addWidget(self.customdns_lbl)
-        self.customdns_edit1 = QtWidgets.QLineEdit(self.options_tab)
-        self.customdns_edit1.setObjectName(_fromUtf8("customdns_1"))
-        self.verticalLayout_5.addWidget(self.customdns_edit1)
-        self.customdns_edit2 = QtWidgets.QLineEdit(self.options_tab)
-        self.customdns_edit2.setObjectName(_fromUtf8("custom_dns2"))
-        self.verticalLayout_5.addWidget(self.customdns_edit2)
+        font.setKerning(False)
+        self.alt_dns_lbl.setFont(font)
+        self.alt_dns_lbl.setObjectName(_fromUtf8("alt_dns_lbl"))
+        self.verticalLayout_5.addWidget(self.alt_dns_lbl)
+        self.alt_dns_edit1 = QtWidgets.QLineEdit(self.options_tab)
+        self.alt_dns_edit1.setObjectName(_fromUtf8("alt_dns_edit1"))
+        self.verticalLayout_5.addWidget(self.alt_dns_edit1)
+        self.alt_dns_edit2 = QtWidgets.QLineEdit(self.options_tab)
+        self.alt_dns_edit2.setObjectName(_fromUtf8("alt_dns_edit2"))
+        self.verticalLayout_5.addWidget(self.alt_dns_edit2)
+        self.dns_label = QtWidgets.QLabel(self.options_tab)
+        self.dns_label.setObjectName(_fromUtf8("dns_check"))
+        self.dns_label.setWordWrap(True)
+        self.dns_label.setFont(cfont)
+        self.verticalLayout_5.addWidget(self.dns_label)
         spacerItem8 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_5.addItem(spacerItem8)
         self.horizontalLayout_6 = QtWidgets.QHBoxLayout()
@@ -355,7 +391,32 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout_6.addWidget(self.cancel_bt)
         self.verticalLayout_5.addLayout(self.horizontalLayout_6)
         self.tabWidget.addWidget(self.options_tab)
-        self.gridLayout.addWidget(self.tabWidget, 2, 1, 1, 1)        
+        self.bypass_tab = QtWidgets.QWidget()
+        self.bypass_tab.setObjectName(_fromUtf8("bypass_tab"))
+        self.verticalLayout_8 = QtWidgets.QVBoxLayout(self.bypass_tab)
+        self.verticalLayout_8.setObjectName(_fromUtf8("verticalLayout_8"))
+        self.bypass_info = QtWidgets.QLabel(self.options_tab)
+        self.bypass_info.setObjectName(_fromUtf8("bypass_check"))
+        self.bypass_info.setWordWrap(True)
+        self.bypass_info.setFont(cfont)
+        self.verticalLayout_8.addWidget(self.bypass_info)
+        self.app_list = QtWidgets.QListWidget(self.bypass_tab)
+        self.app_list.setObjectName(_fromUtf8("app_list"))
+        self.app_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.verticalLayout_8.addWidget(self.app_list)
+        self.horizontalLayout_10= QtWidgets.QHBoxLayout()
+        self.horizontalLayout_10.setObjectName(_fromUtf8("horizontalLayout_10"))
+        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_10.addItem(spacerItem3)
+        self.add_app_bt = QtWidgets.QPushButton(self.bypass_tab)
+        self.add_app_bt.setObjectName(_fromUtf8("add_app_bt"))
+        self.horizontalLayout_10.addWidget(self.add_app_bt)
+        self.del_app_bt = QtWidgets.QPushButton(self.bypass_tab)
+        self.del_app_bt.setObjectName(_fromUtf8("del_app_bt"))
+        self.horizontalLayout_10.addWidget(self.del_app_bt)
+        self.verticalLayout_8.addLayout(self.horizontalLayout_10)
+        self.tabWidget.addWidget(self.bypass_tab)
+        self.gridLayout.addWidget(self.tabWidget, 2, 1, 1, 1) 
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
@@ -369,12 +430,15 @@ class QomuiGui(QtWidgets.QWidget):
         self.airvpn_tab_bt.clicked.connect(self.tabswitch)
         self.mullvad_tab_bt.clicked.connect(self.tabswitch)
         self.custom_tab_bt.clicked.connect(self.tabswitch)
-        self.log_tab_bt.clicked.connect(self.tabswitch)
+        self.bypass_tab_bt.clicked.connect(self.tabswitch)
         self.options_tab_bt.clicked.connect(self.tabswitch)
+        self.log_tab_bt.clicked.connect(self.tabswitch)
         self.apply_bt.clicked.connect(self.applyoptions)
         self.cancel_bt.clicked.connect(self.cancelOptions)
         self.default_bt.clicked.connect(self.restoreDefaults)
         self.firewall_edit_bt.clicked.connect(self.show_firewalleditor)
+        self.add_app_bt.clicked.connect(self.select_application)
+        self.del_app_bt.clicked.connect(self.del_bypass_app)
 
     def retranslateUi(self, Form):
         Form.setWindowTitle(_translate("Form", "Qomui", None))
@@ -382,6 +446,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.mullvad_tab_bt.setText(_translate("Form", "Mullvad", None))
         self.custom_tab_bt.setText(_translate("Form", "Other", None))
         self.log_tab_bt.setText(_translate("Form", "Log", None))
+        self.bypass_tab_bt.setText(_translate("Form", "Bypass", None))
         self.options_tab_bt.setText(_translate("Form", "Options", None))
         self.airvpn_update_bt.setText(_translate("Form", "Update", None))
         self.airvpn_update_bt.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
@@ -391,27 +456,47 @@ class QomuiGui(QtWidgets.QWidget):
         self.add_server_bt.setIcon(QtGui.QIcon.fromTheme("list-add"))
         self.del_server_bt.setText(_translate("Form", "Delete", None))
         self.del_server_bt.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
-        self.autoconnect_check.setText(_translate("Form", "Autoconnect on startup", None))
+        self.autoconnect_check.setText(_translate("Form", "Autoconnect", None))
         self.minimize_check.setText(_translate("Form", "Start minimized", None))
-        self.firewall_check.setText(_translate("Form", "Activate Firewall", None))
+        self.firewall_check.setText(_translate("Form", "Activate Firewall     ", None))
+        self.bypass_check.setText(_translate("Form", "Allow OpenVPN bypass", None))
         self.ipv6_check.setText(_translate("Form", "Disable IPv6", None))
-        self.airdns_lbl.setText(_translate("Form", "AirVPN DNS Servers", None))
-        self.mulldns_lbl.setText(_translate("Form", "Mullvad DNS Servers", None))
-        self.customdns_lbl.setText(_translate("Form", " DNS for other servers", None))
+        self.alt_dns_lbl.setText(_translate("Form", "Use alternative DNS Servers", None))
         self.default_bt.setText(_translate("Form", "Restore defaults", None))
         self.default_bt.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
         self.apply_bt.setText(_translate("Form", "Apply", None))
         self.apply_bt.setIcon(QtGui.QIcon.fromTheme("dialog-ok"))
         self.cancel_bt.setText(_translate("Form", "Cancel", None))
         self.cancel_bt.setIcon(QtGui.QIcon.fromTheme("dialog-close"))
-        self.airdns_edit1.setText(_translate("Form", "10.5.0.1", None))
-        self.airdns_edit2.setText(_translate("Form", "10.4.0.1", None))
-        self.mulldns_edit1.setText(_translate("Form", "10.5.0.1", None))
-        self.mulldns_edit2.setText(_translate("Form", "10.4.0.1", None))
-        self.customdns_edit1.setText(_translate("Form", "10.5.0.1", None))
-        self.customdns_edit2.setText(_translate("Form", "10.4.0.1", None))
         self.firewall_edit_bt.setText(_translate("Form", "Edit firewall rules", None))
         self.firewall_edit_bt.setIcon(QtGui.QIcon.fromTheme("configure"))
+        self.add_app_bt.setText(_translate("Form", "Add Application", None))
+        self.add_app_bt.setIcon(QtGui.QIcon.fromTheme("list-add"))
+        self.del_app_bt.setText(_translate("Form", "Remove", None))
+        self.del_app_bt.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
+        
+        self.autoconnect_label.setText(_translate("Form", 
+                                          "Automatically connect to last server", 
+                                          None))
+        self.minimize_label.setText(_translate("Form", 
+                                          "Only works if system tray is available", 
+                                          None))
+        self.ipv6_label.setText(_translate("Form", 
+                                          "Disables ipv6 stack systemwide", 
+                                          None))
+        self.bypass_label.setText(_translate("Form", 
+                                          "Allow applications to run outside VPN tunnel", 
+                                          None))
+        self.firewall_label.setText(_translate("Form", 
+                                          "Block connections outside VPN tunnel - protects against IPv6 and DNS leaks", 
+                                          None))
+        self.dns_label.setText(_translate("Form", 
+                                          "By default Qomui will set the DNS server by your provider. If you wish to use alternative servers, you can specify them here. Otherwise, leave empty.", 
+                                          None))
+        self.bypass_info.setText(_translate("Form", 
+                                          'To use an application outside the VPN tunnel, you can simply add a program to the list below and launch it from there. Alternatively, you can run commands from a console by prepending "cgexec -g net_cls:bypass_qomui $yourcommand". Be aware that some applications including Firefox will not launch a second instance in bypass mode if they are already running.', 
+                                          None))
+
 
     def tabswitch(self):
         button = self.sender().text().replace("&", "")
@@ -426,7 +511,9 @@ class QomuiGui(QtWidgets.QWidget):
             self.logText.verticalScrollBar().setValue(self.logText.verticalScrollBar().maximum())
         elif button == "Options":
             self.setOptiontab(self.config_dict)
-            self.tabWidget.setCurrentIndex(4)   
+            self.tabWidget.setCurrentIndex(4) 
+        elif button == "Bypass":
+            self.tabWidget.setCurrentIndex(5)  
     
     def systemtray(self):
         self.trayicon = QtGui.QIcon("%s/qomui.png" % (ROOTDIR))
@@ -487,12 +574,8 @@ class QomuiGui(QtWidgets.QWidget):
 
     def applyoptions(self):
         new_config_dict = {}
-        new_config_dict["airdns1"] = self.airdns_edit1.text()
-        new_config_dict["airdns2"] = self.airdns_edit2.text()
-        new_config_dict["mulldns1"] = self.mulldns_edit1.text()
-        new_config_dict["mulldns2"] = self.mulldns_edit2.text()
-        new_config_dict["customdns1"] = self.customdns_edit1.text()
-        new_config_dict["customdns2"] = self.customdns_edit2.text()
+        new_config_dict["alt_dns1"] = self.alt_dns_edit1.text()
+        new_config_dict["alt_dns2"] = self.alt_dns_edit2.text()
         
         if self.firewall_check.checkState() == 2:
             new_config_dict["firewall"] = 1
@@ -513,6 +596,13 @@ class QomuiGui(QtWidgets.QWidget):
             new_config_dict["minimize"] = 1
         elif self.minimize_check.checkState() == 0:
             new_config_dict["minimize"] = 0
+            
+        if self.bypass_check.checkState() == 2:
+            new_config_dict["bypass"] = 1
+            self.bypass_tab_bt.setVisible(True)
+        elif self.bypass_check.checkState() == 0:
+            new_config_dict["bypass"] = 0
+            self.bypass_tab_bt.setVisible(False)
 
         with open ('%s/config_temp.json' % (DIRECTORY), 'w') as config:
             json.dump(new_config_dict, config)
@@ -528,6 +618,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.logger.info("Configuration changes applied successfully")
             if self.config_dict["firewall"] != new_config_dict["firewall"] or self.fire_change is True:
                 self.qomui_service.load_firewall()
+            self.qomui_service.bypass(self.user, self.group)
             self.qomui_service.disable_ipv6(new_config_dict["ipv6_disable"])
             QtWidgets.QMessageBox.information(self,
                                             "Updated",
@@ -543,6 +634,8 @@ class QomuiGui(QtWidgets.QWidget):
                                                 QtWidgets.QMessageBox.Ok)
     
     def Load(self):
+        self.user = check_output(['id', '-u', '-n']).decode("utf-8").split("\n")[0]
+        self.group = check_output(['id', '-g', '-n']).decode("utf-8").split("\n")[0]
         self.logger.debug("Reading configuration files from %s" %(DIRECTORY))
         try:
             with open('%s/airvpn_server.json' % (DIRECTORY), 'r') as sload:
@@ -588,12 +681,22 @@ class QomuiGui(QtWidgets.QWidget):
                         self.popCustomCountryBox()
         except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
             self.logger.error('%s: Could not open %s/custom_server.json' % (e, DIRECTORY))
+            
+        try:
+            with open('%s/bypass_apps.json' % (DIRECTORY), 'r') as sload:
+                self.bypass_app_list = json.load(sload)
+                self.popBypassApps()
+        except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
+            self.logger.error('%s: Could not open %s/bypass_apps.json' % (e, DIRECTORY))
 
         try:
             with open('%s/config.json' % (ROOTDIR), 'r') as config:
                 self.config_dict = json.load(config)
                 if self.config_dict["minimize"] == 0:
                     self.setWindowState(QtCore.Qt.WindowActive)
+                if self.config_dict["bypass"] == 1:
+                    self.qomui_service.bypass(self.user, self.group)
+                    self.bypass_tab_bt.setVisible(True)
                 self.setOptiontab(self.config_dict)        
         except (FileNotFoundError,json.decoder.JSONDecodeError, KeyError) as e:
             self.logger.error('%s: Could not open %s/config.json' % (e, DIRECTORY))
@@ -641,12 +744,11 @@ class QomuiGui(QtWidgets.QWidget):
         self.setOptiontab(self.config_dict)
     
     def setOptiontab(self, config):
-        self.airdns_edit1.setText(config["airdns1"])
-        self.airdns_edit2.setText(config["airdns2"])
-        self.mulldns_edit1.setText(config["mulldns1"])
-        self.mulldns_edit2.setText(config["mulldns2"])
-        self.customdns_edit1.setText(config["customdns1"])
-        self.customdns_edit2.setText(config["customdns2"])
+        try:
+            self.alt_dns_edit1.setText(config["alt_dns1"])
+            self.alt_dns_edit2.setText(config["alt_dns2"])
+        except KeyError:
+            pass
         
         if config["autoconnect"] == 0:
             self.autoconnect_check.setChecked(False)
@@ -662,14 +764,21 @@ class QomuiGui(QtWidgets.QWidget):
             self.minimize_check.setChecked(False)
         elif config["minimize"] == 1:
             self.minimize_check.setChecked(True)
+            
+        if config["bypass"] == 0:
+            self.bypass_check.setChecked(False)
+        elif config["bypass"] == 1:
+            self.bypass_check.setChecked(True)
     
     def networkstate(self, networkstate):
         if networkstate == 70 or networkstate == 60:
             self.logger.info("Detected new network connection")
             self.qomui_service.save_default_dns()
             if self.ovpn_dict is not None:
-                self.connect_thread(self.ovpn_dict)     
+                self.connect_thread(self.ovpn_dict)
+                self.qomui_service.bypass(self.user, self.group)
         elif networkstate != 70 and networkstate != 60:
+            self.qomui_service.bypass(self.user, self.group)
             self.logger.info("Lost network connection - VPN tunnel terminated")
             self.kill()
 
@@ -1009,6 +1118,11 @@ class QomuiGui(QtWidgets.QWidget):
                     self.tray.setIcon(QtGui.QIcon('%s/flags/%s.png' % (ROOTDIR, self.ovpn_dict["country"])))
                 except KeyError:
                     self.tray.setIcon(QtGui.QIcon("%s/qomui.png" % (ROOTDIR)))
+                
+                if self.config_dict["alt_dns1"] != "":
+                    self.qomui_service.update_dns(self.config_dict["alt_dns1"],
+                                                  self.config_dict["alt_dns2"]
+                                                  )
                 QtWidgets.QApplication.restoreOverrideCursor()
             
             elif self.hop_choice == 2 and self.log_count != 1:
@@ -1071,12 +1185,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.WaitBar.setVisible(True)
         self.log_count = 0
         provider = server_dict["provider"]
-        if provider == "airvpn":
-            self.qomui_service.update_dns(self.config_dict["airdns1"], self.config_dict["airdns2"])
-        elif provider == "mullvad":
-            self.qomui_service.update_dns(self.config_dict["mulldns1"], self.config_dict["mulldns2"])
-        elif provider == "custom":
-            self.qomui_service.update_dns(self.config_dict["customdns1"], self.config_dict["customdns2"])
         try:
             self.qomui_service.qomuiConnect(server_dict)
         except dbus.exceptions.DBusException as e:
@@ -1089,8 +1197,68 @@ class QomuiGui(QtWidgets.QWidget):
 
     def firewall_update(self):
         self.fire_change = True  
+        
+    def select_application(self):
+        selector = AppSelector()
+        selector.app_chosen.connect(self.add_bypass_app)
+        selector.exec_()
             
-     
+    def add_bypass_app(self, app_info):
+        self.bypass_app_list[app_info[0]] = [app_info[1], app_info[2]]
+        with open ("%s/bypass_apps.json" %DIRECTORY, "w") as save_bypass:
+            json.dump(self.bypass_app_list, save_bypass)
+        self.popBypassApps()
+        
+    def del_bypass_app(self):
+        for item in self.app_list.selectedItems():
+            data = item.data(QtCore.Qt.UserRole)
+            try:
+                self.bypass_app_list.pop(data, None)
+                self.app_list.removeItemWidget(item)
+            except KeyError:
+                pass
+        with open ("%s/bypass_apps.json" %DIRECTORY, "w") as save_bypass:
+            json.dump(self.bypass_app_list, save_bypass)
+        self.popBypassApps()
+        
+    def popBypassApps(self):
+        self.app_list.clear()
+        for k,v in self.bypass_app_list.items():
+            self.Item = ServerWidget()
+            self.ListItem = QtWidgets.QListWidgetItem(self.app_list)
+            self.ListItem.setSizeHint(QtCore.QSize(100, 50))
+            self.Item.setText(k, "bypass", v[0], None, button="bypass")
+            self.ListItem.setData(QtCore.Qt.UserRole, k)
+            self.Item.removeButton(0)
+            self.app_list.addItem(self.ListItem)
+            self.app_list.setItemWidget(self.ListItem, self.Item)
+            self.Item.establish.connect(self.runBypass)
+            
+    def runBypass(self, app):
+        app = app[1]
+        with open (self.bypass_app_list[app][1], "r") as cmd_ret:
+            search = cmd_ret.readlines()
+            found = 0
+            for line in search:
+                if line.startswith("Exec") and found !=1:
+                    cmd = line.split("=")[1].split(" ")[0].replace("\n", "")
+                    found = 1
+        
+        temp_bash = "%s/bypass_temp.sh" %DIRECTORY
+        with open (temp_bash, "w") as temp_sh:
+            lines = ["#!/bin/bash \n",
+                     "nohup cgexec -g net_cls:bypass_qomui %s & \n" %cmd,
+                     "#test"
+                     ]
+            temp_sh.writelines(lines)
+            temp_sh.close()
+            os.chmod(temp_bash, 0o774)
+        try:
+            check_call([temp_bash])
+        except CalledProcessError:
+            logging.error("Could not start %s" %app)
+        
+        
 class ServerWidget(QtWidgets.QWidget):
     establish = QtCore.pyqtSignal(tuple)
     establish_hop = QtCore.pyqtSignal(tuple)
@@ -1102,7 +1270,7 @@ class ServerWidget(QtWidgets.QWidget):
             
     def setupUi(self, Form):
         Form.setObjectName(_fromUtf8("Form"))
-        Form.resize(100, 100)
+        #Form.resize(100, 100)
         self.horizontalLayout = QtWidgets.QHBoxLayout(Form)
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         self.country_lbl = QtWidgets.QLabel(Form)
@@ -1150,7 +1318,11 @@ class ServerWidget(QtWidgets.QWidget):
         self.name_lbl.setFont(font)
         self.name_lbl.setText(self.name)
         self.city_lbl.setText(city)
-        self.country_lbl.setPixmap(QtGui.QPixmap('%s/flags/%s.png' % (ROOTDIR, country)).scaled(25, 25, transformMode=QtCore.Qt.SmoothTransformation))
+        if self.provider != "bypass":
+            self.country_lbl.setPixmap(QtGui.QPixmap('%s/flags/%s.png' % (ROOTDIR, country)).scaled(25, 25, transformMode=QtCore.Qt.SmoothTransformation))
+        else:
+            icon = QtGui.QIcon.fromTheme(country)
+            self.country_lbl.setPixmap(icon.pixmap(25,25))
         try:
             self.connect_bt.setText(_translate("Form", button, None))
         except AttributeError:
@@ -1192,7 +1364,6 @@ class ServerWidget(QtWidgets.QWidget):
     def hop_signal(self):
         self.establish_hop.emit((self.provider, self.name))
 
-
 class HopSelect(QtWidgets.QWidget):
     clear = QtCore.pyqtSignal()
     
@@ -1220,7 +1391,7 @@ class HopSelect(QtWidgets.QWidget):
 
     def retranslateUi(self, Form):
         Form.setWindowTitle(_translate("Form", "Form", None))
-        self.hop_label.setText(_translate("Form", "Current selection for hop server:", None))
+        self.hop_label.setText(_translate("Form", "Current selection for first hop:", None))
         
     def setText(self, server_dict):
         try:
@@ -1543,6 +1714,75 @@ class FirewallEditor(QtWidgets.QDialog):
         self.hide()
 
     def cancel(self):
+        self.hide()
+        
+        
+class AppSelector(QtWidgets.QDialog):
+    app_chosen = QtCore.pyqtSignal(tuple)
+    
+    def __init__ (self, parent=None):
+        super(AppSelector, self).__init__(parent)
+        self.setupUi(self)
+        self.get_desktop_files()
+        
+    def setupUi(self, Form):
+        Form.setObjectName(_fromUtf8("Form"))
+        Form.resize(600, 700)
+        self.verticalLayout = QtWidgets.QVBoxLayout(Form)
+        self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
+        self.app_lbl = QtWidgets.QLabel(Form)
+        self.verticalLayout.addWidget(self.app_lbl)
+        self.app_list_widget = QtWidgets.QListWidget(Form)
+        self.verticalLayout.addWidget(self.app_list_widget)
+        self.retranslateUi(Form)
+        QtCore.QMetaObject.connectSlotsByName(Form)
+
+    def retranslateUi(self, Form):
+        Form.setWindowTitle(_translate("Form", "Choose an application", None))
+        self.app_lbl.setText(_translate("Form", "Applications installed on your system:", None))
+    
+    def get_desktop_files(self):
+        self.app_list = []
+        directories = ["%s/.local/share/applications" % (os.path.expanduser("~")),
+                       "/usr/share/applications",
+                       "/usr/local/share/applications"
+                       ]
+        
+        try:
+            for d in directories:
+                for f in os.listdir(d):
+                    if f.endswith(".desktop"):
+                        desktop_file = os.path.join(d, f)
+                        c = configparser.ConfigParser()
+                        c.read(desktop_file)
+                        try:
+                            if c["Desktop Entry"]["NoDisplay"] == "true":
+                                pass
+                            else:
+                                name = c["Desktop Entry"]["Name"]
+                                icon = c["Desktop Entry"]["Icon"]
+                                self.app_list.append((name, icon, desktop_file))
+                        except KeyError:
+                            name = c["Desktop Entry"]["Name"]
+                            icon = c["Desktop Entry"]["Icon"]
+                            self.app_list.append((name, icon, desktop_file))
+        except FileNotFoundError:
+            pass
+        
+        self.app_list = sorted(self.app_list)
+        self.popAppList()
+        
+    def popAppList(self):
+        self.app_list_widget.clear()
+        for entry in self.app_list:
+            item = QtWidgets.QListWidgetItem()
+            self.app_list_widget.addItem(item)
+            item.setText(entry[0])
+            item.setIcon(QtGui.QIcon.fromTheme(entry[1]))
+        self.app_list_widget.itemClicked.connect(self.chosen)
+            
+    def chosen(self):
+        self.app_chosen.emit(self.app_list[self.app_list_widget.currentRow()])
         self.hide()
         
 def main():

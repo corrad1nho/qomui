@@ -13,7 +13,8 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - Gui written in PyQt including option to minimize application to system tray
 - security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
 - protection against DNS leaks
-- iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down 
+- iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
+- option allow applications to bypass the OpenVPN tunnel - to watch Netflix for example
 
 
 ### Dependencies/Requirements
@@ -23,6 +24,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - python-pyqt5, python-dbus, and python-dbus.mainloop.pyqt5 
 - openvpn, dnsutils and stunnel
 - geoip and geoip-database (optional: to identify server locations)
+- dnsmasq, libcgroup, iptables >= 1.6 (optional: required for bypassing OpenVPN)
 
 Additionally, the following python modules are required:
 - psutil
@@ -38,14 +40,16 @@ In case the latter are not present on your system these will be automatically in
 To install all dependencies in one go on Arch-based distributions run the following command:
 
 ```
-sudo pacman -S python python-setuptools python-pip python-pyqt5 python-dbus openvpn stunnel dnsutils geoip geoip-database python-psutil python-requests python-lxml python-beautifulsoup4 python-pycountry python-pexpect
+sudo pacman -S python python-setuptools python-pip python-pyqt5 python-dbus openvpn stunnel dnsutils dnsmasq geoip geoip-database python-psutil python-requests python-lxml python-beautifulsoup4 python-pycountry python-pexpect
 ```
-
+```
+yaourt -S libcgroup
+```
 
 The equivalent for Debian/Ubuntu-based distributions is:
 
 ```
-sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
+sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils dnsmasq cgroup-lite cgmanager cgroup-tools geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
 ```
 
 
@@ -82,10 +86,20 @@ Current configurations for AirVPN and Mullvad can be automatically downloaded vi
 ### Double-Hop:
 To create a "double-hop" simply choose a first server via the "hop"-button before connecting to the second one. You can mix connections to different providers. However, the double-hop feature does not support OpenVPN over SSL or SSH. Also be aware that depending on your choice of servers this feature may drastically reduce the speed of your internet connection and increase your ping. In any case, you will likely have to sacrifice some bandwith. In my opinion, the added benefits of increased privacy, being able to use different providers as entry and exit node and making it more difficult to be tracked are worth it, though. This feature was inspired by suggestions to simply run a second instance of OpenVPN in a virtual machine to create a double-hop. If that is possible, it should be possible to do the same by manipulating the routing table without the need to fire up a VM. Invaluable resources on the topic were [this discussion on the Openvpn forum](https://forums.openvpn.net/viewtopic.php?f=15&t=7483) and [this github repository](https://github.com/TomAshley303/VPN-Chain). 
 
+### Bypass OpenVPN
+Qomui includes the option to allow applications such as web browsers to bypass an existing OpenVPN tunnel. This feature is fully compatible with Qomui's firewall activated and double-hop connections. When activated, you can either add and launch applications via the respective tab or via console by issuing your command the following way:
+
+```
+cgexec -g net_cls:bypass_qomui $yourcommand
+```
+The idea is taken from [this post on severfault.com](https://serverfault.com/questions/669430/how-to-bypass-openvpn-per-application/761780#761780). Essentially, running an application outside the OpenVPN tunnel works by putting it in a network control group. This allows classifying and identifying network packets from processes in this cgroup in order to route them differently. Be aware that the implementation of this feature is still experimental. 
+
 ### About this project
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
+### Changelog
+version 0.2
 
-
-
+- added OpenVPN bypass feature
+- rewritten DNS management
 
