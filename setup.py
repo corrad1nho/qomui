@@ -38,7 +38,7 @@ class CustomInstall(install):
 
 
 setup(name="qomui",
-      version="0.2.0",
+      version="0.3.0",
       packages=['qomui'],
       include_package_data=True,
       install_requires=[

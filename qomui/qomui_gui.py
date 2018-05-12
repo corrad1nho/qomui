@@ -4,11 +4,13 @@
 from PyQt5 import QtCore, QtGui, Qt, QtWidgets
 import sys
 import os
+import math
 import json
 import re
 import dbus
 import shutil
 import time
+import random
 import logging
 import psutil
 from dbus.mainloop.pyqt5 import DBusQtMainLoop
@@ -50,16 +52,47 @@ class DbusLogHandler(logging.Handler):
 
 DIRECTORY = "%s/.qomui" % (os.path.expanduser("~"))
 ROOTDIR = "/usr/share/qomui"
+SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA"]
+
+
+class FavouriteButton(QtWidgets.QAbstractButton):
+    def __init__(self, parent=None):
+        super(FavouriteButton, self).__init__(parent)
+        self.star = QtGui.QPolygonF([QtCore.QPointF(1.0, 0.5)])
+        for i in range(5):
+            self.star << QtCore.QPointF(0.5 + 0.5 * math.cos(0.8 * i * math.pi), 0.5 + 0.5 * math.sin(0.8 * i * math.pi))
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        rect = self.rect()
+        palette = self.palette()
+        painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+        painter.setPen(QtCore.Qt.NoPen)
+        if self.isChecked() == True:
+            painter.setBrush(palette.highlight())
+        else:
+            painter.setBrush(palette.buttonText())
+        yOffset = (rect.height() - 25) /2
+        painter.translate(rect.x(), rect.y() + yOffset)
+        painter.scale(25, 25)
+        painter.drawPolygon(self.star, QtCore.Qt.WindingFill)
+        painter.translate(1.0, 0.0)
+
+    def enterEvent(self, event):
+        self.update()
+
+    def leaveEvent(self, event):
+        self.update()
+        
+    def sizeHint(self):
+        return QtCore.QSize(25, 25)
+
 
 class QomuiGui(QtWidgets.QWidget):
-    airvpn_server_dict = {}
-    airvpn_protocol_dict = {}
-    airvpn_country_list = ["All servers"]
-    mullvad_server_dict = {}
-    mullvad_protocol_dict = {}
-    mullvad_country_list = ["All servers"]
-    custom_server_dict = {}
-    custom_country_list = ["All servers"]
+    server_dict = {}
+    protocol_dict = {}
+    country_list = []
+    provider_list = ["All providers"]
     config_dict = {}
     fire_change = False
     hop_choice = 0
@@ -122,7 +155,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.logger.addHandler(handler)
         primary_screen_geometry = QtWidgets.QDesktopWidget().availableGeometry(QtWidgets.QDesktopWidget().primaryScreen())
         positioning = primary_screen_geometry.bottomRight()
-        self.setGeometry(QtCore.QRect(positioning.x(), positioning.y(), 500, 670))
+        self.setGeometry(QtCore.QRect(positioning.x(), positioning.y(), 550, 670))
         self.qomui_service.disconnect()
         self.qomui_service.save_default_dns()
         
@@ -146,27 +179,20 @@ class QomuiGui(QtWidgets.QWidget):
         self.verticalLayout_3.setObjectName(_fromUtf8("verticalLayout_3"))
         self.tab_bt_group = QtWidgets.QButtonGroup(Form)
         self.tab_bt_group.setExclusive(True)
-        self.airvpn_tab_bt = QtWidgets.QCommandLinkButton(Form)
-        self.airvpn_tab_bt.setMinimumSize(QtCore.QSize(100, 0))
-        self.airvpn_tab_bt.setMaximumSize(QtCore.QSize(100, 100))
-        self.airvpn_tab_bt.setCheckable(True)
-        self.tab_bt_group.addButton(self.airvpn_tab_bt)
-        self.airvpn_tab_bt.setObjectName(_fromUtf8("airvpn_tab_bt"))
-        self.verticalLayout_3.addWidget(self.airvpn_tab_bt)
-        self.mullvad_tab_bt = QtWidgets.QCommandLinkButton(Form)
-        self.mullvad_tab_bt.setMinimumSize(QtCore.QSize(100, 0))
-        self.mullvad_tab_bt.setMaximumSize(QtCore.QSize(100, 100))
-        self.mullvad_tab_bt.setCheckable(True)
-        self.tab_bt_group.addButton(self.mullvad_tab_bt)
-        self.mullvad_tab_bt.setObjectName(_fromUtf8("mullvad_tab_bt"))
-        self.verticalLayout_3.addWidget(self.mullvad_tab_bt)
-        self.custom_tab_bt = QtWidgets.QCommandLinkButton(Form)
-        self.custom_tab_bt.setMinimumSize(QtCore.QSize(100, 0))
-        self.custom_tab_bt.setMaximumSize(QtCore.QSize(100, 100))
-        self.custom_tab_bt.setCheckable(True)
-        self.tab_bt_group.addButton(self.custom_tab_bt)
-        self.custom_tab_bt.setObjectName(_fromUtf8("custom_tab_bt"))
-        self.verticalLayout_3.addWidget(self.custom_tab_bt)
+        self.server_tab_bt = QtWidgets.QCommandLinkButton(Form)
+        self.server_tab_bt.setMinimumSize(QtCore.QSize(100, 0))
+        self.server_tab_bt.setMaximumSize(QtCore.QSize(100, 100))
+        self.server_tab_bt.setCheckable(True)
+        self.tab_bt_group.addButton(self.server_tab_bt)
+        self.server_tab_bt.setObjectName(_fromUtf8("server_tab_bt"))
+        self.verticalLayout_3.addWidget(self.server_tab_bt)
+        self.provider_tab_bt = QtWidgets.QCommandLinkButton(Form)
+        self.provider_tab_bt.setMinimumSize(QtCore.QSize(100, 0))
+        self.provider_tab_bt.setMaximumSize(QtCore.QSize(100, 100))
+        self.provider_tab_bt.setCheckable(True)
+        self.tab_bt_group.addButton(self.provider_tab_bt)
+        self.provider_tab_bt.setObjectName(_fromUtf8("provider_tab_bt"))
+        self.verticalLayout_3.addWidget(self.provider_tab_bt)
         self.options_tab_bt = QtWidgets.QCommandLinkButton(Form)
         self.options_tab_bt.setMinimumSize(QtCore.QSize(100, 0))
         self.options_tab_bt.setMaximumSize(QtCore.QSize(100, 100))
@@ -181,7 +207,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.tab_bt_group.addButton(self.log_tab_bt)
         self.log_tab_bt.setObjectName(_fromUtf8("log_tab_bt"))
         self.verticalLayout_3.addWidget(self.log_tab_bt)
-        
         self.bypass_tab_bt = QtWidgets.QCommandLinkButton(Form)
         self.bypass_tab_bt.setVisible(False)
         self.bypass_tab_bt.setMinimumSize(QtCore.QSize(100, 0))
@@ -196,88 +221,50 @@ class QomuiGui(QtWidgets.QWidget):
         self.gridLayout.addLayout(self.verticalLayout_3, 2, 0, 1, 1)
         self.tabWidget = QtWidgets.QStackedWidget(Form)
         self.tabWidget.setObjectName(_fromUtf8("tabWidget"))
-        self.AirVPN_tab = QtWidgets.QWidget()
-        self.AirVPN_tab.setObjectName(_fromUtf8("AirVPN_tab"))
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.AirVPN_tab)
+        self.serverTab = QtWidgets.QWidget()
+        self.serverTab.setObjectName(_fromUtf8("serverTab"))
+        self.verticalLayout = QtWidgets.QVBoxLayout(self.serverTab)
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_3.setObjectName(_fromUtf8("horizontalLayout_3"))
-        self.airvpn_country_box = QtWidgets.QComboBox(self.AirVPN_tab)
-        self.airvpn_country_box.setObjectName(_fromUtf8("airvpn_country_box"))
-        self.horizontalLayout_3.addWidget(self.airvpn_country_box)
-        self.airvpn_mode_box = QtWidgets.QComboBox(self.AirVPN_tab)
-        self.airvpn_mode_box.setObjectName(_fromUtf8("airvpn_mode_box"))
-        self.horizontalLayout_3.addWidget(self.airvpn_mode_box)
+        self.countryBox = QtWidgets.QComboBox(self.serverTab)
+        self.countryBox.setObjectName(_fromUtf8("countryBox"))
+        self.horizontalLayout_3.addWidget(self.countryBox)
+        self.providerBox = QtWidgets.QComboBox(self.serverTab)
+        self.providerBox.setObjectName(_fromUtf8("providerBox"))
+        self.horizontalLayout_3.addWidget(self.providerBox)
+        self.favouriteButton = FavouriteButton(self.serverTab)
+        self.favouriteButton.setCheckable(True)
+        self.favouriteButton.setMinimumSize(QtCore.QSize(25, 25))
+        self.favouriteButton.setMaximumSize(QtCore.QSize(25, 25))
+        self.favouriteButton.setObjectName(_fromUtf8("favouriteButton"))
+        self.horizontalLayout_3.addWidget(self.favouriteButton)
         self.verticalLayout.addLayout(self.horizontalLayout_3)
-        self.airvpn_server_list = QtWidgets.QListWidget(self.AirVPN_tab)
-        self.airvpn_server_list.setObjectName(_fromUtf8("airvpn_server_list"))
-        self.verticalLayout.addWidget(self.airvpn_server_list)
-        self.airvpn_hop_widget = HopSelect(self.AirVPN_tab)
-        self.airvpn_hop_widget.setVisible(False)
-        self.verticalLayout.addWidget(self.airvpn_hop_widget)
+        self.serverListWidget = QtWidgets.QListWidget(self.serverTab)
+        self.serverListWidget.setObjectName(_fromUtf8("serverListWidget"))
+        self.serverListWidget.setLayoutMode(QtWidgets.QListWidget.Batched)
+        self.serverListWidget.setBatchSize(10)
+        self.serverListWidget.setUniformItemSizes(True)
+        self.verticalLayout.addWidget(self.serverListWidget)
+        self.serverHopWidget = HopSelect(self.serverTab)
+        self.serverHopWidget.setVisible(False)
+        self.verticalLayout.addWidget(self.serverHopWidget)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem1)
-        self.airvpn_update_bt = QtWidgets.QPushButton(self.AirVPN_tab)
-        self.airvpn_update_bt.setObjectName(_fromUtf8("airvpn_update_bt"))
-        self.horizontalLayout.addWidget(self.airvpn_update_bt)
-        self.verticalLayout.addLayout(self.horizontalLayout)
-        self.tabWidget.addWidget(self.AirVPN_tab)
-        self.Mullvad_tab = QtWidgets.QWidget()
-        self.Mullvad_tab.setObjectName(_fromUtf8("Mullvad_tab"))
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.Mullvad_tab)
-        self.verticalLayout_2.setObjectName(_fromUtf8("verticalLayout_2"))
-        self.horizontalLayout_4 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_4.setObjectName(_fromUtf8("horizontalLayout_4"))
-        self.mullvad_country_box = QtWidgets.QComboBox(self.Mullvad_tab)
-        self.mullvad_country_box.setObjectName(_fromUtf8("mullvad_country_box"))
-        self.horizontalLayout_4.addWidget(self.mullvad_country_box)
-        self.mullvad_mode_box = QtWidgets.QComboBox(self.Mullvad_tab)
-        self.mullvad_mode_box.setObjectName(_fromUtf8("mullvad_mode_box"))
-        self.horizontalLayout_4.addWidget(self.mullvad_mode_box)
-        self.verticalLayout_2.addLayout(self.horizontalLayout_4)
-        self.mullvad_server_list = QtWidgets.QListWidget(self.Mullvad_tab)
-        self.mullvad_server_list.setObjectName(_fromUtf8("mullvad_server_list"))
-        self.verticalLayout_2.addWidget(self.mullvad_server_list)
-        self.mullvad_hop_widget = HopSelect(self.Mullvad_tab)
-        self.mullvad_hop_widget.setVisible(False)
-        self.verticalLayout_2.addWidget(self.mullvad_hop_widget)
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_2.setObjectName(_fromUtf8("horizontalLayout_2"))
-        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout_2.addItem(spacerItem2)
-        self.mullvad_update_bt = QtWidgets.QPushButton(self.Mullvad_tab)
-        self.mullvad_update_bt.setObjectName(_fromUtf8("mullvad_update_bt"))
-        self.horizontalLayout_2.addWidget(self.mullvad_update_bt)
-        self.verticalLayout_2.addLayout(self.horizontalLayout_2)
-        self.tabWidget.addWidget(self.Mullvad_tab)
-        self.custom_tab = QtWidgets.QWidget()
-        self.custom_tab.setObjectName(_fromUtf8("custom_tab"))
-        self.verticalLayout_4 = QtWidgets.QVBoxLayout(self.custom_tab)
-        self.verticalLayout_4.setObjectName(_fromUtf8("verticalLayout_4"))
-        self.custom_country_box = QtWidgets.QComboBox(self.Mullvad_tab)
-        self.custom_country_box.setObjectName(_fromUtf8("custom_country_box"))
-        self.verticalLayout_4.addWidget(self.custom_country_box)
-        self.custom_server_list = QtWidgets.QListWidget(self.custom_tab)
-        self.custom_server_list.setObjectName(_fromUtf8("custom_server_list"))
-        self.custom_server_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.verticalLayout_4.addWidget(self.custom_server_list)
-        self.custom_hop_widget = HopSelect(self.custom_tab)
-        self.custom_hop_widget.setVisible(False)
-        self.verticalLayout_4.addWidget(self.custom_hop_widget)
-        self.horizontalLayout_5 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_5.setObjectName(_fromUtf8("horizontalLayout_5"))
-        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout_5.addItem(spacerItem3)
-        self.add_server_bt = QtWidgets.QPushButton(self.custom_tab)
+        self.random_server_bt = QtWidgets.QPushButton(self.serverTab)
+        self.random_server_bt.setObjectName(_fromUtf8("random_server_bt"))
+        self.random_server_bt.setVisible(False)
+        self.horizontalLayout.addWidget(self.random_server_bt)
+        self.add_server_bt = QtWidgets.QPushButton(self.serverTab)
         self.add_server_bt.setObjectName(_fromUtf8("add_server_bt"))
-        self.horizontalLayout_5.addWidget(self.add_server_bt)
-        self.del_server_bt = QtWidgets.QPushButton(self.custom_tab)
+        self.horizontalLayout.addWidget(self.add_server_bt)
+        self.del_server_bt = QtWidgets.QPushButton(self.serverTab)
         self.del_server_bt.setObjectName(_fromUtf8("del_server_bt"))
-        self.horizontalLayout_5.addWidget(self.del_server_bt)
-        self.verticalLayout_4.addLayout(self.horizontalLayout_5)
-        self.tabWidget.addWidget(self.custom_tab)
+        self.horizontalLayout.addWidget(self.del_server_bt)
+        self.verticalLayout.addLayout(self.horizontalLayout)
+        self.tabWidget.addWidget(self.serverTab)
         self.log_tab = QtWidgets.QWidget()
         self.log_tab.setObjectName(_fromUtf8("log_tab"))
         self.gridLayout_2 = QtWidgets.QGridLayout(self.log_tab)
@@ -363,6 +350,10 @@ class QomuiGui(QtWidgets.QWidget):
         self.alt_dns_lbl.setFont(font)
         self.alt_dns_lbl.setObjectName(_fromUtf8("alt_dns_lbl"))
         self.verticalLayout_5.addWidget(self.alt_dns_lbl)
+        self.dns_check = QtWidgets.QCheckBox(self.options_tab)
+        self.dns_check.setFont(font)
+        self.dns_check.setObjectName(_fromUtf8("dns_check"))
+        self.verticalLayout_5.addWidget(self.dns_check)
         self.alt_dns_edit1 = QtWidgets.QLineEdit(self.options_tab)
         self.alt_dns_edit1.setObjectName(_fromUtf8("alt_dns_edit1"))
         self.verticalLayout_5.addWidget(self.alt_dns_edit1)
@@ -391,6 +382,96 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout_6.addWidget(self.cancel_bt)
         self.verticalLayout_5.addLayout(self.horizontalLayout_6)
         self.tabWidget.addWidget(self.options_tab)
+        self.provider_tab = QtWidgets.QWidget()
+        self.provider_tab.setObjectName(_fromUtf8("provider_tab"))
+        
+        self.verticalLayout_30 = QtWidgets.QVBoxLayout(self.provider_tab)
+        self.verticalLayout_30.setObjectName("verticalLayout_30")
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.addProviderLabel = QtWidgets.QLabel(self.provider_tab)
+        self.addProviderLabel.setFont(font)
+        self.addProviderLabel.setObjectName("addProviderLabel")
+        self.verticalLayout_30.addWidget(self.addProviderLabel)
+        self.providerChoice = QtWidgets.QComboBox(Form)
+        self.providerChoice.setObjectName(_fromUtf8("providerChoice"))
+        
+        self.verticalLayout_30.addWidget(self.providerChoice)
+        self.provider_edit = QtWidgets.QLineEdit(Form)
+        self.provider_edit.setObjectName(_fromUtf8("provider_edit"))
+        self.provider_edit.setVisible(False)
+        self.verticalLayout_30.addWidget(self.provider_edit)
+        self.gridLayout_3 = QtWidgets.QGridLayout(Form)
+        self.gridLayout_3.setObjectName(_fromUtf8("gridLayout_3"))
+        self.user_edit = QtWidgets.QLineEdit(Form)
+        self.user_edit.setObjectName(_fromUtf8("user_edit"))
+        self.gridLayout_3.addWidget(self.user_edit, 0, 0, 1, 2)
+        self.download_bt = QtWidgets.QPushButton(Form)
+        self.download_bt.setObjectName(_fromUtf8("download_bt"))
+        self.gridLayout_3.addWidget(self.download_bt, 0, 2, 1, 1)
+        self.pass_edit = QtWidgets.QLineEdit(Form)
+        self.pass_edit.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.pass_edit.setObjectName(_fromUtf8("pass_edit"))
+        self.gridLayout_3.addWidget(self.pass_edit, 1, 0, 1, 2)
+        self.verticalLayout_30.addLayout(self.gridLayout_3)
+        
+        self.delProviderLabel = QtWidgets.QLabel(self.provider_tab)
+        self.delProviderLabel.setFont(font)
+        self.delProviderLabel.setObjectName("delProviderLabel")
+        self.verticalLayout_30.addWidget(self.delProviderLabel)
+        self.horizontalLayout_32 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_32.setObjectName("horizontalLayout_32")
+        self.delProviderBox = QtWidgets.QComboBox(self.provider_tab)
+        self.delProviderBox.setObjectName("delProviderBox")
+        self.horizontalLayout_32.addWidget(self.delProviderBox)
+        self.delProviderButton = QtWidgets.QPushButton(self.provider_tab)
+        self.delProviderButton.setObjectName("delProviderButton")
+        self.horizontalLayout_32.addWidget(self.delProviderButton)
+        spacerItem10 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_32.addItem(spacerItem10)
+        self.verticalLayout_30.addLayout(self.horizontalLayout_32)
+        self.protocolLabel = QtWidgets.QLabel(self.provider_tab)
+        self.protocolLabel.setFont(font)
+        self.protocolLabel.setObjectName("protocolLabel")
+        self.verticalLayout_30.addWidget(self.protocolLabel)
+        self.providerSelect = QtWidgets.QComboBox(self.provider_tab)
+        self.providerSelect.setObjectName("providerSelect")
+        self.verticalLayout_30.addWidget(self.providerSelect)
+        self.protocolListWidget = QtWidgets.QListWidget(self.provider_tab)
+        self.protocolListWidget.setObjectName("protocolListWidget")
+        self.verticalLayout_30.addWidget(self.protocolListWidget)
+        self.overrideCheck = QtWidgets.QCheckBox(self.provider_tab)
+        self.overrideCheck.setObjectName("overrideCheck")
+        self.overrideCheck.setVisible(False)
+        self.verticalLayout_30.addWidget(self.overrideCheck)
+        self.horizontalLayout_31 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_31.setObjectName("horizontalLayout_31")
+        self.protocolBox = QtWidgets.QComboBox(self.provider_tab)
+        self.protocolBox.setObjectName("protocolBox")
+        self.protocolBox.addItem("UDP")
+        self.protocolBox.addItem("TCP")
+        self.protocolBox.setVisible(False)
+        self.horizontalLayout_31.addWidget(self.protocolBox)
+        self.portOverrideLabel = QtWidgets.QLabel(self.provider_tab)
+        self.portOverrideLabel.setObjectName("portOverrideLabel")
+        self.portOverrideLabel.setVisible(False)
+        self.horizontalLayout_31.addWidget(self.portOverrideLabel)
+        self.portEdit = QtWidgets.QLineEdit(self.provider_tab)
+        self.portEdit.setObjectName("portEdit")
+        self.portEdit.setVisible(False)
+        self.horizontalLayout_31.addWidget(self.portEdit)
+        self.verticalLayout_30.addLayout(self.horizontalLayout_31)
+        self.savePortButton = QtWidgets.QPushButton(self.provider_tab)
+        self.savePortButton.setObjectName("savePortButton")
+        self.savePortButton.setVisible(False)
+        self.horizontalLayout_31.addWidget(self.savePortButton)
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_31.addItem(spacerItem1)
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        self.verticalLayout_30.addItem(spacerItem)
+        
+        self.tabWidget.addWidget(self.provider_tab)
         self.bypass_tab = QtWidgets.QWidget()
         self.bypass_tab.setObjectName(_fromUtf8("bypass_tab"))
         self.verticalLayout_8 = QtWidgets.QVBoxLayout(self.bypass_tab)
@@ -420,39 +501,40 @@ class QomuiGui(QtWidgets.QWidget):
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
-        self.airvpn_update_bt.clicked.connect(self.airvpn_update)
-        self.mullvad_update_bt.clicked.connect(self.mullvad_update)
-        self.add_server_bt.clicked.connect(self.add_server_file)
+        self.providerSelect.activated[str].connect(self.popProtocolList)
+        self.add_server_bt.clicked.connect(self.switch_provider_tab)
         self.del_server_bt.clicked.connect(self.del_server_file)
-        self.airvpn_country_box.activated[str].connect(self.airvpn_countryChosen)
-        self.mullvad_country_box.activated[str].connect(self.mullvad_countryChosen)
-        self.custom_country_box.activated[str].connect(self.custom_countryChosen)
-        self.airvpn_tab_bt.clicked.connect(self.tabswitch)
-        self.mullvad_tab_bt.clicked.connect(self.tabswitch)
-        self.custom_tab_bt.clicked.connect(self.tabswitch)
+        self.countryBox.activated[str].connect(self.filterList)
+        self.providerBox.activated[str].connect(self.filterList)
+        self.server_tab_bt.clicked.connect(self.tabswitch)
         self.bypass_tab_bt.clicked.connect(self.tabswitch)
         self.options_tab_bt.clicked.connect(self.tabswitch)
         self.log_tab_bt.clicked.connect(self.tabswitch)
+        self.provider_tab_bt.clicked.connect(self.tabswitch)
         self.apply_bt.clicked.connect(self.applyoptions)
         self.cancel_bt.clicked.connect(self.cancelOptions)
         self.default_bt.clicked.connect(self.restoreDefaults)
         self.firewall_edit_bt.clicked.connect(self.show_firewalleditor)
         self.add_app_bt.clicked.connect(self.select_application)
         self.del_app_bt.clicked.connect(self.del_bypass_app)
+        self.favouriteButton.toggled.connect(self.show_favs)
+        self.overrideCheck.toggled.connect(self.protocol_override)
+        self.delProviderButton.clicked.connect(self.del_provider)
+        self.providerChoice.activated[str].connect(self.providerChosen)
+        self.download_bt.clicked.connect(self.login)
+        self.random_server_bt.clicked.connect(self.chooseRandomServer)
+        self.savePortButton.clicked.connect(self.overrideProtocol)
 
     def retranslateUi(self, Form):
         Form.setWindowTitle(_translate("Form", "Qomui", None))
-        self.airvpn_tab_bt.setText(_translate("Form", "Airvpn", None))
-        self.mullvad_tab_bt.setText(_translate("Form", "Mullvad", None))
-        self.custom_tab_bt.setText(_translate("Form", "Other", None))
+        self.server_tab_bt.setText(_translate("Form", "Server", None))
         self.log_tab_bt.setText(_translate("Form", "Log", None))
+        self.provider_tab_bt.setText(_translate("Form", "Provider", None))
         self.bypass_tab_bt.setText(_translate("Form", "Bypass", None))
         self.options_tab_bt.setText(_translate("Form", "Options", None))
-        self.airvpn_update_bt.setText(_translate("Form", "Update", None))
-        self.airvpn_update_bt.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
-        self.mullvad_update_bt.setText(_translate("Form", "Update", None))
-        self.mullvad_update_bt.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
-        self.add_server_bt.setText(_translate("Form", "Add Config File(s)", None))
+        self.random_server_bt.setText(_translate("Form", "Choose Random", None))
+        self.random_server_bt.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
+        self.add_server_bt.setText(_translate("Form", "Add Servers", None))
         self.add_server_bt.setIcon(QtGui.QIcon.fromTheme("list-add"))
         self.del_server_bt.setText(_translate("Form", "Delete", None))
         self.del_server_bt.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
@@ -461,7 +543,8 @@ class QomuiGui(QtWidgets.QWidget):
         self.firewall_check.setText(_translate("Form", "Activate Firewall     ", None))
         self.bypass_check.setText(_translate("Form", "Allow OpenVPN bypass", None))
         self.ipv6_check.setText(_translate("Form", "Disable IPv6", None))
-        self.alt_dns_lbl.setText(_translate("Form", "Use alternative DNS Servers", None))
+        self.dns_check.setText(_translate("Form", "Use always", None))
+        self.alt_dns_lbl.setText(_translate("Form", "Alternative DNS Servers:", None))
         self.default_bt.setText(_translate("Form", "Restore defaults", None))
         self.default_bt.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
         self.apply_bt.setText(_translate("Form", "Apply", None))
@@ -474,6 +557,19 @@ class QomuiGui(QtWidgets.QWidget):
         self.add_app_bt.setIcon(QtGui.QIcon.fromTheme("list-add"))
         self.del_app_bt.setText(_translate("Form", "Remove", None))
         self.del_app_bt.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
+        self.protocolLabel.setText(_translate("Form", "Choose protocol and port:", None))
+        self.addProviderLabel.setText(_translate("Form", "Add provider:", None))
+        self.delProviderLabel.setText(_translate("Form", "Delete provider:", None))
+        self.delProviderButton.setText(_translate("Form", "Delete", None))
+        self.delProviderButton.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
+        self.overrideCheck.setText(_translate("Form", "Override settings from config file", None))
+        self.portOverrideLabel.setText(_translate("Form", "Port", None))
+        self.savePortButton.setText(_translate("Form", "Save", None))
+        self.savePortButton.setIcon(QtGui.QIcon.fromTheme("dialog-ok"))
+        self.user_edit.setPlaceholderText(_translate("Form", "Username", None))
+        self.download_bt.setText(_translate("Form", "Download", None))
+        self.download_bt.setIcon(QtGui.QIcon.fromTheme("list-add"))
+        self.pass_edit.setPlaceholderText(_translate("Form", "Password", None))
         
         self.autoconnect_label.setText(_translate("Form", 
                                           "Automatically connect to last server", 
@@ -491,29 +587,34 @@ class QomuiGui(QtWidgets.QWidget):
                                           "Block connections outside VPN tunnel - protects against IPv6 and DNS leaks", 
                                           None))
         self.dns_label.setText(_translate("Form", 
-                                          "By default Qomui will set the DNS server by your provider. If you wish to use alternative servers, you can specify them here. Otherwise, leave empty.", 
+                                          "By default Qomui will try to use the DNS server by your provider. Otherwise, it will fall back to the alternative DNS servers", 
                                           None))
         self.bypass_info.setText(_translate("Form", 
                                           'To use an application outside the VPN tunnel, you can simply add a program to the list below and launch it from there. Alternatively, you can run commands from a console by prepending "cgexec -g net_cls:bypass_qomui $yourcommand". Be aware that some applications including Firefox will not launch a second instance in bypass mode if they are already running.', 
                                           None))
+        
+        for provider in SUPPORTED_PROVIDERS:
+            self.providerChoice.addItem(provider)
+        self.providerChoice.addItem("Manually add config file folder")
 
 
     def tabswitch(self):
         button = self.sender().text().replace("&", "")
-        if button == "Airvpn":
+        if button == "Server":
             self.tabWidget.setCurrentIndex(0)
-        elif button == "Mullvad":
-            self.tabWidget.setCurrentIndex(1)
-        elif button == "Other":
-            self.tabWidget.setCurrentIndex(2)
         elif button == "Log":
-            self.tabWidget.setCurrentIndex(3)
+            self.tabWidget.setCurrentIndex(1)
             self.logText.verticalScrollBar().setValue(self.logText.verticalScrollBar().maximum())
         elif button == "Options":
             self.setOptiontab(self.config_dict)
-            self.tabWidget.setCurrentIndex(4) 
+            self.tabWidget.setCurrentIndex(2)
+        elif button == "Provider":
+            self.tabWidget.setCurrentIndex(3) 
         elif button == "Bypass":
-            self.tabWidget.setCurrentIndex(5)  
+            self.tabWidget.setCurrentIndex(4)  
+    
+    def switch_provider_tab(self):
+        self.tabWidget.setCurrentIndex(3) 
     
     def systemtray(self):
         self.trayicon = QtGui.QIcon("%s/qomui.png" % (ROOTDIR))
@@ -597,6 +698,11 @@ class QomuiGui(QtWidgets.QWidget):
         elif self.minimize_check.checkState() == 0:
             new_config_dict["minimize"] = 0
             
+        if self.dns_check.checkState() == 2:
+            new_config_dict["fallback"] = 1
+        elif self.dns_check.checkState() == 0:
+            new_config_dict["fallback"] = 0
+            
         if self.bypass_check.checkState() == 2:
             new_config_dict["bypass"] = 1
             self.bypass_tab_bt.setVisible(True)
@@ -616,7 +722,7 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             update = check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
-            if self.config_dict["firewall"] != new_config_dict["firewall"] or self.fire_change is True:
+            if self.config_dict != new_config_dict or self.fire_change is True:
                 self.qomui_service.load_firewall()
             self.qomui_service.bypass(self.user, self.group)
             self.qomui_service.disable_ipv6(new_config_dict["ipv6_disable"])
@@ -637,50 +743,20 @@ class QomuiGui(QtWidgets.QWidget):
         self.user = check_output(['id', '-u', '-n']).decode("utf-8").split("\n")[0]
         self.group = check_output(['id', '-g', '-n']).decode("utf-8").split("\n")[0]
         self.logger.debug("Reading configuration files from %s" %(DIRECTORY))
+        
         try:
-            with open('%s/airvpn_server.json' % (DIRECTORY), 'r') as sload:
-                self.airvpn_server_dict = json.load(sload)
-                for k,v in self.airvpn_server_dict.items():
-                    if v["country"] not in self.airvpn_country_list:
-                        self.airvpn_country_list.append(v["country"])
-                        self.popAirCountryBox()
+            with open('%s/protocol.json' % (DIRECTORY), 'r') as pload:
+                self.protocol_dict = json.load(pload)
         except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
-            self.logger.error('%s: Could not open %s/airvpn_server.json' % (e, DIRECTORY))
-
+            self.logger.error('%s: Could not open %s/_protocol.json' % (e, DIRECTORY))
+        
         try:
-            with open('%s/airvpn_protocol.json' % (DIRECTORY), 'r') as pload:
-                self.airvpn_protocol_dict = json.load(pload)
-                self.popAirModeBox()
+            with open('%s/server.json' % (DIRECTORY), 'r') as sload:
+                self.server_dict = json.load(sload)
+                self.popBoxes()
+    
         except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
-            self.logger.error('%s: Could not open %s/airvpn_protocol.json' % (e, DIRECTORY))
-
-        try:
-            with open('%s/mullvad_server.json' % (DIRECTORY), 'r') as sload:
-                self.mullvad_server_dict = json.load(sload)
-                for k,v in self.mullvad_server_dict.items():
-                    if v["country"] not in self.mullvad_country_list:
-                        self.mullvad_country_list.append(v["country"])
-                        self.popMullvadCountryBox()
-        except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
-            self.logger.error('%s Could not open %s/mullvad_server.json' % (e, DIRECTORY))
-
-        try:
-            with open('%s/mullvad_protocol.json' % (DIRECTORY), 'r') as pload:
-                self.mullvad_protocol_dict = json.load(pload)
-                self.popMullvadModeBox()
-        except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
-            self.logger.error('%s: Could not open %s/mullvad_protocol.json' % (e, DIRECTORY))
-
-
-        try:
-            with open('%s/custom_server.json' % (DIRECTORY), 'r') as sload:
-                self.custom_server_dict = json.load(sload)
-                for k,v in self.custom_server_dict.items():
-                    if v["country"] not in self.custom_country_list:
-                        self.custom_country_list.append(v["country"])
-                        self.popCustomCountryBox()
-        except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
-            self.logger.error('%s: Could not open %s/custom_server.json' % (e, DIRECTORY))
+            self.logger.error('%s: Could not open %s/_server.json' % (e, DIRECTORY))
             
         try:
             with open('%s/bypass_apps.json' % (DIRECTORY), 'r') as sload:
@@ -709,28 +785,27 @@ class QomuiGui(QtWidgets.QWidget):
                     self.hop_server_dict = last_server_dict["hop"]
                     if self.hop_server_dict is not None:
                         self.setHop()
-                    self.connect_thread(self.ovpn_dict)             
+                    try: 
+                        if self.ovpn_dict["random"] == "on":
+                            self.chooseRandomServer()
+                    except KeyError:
+                        self.connect_thread(self.ovpn_dict)
+                    try:
+                        if self.ovpn_dict["favourite"] == "on":
+                            self.favouriteButton.setChecked(True)
+                        else:
+                            try:
+                                self.countryBox.setCurrentIndex(sorted(self.country_list).index(self.ovpn_dict["country"]))
+                                self.filterList()
+                            except ValueError:
+                                pass
+                    except KeyError:
+                        try:
+                            self.countryBox.setCurrentIndex(sorted(self.country_list).index(self.ovpn_dict["country"]))
+                            self.filterList()
+                        except ValueError:
+                            pass
                     
-                    
-                    if self.ovpn_dict["provider"] == "airvpn":
-                        self.tabWidget.setCurrentIndex(0)
-                        self.airvpn_tab_bt.setChecked(True)
-                        country = self.ovpn_dict["country"]
-                        self.airvpn_country_box.setCurrentIndex(sorted(self.airvpn_country_list).index(country))
-                        self.airvpn_countryChosen(country)
-                        self.airvpn_mode_box.setCurrentIndex(int(self.ovpn_dict["prot_index"]))
-                    elif self.ovpn_dict["provider"] == "mullvad":
-                        self.tabWidget.setCurrentIndex(1)
-                        self.mullvad_tab_bt.setChecked(True)
-                        country = self.ovpn_dict["country"]
-                        self.mullvad_country_box.setCurrentIndex(self.mullvad_country_list.index(country))
-                        self.mullvad_countryChosen(country)
-                        self.mullvad_mode_box.setCurrentIndex(int(self.ovpn_dict["prot_index"]))
-                    elif self.ovpn_dict["provider"] == "custom":
-                        self.tabWidget.setCurrentIndex(2)
-                        self.custom_tab_bt.setChecked(True)
-                    
-                        
         except (FileNotFoundError,json.decoder.JSONDecodeError, KeyError) as e:
             self.logger.error('Could not open %s/last_server.json' % (DIRECTORY))
 
@@ -769,6 +844,12 @@ class QomuiGui(QtWidgets.QWidget):
             self.bypass_check.setChecked(False)
         elif config["bypass"] == 1:
             self.bypass_check.setChecked(True)
+            
+        if config["fallback"] == 0:
+            self.dns_check.setChecked(False)
+        elif config["fallback"] == 1:
+            self.dns_check.setChecked(True)
+    
     
     def networkstate(self, networkstate):
         if networkstate == 70 or networkstate == 60:
@@ -778,295 +859,413 @@ class QomuiGui(QtWidgets.QWidget):
                 self.connect_thread(self.ovpn_dict)
                 self.qomui_service.bypass(self.user, self.group)
         elif networkstate != 70 and networkstate != 60:
-            self.qomui_service.bypass(self.user, self.group)
+            #self.qomui_service.bypass(self.user, self.group)
             self.logger.info("Lost network connection - VPN tunnel terminated")
             self.kill()
-
-    def airvpn_update(self):
-        self.Login = update.Login(self, "airvpn")
-        self.qomui_service.allowUpdate("airvpn")
-        self.Login.wait.connect(self.update_bar)
-        self.Login.downloaded.connect(self.downloaded)
-        self.Login.exec_()
-
-    def mullvad_update(self):
-        self.Login = update.Login(self, "mullvad")
-        self.qomui_service.allowUpdate("mullvad")
-        self.Login.wait.connect(self.update_bar)
-        self.Login.downloaded.connect(self.downloaded)
-        self.Login.exec_()
         
-    def update_bar(self, i):
-        if i[0] == "stop":
-            self.WaitBar.setVisible(False)
-        elif i[0] == "start":
-            self.WaitBar.setVisible(True)
-            self.WaitBar.setText("Updating %s" %i[1].title())
+    def providerChosen(self):
+        provider = self.providerChoice.currentText()
+        if provider == "Airvpn" or provider == "PIA":
+            self.provider_edit.setVisible(False)
+            self.user_edit.setPlaceholderText(_translate("Form", "Username", None))
+            self.pass_edit.setPlaceholderText(_translate("Form", "Password", None))
+            if provider in self.provider_list:
+                self.download_bt.setText(_translate("Form", "Update", None))
+            else:
+                self.download_bt.setText(_translate("Form", "Download", None))
+        elif provider == "Mullvad":
+            self.provider_edit.setVisible(False)
+            self.user_edit.setPlaceholderText(_translate("Form", "Account Number", None))
+            self.pass_edit.setPlaceholderText(_translate("Form", "N.A.", None))
+            if provider in self.provider_list:
+                self.download_bt.setText(_translate("Form", "Update", None))
+            else:
+                self.download_bt.setText(_translate("Form", "Download", None))
+        else:
+            self.provider_edit.setVisible(True)
+            self.provider_edit.setPlaceholderText(_translate("Form", "Specify name of provider", None))
+            self.user_edit.setPlaceholderText(_translate("Form", "Username", None))
+            self.pass_edit.setPlaceholderText(_translate("Form", "Password", None))
+            self.download_bt.setText(_translate("Form", "Add Folder", None))
 
-    def downloaded(self, content):
-        down_msg = QtWidgets.QMessageBox.information(self,
-                                                "Download successful",
-                                                "List of available servers updated",
-                                                QtWidgets.QMessageBox.Ok)
-        provider = content["provider"]
-        if provider == "airvpn":
-            self.airvpn_server_dict = content["server"]
-            self.airvpn_protocol_dict = content["protocol"]
-            with open ("%s/airvpn_server.json" % DIRECTORY, "w") as s:
-                json.dump(self.airvpn_server_dict, s)
-            with open ("%s/airvpn_protocol.json" % DIRECTORY, "w") as p:
-                json.dump(self.airvpn_protocol_dict, p)
-            self.popAirCountryBox()
-            self.popAirModeBox()
-        elif provider == "mullvad":
-            self.mullvad_server_dict = content["server"]
-            self.mullvad_protocol_dict = content["protocol"]
-            with open ("%s/mullvad_server.json" % DIRECTORY, "w") as s:
-                json.dump(self.mullvad_server_dict, s)
-            with open ("%s/mullvad_protocol.json" % DIRECTORY, "w") as p:
-                json.dump(self.mullvad_protocol_dict, p)            
-            self.popMullvadCountryBox()
-            self.popMullvadModeBox()
-
-        self.copyfiles(provider, content["path"])   
-
-    def add_server_file(self):
-        self.AuthEdit = update.AuthEdit(self)
-        self.AuthEdit.auth.connect(self.modify_config_file)
-        self.AuthEdit.exec_()
-        
-        
-    def modify_config_file(self, credentials):
+    def login(self):
         if not os.path.exists("%s/temp" % (DIRECTORY)):
                os.makedirs("%s/temp" % (DIRECTORY))
-               
-        with open("%s/temp/auth.txt" % (DIRECTORY) , "w") as passfile:
-            passfile.write('%s\n%s' % (credentials[0], credentials[1]))
+        
+        provider = self.providerChoice.currentText()
+        if provider not in SUPPORTED_PROVIDERS:
+            provider = self.provider_edit.text()
+    
+        self.qomui_service.allowUpdate(provider)
+        if provider == "Airvpn":
+            username = self.user_edit.text()
+            password = self.pass_edit.text()
+            self.down_thread = update.AirVPNDownload(username, password)
+            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+            self.down_thread.importFail.connect(self.importFail)
+            self.down_thread.down_finished.connect(self.downloaded)
+            self.down_thread.start()
+            self.update_bar("start", provider)
+        elif provider == "Mullvad":
+            account_number = self.user_edit.text()
+            self.down_thread = update.MullvadDownload(account_number)
+            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+            self.down_thread.importFail.connect(self.importFail)
+            self.down_thread.down_finished.connect(self.downloaded)
+            self.down_thread.start()
+        elif provider == "PIA":
+            username = self.user_edit.text()
+            password = self.pass_edit.text()
+            self.down_thread = update.PiaDownload(username, password)
+            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+            self.down_thread.importFail.connect(self.importFail)
+            self.down_thread.down_finished.connect(self.downloaded)
+            self.down_thread.start()
+        else:
+            if self.provider_edit.text() == "":
+                err = QtWidgets.QMessageBox.critical(self,
+                                                "Error",
+                                                "Please enter a provider name",
+                                                QtWidgets.QMessageBox.Ok)
+                
+            elif self.provider_edit.text() in self.provider_list:
+                err = QtWidgets.QMessageBox.critical(self,
+                                                "Provider already exists",
+                                                "Please choose another name",
+                                                QtWidgets.QMessageBox.Ok)
+            
+            else:
+                credentials = (self.user_edit.text(), self.pass_edit.text(), self.provider_edit.text())
+                try:
+                    dialog = QtWidgets.QFileDialog.getOpenFileName(self,
+                                                                    caption="Choose Folder",
+                                                                    directory = os.path.expanduser("~"),
+                                                                    filter=self.tr('OpenVPN (*.ovpn *conf);;All files (*.*)'),
+                                                                    options=QtWidgets.QFileDialog.ReadOnly)
+                    
+                    folderpath = QtCore.QFileInfo(dialog[0]).absolutePath()
+                    if folderpath != "":
+                        self.thread = update.AddThread(credentials, folderpath)
+                        self.thread.down_finished.connect(self.downloaded)
+                        self.thread.importFail.connect(self.importFail)
+                        self.thread.start()
+                except TypeError:
+                    pass
+                    
+        self.update_bar("start", provider)
+            
+    def importFail(self, provider):
+        QtWidgets.QApplication.restoreOverrideCursor()
+        self.update_bar("stop", None)
+        if provider == "Airvpn":
+            header = "Authentication failed"
+            msg = "Perhaps the credentials you entered are wrong"
+        else:
+            header = "No config files found"
+            msg = "Are you sure this folder contains config files?" 
+            
+        fail_msg = QtWidgets.QMessageBox.information(self,
+                                                header,
+                                                msg,
+                                                QtWidgets.QMessageBox.Ok)
         
         try:
-            ovpn_files = QtWidgets.QFileDialog.getOpenFileNames(self,
-                                                         caption="Choose OVPN-File",
-                                                         directory = os.path.expanduser("~"),
-                                                         filter=self.tr('OpenVPN (*.ovpn *conf);;All files (*.*)'),
-                                                         options=QtWidgets.QFileDialog.ReadOnly)
-        except TypeError:
+            shutil.rmtree("%s/temp/" % (DIRECTORY))
+        except FileNotFoundError:
             pass
         
-        self.qomui_service.allow_dns()
-        try:
-            files = ovpn_files[0]
-            self.WaitBar.setVisible(True)
-            self.WaitBar.setText("Adding Servers")
-            self.thread = update.AddThread(self.qomui_service, files, credentials[0], credentials[1])
-            self.thread.copyauth.connect(self.copy_auth_file)
-            self.thread.added.connect(self.update_custom_servers)
-            self.thread.start()
-        except IndexError:
-            pass
-    
-    def update_custom_servers(self, servers):
-        self.custom_server_dict.update(servers)
-        self.qomui_service.block_dns()
-        with open ("%s/custom_server.json" % DIRECTORY, "w") as s:
-            json.dump(self.custom_server_dict, s) 
-        self.popCustomCountryBox()
-        shutil.rmtree("%s/temp/" % (DIRECTORY))
-        self.WaitBar.setVisible(False)
-        
-    def copy_auth_file(self, auth_file):
-        copy = self.qomui_service.copyCerts("custom", "%s/temp/auth.txt %s" %(DIRECTORY, auth_file))
-    
-    def del_server_file(self):
-        for item in self.custom_server_list.selectedItems():
-            data = item.data(QtCore.Qt.UserRole)
-            delete_file = self.custom_server_dict[data]["path"]
+    def del_provider(self):
+        confirm = QtWidgets.QMessageBox()
+        confirm.setText("Are you sure?")
+        confirm.addButton(QtWidgets.QPushButton("No"), QtWidgets.QMessageBox.NoRole)
+        confirm.addButton(QtWidgets.QPushButton("Yes"), QtWidgets.QMessageBox.YesRole)
+        ret = confirm.exec_()
+        provider = self.delProviderBox.currentText()
+        del_list = []
+        if ret == 1:
+            for k, v in self.server_dict.items():
+                if v["provider"] == provider:
+                    del_list.append(k)
+            for k in del_list:
+                self.server_dict.pop(k)
             try:
-                os.remove(delete_file)
-            except FileNotFoundError:
-                pass
-            try:
-                self.custom_server_dict.pop(data, None)
-                self.custom_server_list.removeItemWidget(item)
+                self.protocol_dict.pop(provider)
             except KeyError:
                 pass
-        with open ("%s/custom_server.json" % DIRECTORY, "w") as s:
-            json.dump(self.custom_server_dict, s)
-        self.popCustomCountryBox()
-
-    def pop_custom_ServerList(self, country):
-        self.custom_server_list.clear()
-        if not self.custom_server_dict:
-            empty_item = QtWidgets.QListWidgetItem(self.custom_server_list)
-            empty_item.setText("No servers defined yet")
-            empty_item2 = QtWidgets.QListWidgetItem(self.custom_server_list)
-            empty_item2.setText("Please add servers via Add or Update")
-            self.custom_server_list.addItem(empty_item)
-            self.custom_server_list.addItem(empty_item2)
-        else:
-            for key, val in self.custom_server_dict.items():
-                if val["country"] == country or country == "All servers":
-                    self.Item = ServerWidget()
-                    self.ListItem = QtWidgets.QListWidgetItem(self.custom_server_list)
-                    self.ListItem.setData(QtCore.Qt.UserRole, key)
-                    self.ListItem.setSizeHint(QtCore.QSize(100, 50))
-                    self.Item.setText(val["name"], val["provider"], val["country"], None)
-                    self.custom_server_list.addItem(self.ListItem)
-                    self.custom_server_list.setItemWidget(self.ListItem, self.Item)
-                    self.Item.establish.connect(self.establish)
-                    self.Item.establish_hop.connect(self.createHop)
+            self.qomui_service.deleteProvider(provider)
+            with open ("%s/server.json" % DIRECTORY, "w") as s:
+                json.dump(self.server_dict, s)
+            self.popBoxes()
+        elif ret == 0:
+            pass
                 
-    def popCustomCountryBox(self):
-        for k,v in self.custom_server_dict.items():
-            if v["country"] not in self.custom_country_list:
-                self.custom_country_list.append(v["country"])
-        self.custom_country_box.clear()
-        for index, country in enumerate(sorted(self.custom_country_list)):
-            #icon = QtGui.QIcon('%s/flags/%s.png' % (ROOTDIR, country))
-            self.custom_country_box.addItem(country)
-            self.custom_country_box.setItemText(index, country)
-            #self.custom_country_box.setItemIcon(index, QtGui.QIcon(icon))
-        self.custom_countryChosen()
+    def update_bar(self, text, provider):
+        if text == "stop":
+            self.WaitBar.setVisible(False)
+        elif text == "start":
+            self.WaitBar.setVisible(True)
+            self.WaitBar.setText("Importing %s" %provider)
+
+    def downloaded(self, content):
+        self.update_bar("stop", None)
+        QtWidgets.QApplication.restoreOverrideCursor()
+        down_msg = QtWidgets.QMessageBox.information(self,
+                                                "Import successful",
+                                                "List of available servers updated",
+                                                QtWidgets.QMessageBox.Ok)
         
-    def custom_countryChosen(self, *arg):
-        if not arg:
-            custom_country = self.custom_country_box.currentText()
-        else:
-            custom_country = arg[0]
-        self.pop_custom_ServerList(custom_country)
+        provider = content["provider"]
+        self.provider_list.append(provider)
+        self.copyfiles(provider, content["path"])
+        self.server_dict.update(content["server"])
+        try:
+            self.protocol_dict[provider] = (content["protocol"])
+        except KeyError:
+            pass
+        with open ("%s/server.json" % DIRECTORY, "w") as s:
+            json.dump(self.server_dict, s)
+        
+        try:
+            if 'selected' in self.protocol_dict[provider].keys():
+                pass
+            else:
+                self.protocol_dict[provider]["selected"] = "protocol_1"
+        except KeyError:
+            pass
+        
+        with open ("%s/protocol.json" % DIRECTORY, "w") as p:
+            json.dump(self.protocol_dict, p) 
+        self.popBoxes()
+    
+    def del_server_file(self):
+        for item in self.serverListWidget.selectedItems():
+            data = item.data(QtCore.Qt.UserRole)
+            index = self.serverListWidget.row(item)
+            try:
+                self.server_dict.pop(data, None)
+                self.serverListWidget.takeItem(index)
+            except KeyError:
+                pass
+        with open ("%s/server.json" % DIRECTORY, "w") as s:
+            json.dump(self.server_dict, s)
         
     def copyfiles(self, provider, path):
         self.qomui_service.block_dns()
-        if provider == "airvpn":
-            copy = self.qomui_service.copyCerts(provider, path)
-        elif provider == "mullvad":
-            copy = self.qomui_service.copyCerts(provider, path)
+        copy = self.qomui_service.copyCerts(provider, path)
         if copy == "copied":
             shutil.rmtree("%s/temp/" % (DIRECTORY))
 
-    def popMullvadCountryBox(self):
-        for k,v in self.mullvad_server_dict.items():
-            if v["country"] not in self.mullvad_country_list:
-                self.mullvad_country_list.append(v["country"])
-        self.mullvad_country_box.clear()
-        for index, country in enumerate(sorted(self.mullvad_country_list)):
-            #BAD MEMORY LEAK -- TRIPLES MEMORY USAGE!!!!!!
-            #icon = QtGui.QIcon('%s/flags/%s.png' % (ROOTDIR, country))
-            self.mullvad_country_box.addItem(country)
-            self.mullvad_country_box.setItemText(index, country)
-            #self.mullvad_country_box.setItemIcon(index, QtGui.QIcon(icon))
-        self.mullvad_countryChosen()
-
-    def popMullvadModeBox(self):
-        self.mullvad_mode_box.clear()
-        index = -1
-        for k, v in sorted(self.mullvad_protocol_dict.items()):
-            index += 1
-            mode = v["protocol"] + " " + v["port"]
-            self.mullvad_mode_box.addItem(mode)
-            self.mullvad_mode_box.setItemText(index, mode)
-            self.mullvad_mode_box.setItemData(index, k, QtCore.Qt.UserRole)
-    
-    
-    def popAirCountryBox(self):
-        for k,v in self.airvpn_server_dict.items():
-            if v["country"] not in self.airvpn_country_list:
-                self.airvpn_country_list.append(v["country"])
+    def popBoxes(self):
+        self.country_list = []
+        self.provider_list = ["All providers"]
+        for k,v in self.server_dict.items():
+            if v["country"] not in self.country_list:
+                self.country_list.append(v["country"])
+            elif v["provider"] not in self.provider_list:
+                self.provider_list.append(v["provider"])
+                self.popProviderBox()
+                self.popDeleteProviderBox()
                 
-        self.airvpn_country_box.clear()
-        for index, country in enumerate(sorted(self.airvpn_country_list)):
-            #icon = QtGui.QIcon('%s/flags/%s.png' % (ROOTDIR, country))
-            self.airvpn_country_box.addItem(country)
-            self.airvpn_country_box.setItemText(index, country)
-            #self.airvpn_country_box.setItemIcon(index, QtGui.QIcon(icon))
-        self.airvpn_countryChosen()
-                
-    def popAirModeBox(self):
-        self.airvpn_mode_box.clear()
-        index = -1
-        for k, v in sorted(self.airvpn_protocol_dict.items()):
-            index += 1
-            mode = v["protocol"] + " " + v["port"] + ", " + v["ip"]
-            self.airvpn_mode_box.addItem(mode)
-            self.airvpn_mode_box.setItemText(index, mode)
-            self.airvpn_mode_box.setItemData(index, k, QtCore.Qt.UserRole)
-
-    def mullvad_countryChosen(self, *arg):
-        if not arg:
-            mullvad_country = self.mullvad_country_box.currentText()
+        self.countryBox.clear()
+        self.providerBox.clear()
+        if len(self.provider_list) <= 2 :
+            self.providerBox.setVisible(False)
         else:
-            mullvad_country = arg[0]
-        self.pop_mullvad_ServerList(mullvad_country)
+            self.providerBox.setVisible(True)
+        for index, country in enumerate(sorted(self.country_list)):
+            self.countryBox.addItem(country)
+            self.countryBox.setItemText(index, country)
+        for index, provider in enumerate(self.provider_list):
+            self.providerBox.addItem(provider)
+            self.providerBox.setItemText(index, provider)
+        self.filterList()
         
-    def airvpn_countryChosen(self, *arg):
-        if not arg:
-            airvpn_country = self.airvpn_country_box.currentText()
-        else:
-            airvpn_country = arg[0]
-        airvpn_country = self.airvpn_country_box.currentText()
-        self.pop_airvpn_ServerList(airvpn_country)
-    
-    def pop_airvpn_ServerList(self, country):
-        self.airvpn_server_list.clear()
-        for key, val in self.airvpn_server_dict.items():
-            if val["country"] == country or country == "All servers":
-                self.Item = ServerWidget()
-                self.ListItem = QtWidgets.QListWidgetItem(self.airvpn_server_list)
-                self.ListItem.setSizeHint(QtCore.QSize(100, 50))
-                self.Item.setText(val["name"], val["provider"], val["country"], val["city"])
-                self.airvpn_server_list.addItem(self.ListItem)
-                self.airvpn_server_list.setItemWidget(self.ListItem, self.Item)
-                self.Item.establish.connect(self.establish)
-                self.Item.establish_hop.connect(self.createHop)
+    def show_favs(self, state):
+        self.random_server_bt.setVisible(True)
+        self.serverListWidget.clear()
+        if state == True:
+            for key, val in self.server_dict.items():
+                try:
+                    if val["favourite"] == "on":
+                        self.pop_ServerList(key, val)
+                except KeyError:
+                    pass
+        elif state == False:
+            self.filterList()
+                    
 
-    def pop_mullvad_ServerList(self, country):
-        self.mullvad_server_list.clear()
-        for key, val in self.mullvad_server_dict.items():
-            if val["country"] == country or country == "All servers":
-                self.Item = ServerWidget()
-                self.ListItem = QtWidgets.QListWidgetItem(self.mullvad_server_list)
-                self.ListItem.setSizeHint(QtCore.QSize(100, 50))
-                self.Item.setText(val["name"], val["provider"], val["country"], val["city"])
-                self.mullvad_server_list.addItem(self.ListItem)
-                self.mullvad_server_list.setItemWidget(self.ListItem, self.Item)
-                self.Item.establish.connect(self.establish)
-                self.Item.establish_hop.connect(self.createHop)
-                
+    def filterList(self, *arg):
+        self.random_server_bt.setVisible(False)
+        self.serverListWidget.clear()
+        if self.favouriteButton.isChecked() == True:
+            self.favouriteButton.setChecked(False)
+        country = self.countryBox.currentText()
+        provider = self.providerBox.currentText()
+        for key, val in self.server_dict.items():
+            if val["provider"] == provider or provider == "All providers":
+                if val["country"] == country or country == "All countries":
+                    self.pop_ServerList(key, val)
+        
+    def pop_ServerList(self, key, val):
+        self.Item = ServerWidget()
+        self.ListItem = QtWidgets.QListWidgetItem(self.serverListWidget)
+        self.ListItem.setData(QtCore.Qt.UserRole, key)
+        self.ListItem.setSizeHint(QtCore.QSize(100, 50))
+        try: 
+            fav = val["favourite"]
+        except KeyError:
+            fav = 1
+        self.Item.setText(val["name"], val["provider"], val["country"], 
+                          val["city"], fav=fav)
+        self.serverListWidget.addItem(self.ListItem)
+        self.serverListWidget.setItemWidget(self.ListItem, self.Item)
+        self.Item.establish.connect(self.establish)
+        self.Item.establish_hop.connect(self.createHop)
+        self.Item.fav_sig.connect(self.change_favourite)
+                        
+    def popProviderBox(self):
+        self.providerSelect.clear()
+        for provider in sorted(self.provider_list):
+            if provider != "All providers":
+                self.providerSelect.addItem(provider)
+                self.popProtocolList(self.providerSelect.currentText())
+            
+    def popProtocolList(self, provider):
+        if provider in SUPPORTED_PROVIDERS:
+            self.protocolListWidget.setVisible(True)
+            self.overrideCheck.setVisible(False)
+            self.portOverrideLabel.setVisible(False)
+            self.protocolBox.setVisible(False)
+            self.portEdit.setVisible(False)
+            self.savePortButton.setVisible(False)
+            self.protocolListWidget.clear()
+            self.protocolListWidget.itemClicked.connect(self.protocolChange)
+            try:
+                current = self.protocol_dict[provider]["selected"]
+            except KeyError:
+                current = self.protocol_dict[provider]["protocol_1"]
+            for k,v in sorted(self.protocol_dict[provider].items()):
+                if k != "selected":
+                    try:
+                        mode = v["protocol"] + " " + v["port"] + ", " + v["ip"]
+                    except KeyError:
+                        mode = v["protocol"] + " " + v["port"]
+                        
+                    item = QtWidgets.QListWidgetItem()
+                    item.setText(mode)
+                    item.setData(QtCore.Qt.UserRole, k)
+                    item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
+                    if k == current:
+                        item.setCheckState(QtCore.Qt.Checked)
+                    else:
+                        item.setCheckState(QtCore.Qt.Unchecked)
+                    self.protocolListWidget.addItem(item)
+        else:
+            self.protocolListWidget.setVisible(False)
+            self.overrideCheck.setVisible(True)
+            try:
+                protocol = self.protocol_dict[provider]["protocol"]
+                port = self.protocol_dict[provider]["port"]
+                self.protocol_override(True, protocol=protocol, port=port)
+                self.overrideCheck.setChecked(True)
+            except KeyError:
+                pass
+            
+    def protocolChange(self, selection):
+        provider = self.providerSelect.currentText()
+        if provider in SUPPORTED_PROVIDERS:
+            self.protocol_dict[provider]["selected"] = selection.data(QtCore.Qt.UserRole)
+            with open ("%s/protocol.json" % DIRECTORY, "w") as p:
+                json.dump(self.protocol_dict, p)
+            for item in range(self.protocolListWidget.count()):
+                if self.protocolListWidget.item(item) != selection:
+                    self.protocolListWidget.item(item).setCheckState(QtCore.Qt.Unchecked)
+                else:
+                    self.protocolListWidget.item(item).setCheckState(QtCore.Qt.Checked)
+            
+    def protocol_override(self, state, protocol=None, port=None):
+        if state == True:
+            self.portOverrideLabel.setVisible(True)
+            self.protocolBox.setVisible(True)
+            self.portEdit.setVisible(True)
+            self.savePortButton.setVisible(True)
+            if protocol is not None:
+                if protocol == "UDP":
+                    self.protocolBox.setCurrentIndex(0)
+                elif protocol == "TCP":
+                    self.protocolBox.setCurrentIndex(1)
+                self.portEdit.setText(port)
+                    
+        elif state == False:
+            try:
+                self.protocol_dict.pop(self.providerSelect.currentText(), None)
+                with open ("%s/protocol.json" % DIRECTORY, "w") as p:
+                    json.dump(self.protocol_dict, p)
+            except KeyError:
+                pass
+            
+    def overrideProtocol(self):
+        protocol = self.protocolBox.currentText()
+        port = self.portEdit.text()
+        provider = self.providerSelect.currentText()
+        if self.overrideCheck.checkState() == 2:
+            self.protocol_dict[provider] = {"protocol" : protocol, "port": port}
+            with open ("%s/protocol.json" % DIRECTORY, "w") as p:
+                json.dump(self.protocol_dict, p) 
+        
+            
+    def popDeleteProviderBox(self):
+        self.delProviderBox.clear()
+        for provider in self.provider_list:
+            if provider != "All providers":
+                self.delProviderBox.addItem(provider)
+            
+    
+    def change_favourite(self, change):
+        if change[1] == True:
+            self.server_dict[change[0]].update({"favourite" : "on"})
+        elif change[1] == False:
+            self.server_dict[change[0]].update({"favourite" : "off"})
+            if self.favouriteButton.isChecked() == True:
+                self.show_favs(True)
+        with open ("%s/server.json" % DIRECTORY, "w") as s:
+            json.dump(self.server_dict, s) 
+            
+    
     def createHop(self, server):
-        current_dict = getattr(self, "%s_server_dict"%(server[0]))[server[1]]
+        current_dict = self.server_dict[server]
         self.create_server_dict(current_dict, 1)
         self.setHop()
         
     def setHop(self):
         self.hop_choice = 2
         self.hop_server_dict.update({"hop":"1"})
-        self.airvpn_hop_widget.setVisible(True)
-        self.airvpn_hop_widget.setText(self.hop_server_dict)
-        self.mullvad_hop_widget.setVisible(True)
-        self.mullvad_hop_widget.setText(self.hop_server_dict)
-        self.custom_hop_widget.setVisible(True)
-        self.custom_hop_widget.setText(self.hop_server_dict)
-        self.custom_hop_widget.clear.connect(self.clear_HopSelect)
-        self.airvpn_hop_widget.clear.connect(self.clear_HopSelect)
-        self.mullvad_hop_widget.clear.connect(self.clear_HopSelect)
+        self.serverHopWidget.setVisible(True)
+        self.serverHopWidget.setText(self.hop_server_dict)
+        self.serverHopWidget.clear.connect(self.clear_HopSelect)
         self.qomui_service.hopConnect(self.hop_server_dict)
         
     def clear_HopSelect(self):
         self.hop_choice = 0
         self.hop_server_dict = None
-        self.airvpn_hop_widget.setVisible(False)
-        self.mullvad_hop_widget.setVisible(False)
-        self.custom_hop_widget.setVisible(False)
+        self.serverHopWidget.setVisible(False)
         index = self.tabWidget.currentIndex()
-        if index == 0:
-            self.airvpn_countryChosen()
-        elif index == 1:
-            self.mullvad_countryChosen()
-        elif index == 2:
-            self.custom_countryChosen()
+        self.filterList()
+        
+    def chooseRandomServer(self):
+        random_list = []
+        for key, val in self.server_dict.items():
+            try:
+                if val["favourite"] == "on":
+                    random_list.append(key)
+            except KeyError:
+                pass
+        if len(random_list) != 0:
+            self.establish(random.choice(random_list), random="on")
         
     
-    def establish(self, server):
-        current_dict = getattr(self, "%s_server_dict"%(server[0]))[server[1]]
+    def establish(self, server, random=None):
+        current_dict = self.server_dict[server]
         QtWidgets.QApplication.restoreOverrideCursor()
         self.kill()
         self.create_server_dict(current_dict, 0)
@@ -1075,38 +1274,51 @@ class QomuiGui(QtWidgets.QWidget):
             self.ovpn_dict.update({"hop":"2"})
         else:
             self.ovpn_dict.update({"hop":"0"})
+            
+        if random is not None:
+            self.ovpn_dict.update({"random" : "on"})
+            
         self.connect_thread(self.ovpn_dict)
         
     def create_server_dict(self, current_dict, h):
         provider = current_dict["provider"]
-        
-        if provider == "airvpn":
-            prot_index = self.airvpn_mode_box.currentIndex()
-            mode = self.airvpn_mode_box.itemData(prot_index, QtCore.Qt.UserRole)
-            port = self.airvpn_protocol_dict[mode]["port"]
-            protocol = self.airvpn_protocol_dict[mode]["protocol"]
+        if provider == "Airvpn":
+            mode = self.protocol_dict["Airvpn"]["selected"]
+            port = self.protocol_dict["Airvpn"][mode]["port"]
+            protocol = self.protocol_dict["Airvpn"][mode]["protocol"]
 
-            if self.airvpn_protocol_dict[mode]["ip"] == "Primary":
+            if self.protocol_dict["Airvpn"][mode]["ip"] == "Primary":
                 ip = current_dict["prim_ip"]
             
-            elif self.airvpn_protocol_dict[mode]["ip"] == "Alternative":
+            elif self.protocol_dict["Airvpn"][mode]["ip"] == "Alternative":
                 ip = current_dict["alt_ip"]
-            current_dict.update({"ip" : ip, "port": port, "protocol": protocol, "prot_index": str(prot_index)})
+            current_dict.update({"ip" : ip, "port": port, "protocol": protocol, "prot_index": mode})
             
-        elif provider == "mullvad":
-            prot_index = self.mullvad_mode_box.currentIndex()
-            mode = self.mullvad_mode_box.itemData(prot_index, QtCore.Qt.UserRole)
-            port = self.mullvad_protocol_dict[mode]["port"]
-            protocol = self.mullvad_protocol_dict[mode]["protocol"]
-            current_dict.update({"port": port, "protocol": protocol, "prot_index": str(prot_index)})
+        elif provider == "Mullvad":
+            mode = self.protocol_dict["Mullvad"]["selected"]
+            port = self.protocol_dict["Mullvad"][mode]["port"]
+            protocol = self.protocol_dict["Mullvad"][mode]["protocol"]
+            current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
+            
+        elif provider == "PIA":
+            mode = self.protocol_dict["PIA"]["selected"]
+            port = self.protocol_dict["PIA"][mode]["port"]
+            protocol = self.protocol_dict["PIA"][mode]["protocol"]
+            current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
         
-        elif provider == "custom":
-            pass
-    
+        else:
+            try: 
+                port = self.protocol_dict[provider]["port"]
+                protocol = self.protocol_dict[provider]["protocol"]
+                current_dict.update({"port": port, "protocol": protocol})
+            except KeyError:
+                pass
+            
         if h == 1:
             self.hop_server_dict = current_dict
         else:
             self.ovpn_dict = current_dict
+            
           
     def log_check(self, reply):
         if reply == "success":
@@ -1119,10 +1331,6 @@ class QomuiGui(QtWidgets.QWidget):
                 except KeyError:
                     self.tray.setIcon(QtGui.QIcon("%s/qomui.png" % (ROOTDIR)))
                 
-                if self.config_dict["alt_dns1"] != "":
-                    self.qomui_service.update_dns(self.config_dict["alt_dns1"],
-                                                  self.config_dict["alt_dns2"]
-                                                  )
                 QtWidgets.QApplication.restoreOverrideCursor()
             
             elif self.hop_choice == 2 and self.log_count != 1:
@@ -1166,16 +1374,14 @@ class QomuiGui(QtWidgets.QWidget):
         self.ActiveWidget.setVisible(True)
         self.ActiveWidget.disconnect.connect(self.kill)
         self.gridLayout.addWidget(self.ActiveWidget, 0, 0, 1, 3)
-        pop_list = getattr(self, 'pop_%s_ServerList' %(current_server["provider"]))
-        try:
-            pop_list(current_server["country"])
-        except KeyError:
-            pop_list()
 
     def kill(self):
         self.WaitBar.setVisible(False)
         self.ActiveWidget.setVisible(False)
-        self.tray.setIcon(QtGui.QIcon("%s/qomui.png" % (ROOTDIR)))
+        try:
+            self.tray.setIcon(QtGui.QIcon("%s/qomui.png" % (ROOTDIR)))
+        except AttributeError:
+            pass
         self.qomui_service.disconnect()
 
     def connect_thread(self, server_dict):
@@ -1235,8 +1441,8 @@ class QomuiGui(QtWidgets.QWidget):
             self.Item.establish.connect(self.runBypass)
             
     def runBypass(self, app):
-        app = app[1]
-        with open (self.bypass_app_list[app][1], "r") as cmd_ret:
+        desktop_file = self.bypass_app_list[app][1]
+        with open (desktop_file, "r") as cmd_ret:
             search = cmd_ret.readlines()
             found = 0
             for line in search:
@@ -1260,8 +1466,9 @@ class QomuiGui(QtWidgets.QWidget):
         
         
 class ServerWidget(QtWidgets.QWidget):
-    establish = QtCore.pyqtSignal(tuple)
-    establish_hop = QtCore.pyqtSignal(tuple)
+    establish = QtCore.pyqtSignal(str)
+    establish_hop = QtCore.pyqtSignal(str)
+    fav_sig = QtCore.pyqtSignal(tuple)
     
     def __init__ (self, parent=None):
         super(ServerWidget, self).__init__(parent)
@@ -1270,7 +1477,6 @@ class ServerWidget(QtWidgets.QWidget):
             
     def setupUi(self, Form):
         Form.setObjectName(_fromUtf8("Form"))
-        #Form.resize(100, 100)
         self.horizontalLayout = QtWidgets.QHBoxLayout(Form)
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         self.country_lbl = QtWidgets.QLabel(Form)
@@ -1291,6 +1497,11 @@ class ServerWidget(QtWidgets.QWidget):
         self.stat_lbl.setVisible(False)                            
         spacerItem = QtWidgets.QSpacerItem(105, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem)
+        self.FavouriteButton = FavouriteButton(Form)
+        self.FavouriteButton.setVisible(False)
+        self.FavouriteButton.setCheckable(True)
+        self.FavouriteButton.setObjectName(_fromUtf8("FavouriteButton"))
+        self.horizontalLayout.addWidget(self.FavouriteButton)
         self.hop_bt = QtWidgets.QPushButton(Form)
         self.hop_bt.setVisible(False)
         self.hop_bt.setObjectName(_fromUtf8("hop_bt"))
@@ -1303,18 +1514,21 @@ class ServerWidget(QtWidgets.QWidget):
         QtCore.QMetaObject.connectSlotsByName(Form)
         self.connect_bt.clicked.connect(self.signal)
         self.hop_bt.clicked.connect(self.hop_signal)
+        self.FavouriteButton.toggled.connect(self.fav_change)
 
     def retranslateUi(self, Form):
         Form.setWindowTitle(_translate("Form", "Form", None))
         
-    def setText(self, name, provider, country, city, button = "connect"):
+    def setText(self, name, provider, country, city, button = "connect", fav = 0):
         self.name = name
         self.provider = provider
+        self.fav = fav
         font = QtGui.QFont()
         font.setBold(True)
         font.setWeight(75)
-        if self.provider == "airvpn" or self.provider == "mullvad" or button == "disconnect":
-            font.setPointSize(12)
+        font.setPointSize(11)
+        if self.fav == "on":
+            self.FavouriteButton.setChecked(True)
         self.name_lbl.setFont(font)
         self.name_lbl.setText(self.name)
         self.city_lbl.setText(city)
@@ -1347,6 +1561,8 @@ class ServerWidget(QtWidgets.QWidget):
             self.hop_bt.setVisible(True)
         except AttributeError:
             pass
+        if self.fav != 0:
+            self.FavouriteButton.setVisible(True)
 
     def leaveEvent(self, event):
         try:
@@ -1357,12 +1573,19 @@ class ServerWidget(QtWidgets.QWidget):
             self.hop_bt.setVisible(False)
         except AttributeError:
             pass
+        self.FavouriteButton.setVisible(False)
 
     def signal(self):
-        self.establish.emit((self.provider, self.name))
+        self.establish.emit(self.name)
     
     def hop_signal(self):
-        self.establish_hop.emit((self.provider, self.name))
+        self.establish_hop.emit(self.name)
+        
+    def fav_change(self, change):
+        self.fav_sig.emit((self.name, change))
+        
+    def sizeHint(self):
+        return QtCore.QSize(100, 50)
 
 class HopSelect(QtWidgets.QWidget):
     clear = QtCore.pyqtSignal()

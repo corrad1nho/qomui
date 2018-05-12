@@ -22,6 +22,7 @@ OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
 BUS_NAME = "org.qomui.service"
 ROOTDIR = "/usr/share/qomui"
+SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA"]
 
 class GuiLogHandler(logging.Handler):
     def __init__(self, send_log, parent = None):
@@ -38,6 +39,7 @@ class QomuiDbus(dbus.service.Object):
     hop_dict = {"none" : "none"}
     tun = "tun0"
     connect_status = 0
+    config = {}
     
     def __init__(self):
         self.sys_bus = dbus.SystemBus()
@@ -85,11 +87,11 @@ class QomuiDbus(dbus.service.Object):
     def load_firewall(self):
         try:
             with open('%s/config.json' % (ROOTDIR), 'r') as c:
-                config = json.load(c)
-                firewall.apply_rules(config["firewall"])
-                self.disable_ipv6(config["ipv6_disable"])
+                self.config = json.load(c)
+                firewall.apply_rules(self.config["firewall"])
+                self.disable_ipv6(self.config["ipv6_disable"])
         except KeyError:
-            self.logger.warning('Could not read all values from config file')
+            self.logger.warning('Could not read all values from  file')
             
     @dbus.service.method(BUS_NAME, in_signature='i', out_signature='')
     def disable_ipv6(self, i):
@@ -119,42 +121,46 @@ class QomuiDbus(dbus.service.Object):
                 self.logger.debug("OS: process %s does not exist anymore" % (i)) 
 
     @dbus.service.method(BUS_NAME, in_signature='s', out_signature='')
-    def allowUpdate(self, provider): 
-        if provider == "airvpn":
-            server = "airvpn.org"
-        elif provider == "mullvad":
-            server = "mullvad.net"
+    def allowUpdate(self, provider):
+        server = None
+        if provider == "Airvpn":
+            server = "www.airvpn.org"
+        elif provider == "Mullvad":
+            server = "www.mullvad.net"
+        elif provider == "PIA":
+            server = "www.privateinternetaccess.com"
         self.allow_dns()
-        self.logger.info("iptables: Temporarily creating rule to allow access to %s" % server)
-        dig_cmd = ["dig", "%s" %(server), "+short"]
-        ip = check_output(dig_cmd).decode("utf-8")
-        ip = ip.split("\n")[0]
-        allow = firewall.add_rule(['-I', 'OUTPUT', '1', '-d', '%s' % (ip), '-j', 'ACCEPT'])
+        if server is not None:
+            self.logger.info("iptables: Temporarily creating rule to allow access to %s" % server)
+            dig_cmd = ["dig", "%s" %(server), "+short"]
+            answer = check_output(dig_cmd).decode("utf-8")
+            parse = answer.split("\n")
+            ip = parse[len(parse)-2]
+            allow = firewall.add_rule(['-I', 'OUTPUT', '1', '-d', '%s' % (ip), '-j', 'ACCEPT'])
 
-    @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
     def allow_dns(self):
         self.logger.debug("iptables: temporarily allowing dns requests via opendns servers - allowed")
         ipt_dns_out_add = firewall.add_rule(['-I', 'OUTPUT','1', '-p', 'udp',
-                                 '-d', "208.67.222.222", '--dport', '53','-j', 'ACCEPT'])
+                                 '-d', self.config["alt_dns1"], '--dport', '53','-j', 'ACCEPT'])
         ipt_dns_in_add = firewall.add_rule(['-I', 'INPUT','2', '-p', 'udp',
-                                '-s', "208.67.222.222", '--sport', '53','-j', 'ACCEPT'])
+                                '-s', self.config["alt_dns1"], '--sport', '53','-j', 'ACCEPT'])
         ipt_dns_out_add_alt = firewall.add_rule(['-I', 'OUTPUT','3', '-p', 'udp',
-                                     '-d', "208.67.220.220", '--dport', '53','-j', 'ACCEPT'])
+                                     '-d', self.config["alt_dns2"], '--dport', '53','-j', 'ACCEPT'])
         ipt_dns_in_add_alt = firewall.add_rule(['-I', 'INPUT','4', '-p', 'udp',
-                                    '-s', "208.67.220.220", '--sport', '53','-j', 'ACCEPT'])
-        self.update_dns("208.67.222.222", "208.67.220.220")
-        
+                                    '-s', self.config["alt_dns2"], '--sport', '53','-j', 'ACCEPT'])
+        self.update_dns(dns2="fallback")
+    
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
     def block_dns(self):
         self.logger.debug("iptables: deleting rule for dns requests via opendns servers - blocked")
         ipt_dns_out_del = firewall.add_rule(['-D', 'OUTPUT','-p', 'udp',
-                                 '-d', "208.67.222.222", '--dport', '53','-j', 'ACCEPT'])
+                                 '-d', self.config["alt_dns1"], '--dport', '53','-j', 'ACCEPT'])
         ipt_dns_in_del = firewall.add_rule(['-D', 'INPUT','-p', 'udp',
-                                '-s', "208.67.222.222", '--sport', '53','-j', 'ACCEPT'])
+                                '-s', self.config["alt_dns1"], '--sport', '53','-j', 'ACCEPT'])
         ipt_dns_out_del_alt = firewall.add_rule(['-D', 'OUTPUT','-p', 'udp',
-                                     '-d', "208.67.220.220", '--dport', '53','-j', 'ACCEPT'])
+                                     '-d', self.config["alt_dns2"], '--dport', '53','-j', 'ACCEPT'])
         ipt_dns_in_del_alt = firewall.add_rule(['-D', 'INPUT','-p', 'udp',
-                                    '-s', "208.67.220.220", '--sport', '53','-j', 'ACCEPT']) 
+                                    '-s', self.config["alt_dns2"], '--sport', '53','-j', 'ACCEPT']) 
         
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
     def save_default_dns(self):
@@ -167,47 +173,57 @@ class QomuiDbus(dbus.service.Object):
             shutil.copyfile("/etc/resolv.conf.qomui.bak", "/etc/resolv.conf")
             self.logger.debug("Restored backup of /etc/resolv.conf")
         except FileNotFoundError:
-            self.logger.warning("Default DNS settings not restore. Could not find backup of /etc/resolv.conf")
+            self.logger.warning("Default DNS settings not restored. Could not find backup of /etc/resolv.conf")
     
     @dbus.service.method(BUS_NAME, in_signature='ss', out_signature='s')
     def copyCerts(self, provider, certpath):
         if not os.path.exists("%s/certs" %ROOTDIR):
             os.makedirs("%s/certs" %ROOTDIR)
         
-        if provider == "airvpn":
+        if provider == "Airvpn":
             shutil.copyfile("%s/sshtunnel.key" % (certpath), "%s/certs/sshtunnel.key" % (ROOTDIR))
             shutil.copyfile("%s/stunnel.crt" % (certpath), "%s/certs/stunnel.crt" % (ROOTDIR))
             shutil.copyfile("%s/ca.crt" % (certpath), "%s/certs/ca.crt" % (ROOTDIR))
             shutil.copyfile("%s/ta.key" % (certpath), "%s/certs/ta.key" % (ROOTDIR))
             shutil.copyfile("%s/user.key" % (certpath), "%s/certs/user.key" % (ROOTDIR))
             shutil.copyfile("%s/user.crt" % (certpath), "%s/certs/user.crt" % (ROOTDIR))
-        elif provider == "mullvad":
+        elif provider == "Mullvad":
             shutil.copyfile("%s/ca.crt" % (certpath), "%s/certs/mullvad_ca.crt" % (ROOTDIR))
             shutil.copyfile("%s/crl.pem" % (certpath), "%s/certs/mullvad_crl.pem" % (ROOTDIR))
             shutil.copyfile("%s/mullvad_userpass.txt" % (certpath), "%s/certs/mullvad_userpass.txt" % (ROOTDIR))
             
-        elif provider == "custom":
-            if not os.path.exists("%s/authfiles" % (ROOTDIR)):
-               os.makedirs("%s/authfiles" % (ROOTDIR))
-            split_path = certpath.split(" ")
-            shutil.copyfile(split_path[0], split_path[1])
+        elif provider == "PIA":
+            shutil.copyfile("%s/crl.rsa.4096.pem" % (certpath), "%s/certs/pia_crl.rsa.4096.pem" % (ROOTDIR))
+            shutil.copyfile("%s/ca.rsa.4096.crt" % (certpath), "%s/certs/pia_ca.rsa.4096.crt" % (ROOTDIR))
+            shutil.copyfile("%s/pia_userpass.txt" % (certpath), "%s/certs/pia_userpass.txt" % (ROOTDIR))
+            
+        else:
+            shutil.copytree(certpath,"%s/%s" %(ROOTDIR, provider))
+            shutil.move("%s/%s/%s-auth.txt" %(ROOTDIR, provider, provider), 
+                        "%s/certs/" % (ROOTDIR))
   
         self.logger.debug("Copied certificates and keys to %s/certs" %ROOTDIR)
         self.logger.debug("Removed temporary files")
         for key in [file for file in os.listdir("%s/certs" % (ROOTDIR))]:
-
             Popen(['chown', 'root', '%s/certs/%s' % (ROOTDIR, key)])
             Popen(['chmod', '0600', '%s/certs/%s' % (ROOTDIR, key)])
         return "copied"
        
+    @dbus.service.method(BUS_NAME, in_signature='s', out_signature='')
+    def deleteProvider(self, provider):
+        path = "%s/%s" % (ROOTDIR, provider)
+        if os.path.exists(path):
+            shutil.rmtree(path)
+            os.remove("%s/certs/%s-auth.txt" %(ROOTDIR, provider))
     
-    @dbus.service.method(BUS_NAME, in_signature='ss', out_signature='')
     def update_dns(self, dns1=None, dns2=None):
         dns = open("/etc/resolv.conf", "w")
-        if dns2 is None:
+        if dns2 is None and self.config["fallback"] == 0:
             dns.write("nameserver %s\n" %dns1)
         else:
-            dns.write("nameserver %s\nnameserver %s" % (dns1, dns2))
+            dns1 = self.config["alt_dns1"]
+            dns2 = self.config["alt_dns2"]
+            dns.write("nameserver %s\nnameserver %s\n" % (dns1, dns2)) 
         self.logger.info("DNS: Overwriting /etc/resolv.conf with %s and %s" %(dns1, dns2))
         
     @dbus.service.method(BUS_NAME, in_signature='ss', out_signature='')
@@ -222,19 +238,16 @@ class QomuiDbus(dbus.service.Object):
             self.default_interface = parse_route[4]
             default_gateway = parse_route[2]
             try:
-                with open('%s/config.json' % (ROOTDIR), 'r') as c:
-                    config = json.load(c)
-                    if config["bypass"] == 1:
-                        pid = bypass.create_cgroup(user, group, self.default_interface, default_gateway)
-                        print("DNSMASQ PID = %s" %pid)
-                        self.dnsmasq_pid = (pid, "dnsmasq")
-                    elif config["bypass"] == 0:
-                        try:
-                            bypass.delete_cgroup(self.default_interface)
-                        except AttributeError:
-                            pass
+                if self.config["bypass"] == 1:
+                    pid = bypass.create_cgroup(user, group, self.default_interface, default_gateway)
+                    self.dnsmasq_pid = (pid, "dnsmasq")
+                elif self.config["bypass"] == 0:
+                    try:
+                        bypass.delete_cgroup(self.default_interface)
+                    except AttributeError:
+                        pass
             except KeyError:
-                self.logger.warning('Could not read all values from config file')
+                self.logger.warning('Could not read all values from  file')
         except (CalledProcessError, IndexError):
             self.logger.info('Could not create cgroup for bypass - no network connectivity')
         
@@ -247,7 +260,6 @@ class QomuiDbus(dbus.service.Object):
         provider = self.ovpn_dict["provider"]
         ip = self.ovpn_dict["ip"]
         firewall.add_rule(['-I', 'OUTPUT', '1', '-d', '%s' % (ip), '-j', 'ACCEPT'])
-     
         self.logger.info("iptables: created rule for %s" %ip)
         path = "%s/temp.ovpn" %ROOTDIR
         cwd_ovpn = None
@@ -257,9 +269,9 @@ class QomuiDbus(dbus.service.Object):
         except KeyError:
             pass
               
-        if provider == "airvpn":
+        if provider == "Airvpn":
             if protocol == "SSL":
-                with open("%s/ssl_config" %ROOTDIR, "r") as ssl_edit:
+                with open("%s/ssl_" %ROOTDIR, "r") as ssl_edit:
                     ssl_config = ssl_edit.readlines()
                     for line, value in enumerate(ssl_config):
                         if value.startswith("connect") is True:
@@ -281,23 +293,43 @@ class QomuiDbus(dbus.service.Object):
             else:
                 self.write_config(provider, ip, port, protocol)
 
-        elif provider == "mullvad":
+        elif provider == "Mullvad":
             self.write_config(provider, ip, port, protocol)
             
-        elif provider == "custom":
-            path = self.ovpn_dict["path"]
-            cwd_ovpn=os.path.dirname(path) 
+        elif provider == "PIA":
+            self.write_config(provider, ip, port, protocol)
+            
+        else:
+            config_file = "%s/%s" %(ROOTDIR, self.ovpn_dict["path"])
+            try:
+                edit = "%s/temp" %(provider)
+                self.write_config(provider, ip, port, protocol, 
+                                  edit=edit, path=config_file)
+                
+                path = "%s/%s/temp.ovpn" %(ROOTDIR, provider)
+            except UnboundLocalError:
+                path = config_file
+            cwd_ovpn=os.path.dirname(config_file) 
             
         if self.hop == "2":
             firewall_hop_add = firewall.add_rule(['-I', 'OUTPUT', '1', '-d', '%s' % (self.hop_dict["ip"]), '-j', 'ACCEPT'])
-            if self.hop_dict["provider"] != "custom":
+            if self.hop_dict["provider"] in SUPPORTED_PROVIDERS:
                 hop_path = "%s/hop.ovpn" %ROOTDIR
                 self.write_config(self.hop_dict["provider"], self.hop_dict["ip"], 
                                 self.hop_dict["port"], self.hop_dict["protocol"],
                                 edit="hop")
             else:
-                hop_path = self.hop_dict["path"]
-                cwd_ovpn=os.path.dirname(path) 
+                config_file = "%s/%s" %(ROOTDIR, self.hop_dict["path"])
+                try:
+                    edit = "%s/hop" %(provider)
+                    self.write_config(self.hop_dict["provider"], self.hop_dict["ip"], 
+                                self.hop_dict["port"], self.hop_dict["protocol"],
+                                edit=edit, path=config_file)
+                    
+                    hop_path = "%s/%s/temp.ovpn" %(ROOTDIR, provider)
+                except (UnboundLocalError, KeyError):
+                     hop_path = config_file
+                cwd_ovpn=os.path.dirname(config_file)
             self.hop_thread = threading.Thread(target=self.ovpn, args=(hop_path, 
                                                                        "1", cwd_ovpn,))
             self.hop_thread.start()
@@ -306,8 +338,13 @@ class QomuiDbus(dbus.service.Object):
             
         self.ovpn(path, self.hop, cwd_ovpn)
             
-    def write_config(self, provider, ip, port, protocol, edit="temp"):
-        with open("%s/%s_config" %(ROOTDIR, provider), "r") as ovpn_edit:    
+    def write_config(self, provider, ip, port, protocol, edit="temp", path=None):
+        if path is None:
+            ovpn_file = "%s/%s_config" %(ROOTDIR, provider)
+        else:
+            ovpn_file = path
+        
+        with open(ovpn_file, "r") as ovpn_edit:    
             config = ovpn_edit.readlines()
             if protocol == "SSL":
                config.insert(13, "route %s 255.255.255.255 net_gateway\n" % (ip))
@@ -322,9 +359,9 @@ class QomuiDbus(dbus.service.Object):
                protocol = "tcp"
 
             for line, value in enumerate(config):
-                if value == "proto \n":
+                if value.startswith("proto ") is True:
                     config[line] = "proto %s \n" % (protocol.lower()) 
-                elif value == "remote \n":
+                elif value.startswith("remote ") is True:
                     config[line] = "remote %s %s \n" % (ip.replace("\n", ""), port)
             
             with open("%s/%s.ovpn" %(ROOTDIR, edit), "w") as ovpn_dump:
@@ -334,6 +371,7 @@ class QomuiDbus(dbus.service.Object):
         logging.debug("Temporary config file(s) for requested server written") 
         
     def ovpn(self, ovpn_file, h, cwd_ovpn):
+        self.dns_found = 0
         logging.info("Establishing new OpenVPN tunnel")
         name = self.ovpn_dict["name"]
         last_ip = self.ovpn_dict["ip"]
@@ -372,14 +410,17 @@ class QomuiDbus(dbus.service.Object):
                     self.connect_status = 1
                     self.reply("success")
                     self.logger.info("Successfully connected to %s" %name)
+                    if self.dns_found == 0:
+                        self.update_dns(dns2="fallback")
                 elif line.find('TUN/TAP device') != -1:
                     self.tun = line_format.split(" ")[3]
                 elif line.find('PUSH: Received control message:') != -1:
-                    index = line_format.find('dhcp-option')
-                    option = line_format[index:].split(",")[0]
-                    self.dns = option.split(" ")[2]
-                    print("DNS = %s" %self.dns)
-                    self.update_dns(dns1=self.dns)
+                    if line_format.find('dhcp-option') != -1:
+                        index = line_format.find('dhcp-option')
+                        option = line_format[index:].split(",")[0]
+                        self.dns = option.split(" ")[2]
+                        self.update_dns(dns1=self.dns)
+                        self.dns_found = 1
                 elif line.find("Restart pause, 10 second(s)") != -1:
                     self.reply("fail1")
                     self.logger.info("Connection attempt failed") 

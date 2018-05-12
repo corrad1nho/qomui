@@ -3,11 +3,11 @@
 Written in Python 3.6
 
 ### Description
-Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux with some unique features such as provider-independent support for double-hop connections. Qomui supports multiple providers with added convenience when using AirVPN or Mullvad. 
+Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux with some unique features such as provider-independent support for double-hop connections. Qomui supports multiple providers with added convenience when using AirVPN, PIA or Mullvad. 
 
 ### Features
 - should work with all VPN providers that offer OpenVPN config files 
-- automatic download function for Mullvad and AirVPN 
+- automatic download function for Mullvad, Private Internet Access and AirVPN 
 - support for OpenVPN over SSL and SSH for AirVPN
 - allows double-hop VPN connections (VPN chains) between different providers (currently tested with AirVPN, Mullvad and ProtonVPN). 
 - Gui written in PyQt including option to minimize application to system tray 
@@ -98,6 +98,12 @@ The idea is taken from [this post on severfault.com](https://serverfault.com/que
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.3
+- added feature to make a list of favourite servers
+- improved support for config-file import
+- added support for PIA
+- all servers are now shown in one tab
+
 version 0.2
 
 - added OpenVPN bypass feature
