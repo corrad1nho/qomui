@@ -20,8 +20,7 @@ import shlex
 import glob
 import configparser
 
-import update
-#from qomui import update
+from qomui import update
 
 
 try:
