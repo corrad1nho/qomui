@@ -12,10 +12,9 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - allows double-hop VPN connections (VPN chains) between different providers (currently tested with AirVPN, Mullvad and ProtonVPN). 
 - Gui written in PyQt including option to minimize application to system tray 
 - security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
-- protection against DNS leaks
+- protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
-- option allow applications to bypass the OpenVPN tunnel - to watch Netflix for example
-
+- allow applications to bypass the OpenVPN tunnel - to watch Netflix for example
 
 ### Dependencies/Requirements
 - Qomui should work on any GNU/Linux distribution 
@@ -49,7 +48,7 @@ yaourt -S libcgroup
 The equivalent for Debian/Ubuntu-based distributions is:
 
 ```
-sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils dnsmasq cgroup-lite cgroup-tools geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
+sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils net-tools dnsmasq cgroup-lite cgroup-tools geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
 ```
 
 
@@ -98,14 +97,24 @@ The idea is taken from [this post on severfault.com](https://serverfault.com/que
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.3.1
+- [new] Modify imported servers and config files
+- [change] Improved performance of server list
+- [change] Mullvad: Updated link to parse server info
+- [bugfix] Crashes when deleting server/provider fixed
+- [bugfix] Memory leak in server tab fixed
+
 version 0.3
-- added feature to make a list of favourite servers
-- improved support for config-file import
-- added support for PIA
-- all servers are now shown in one tab
+- [new] Mark servers as favourites
+- [new] Randomly connect to a favourite server
+- [new] Support for PIA (PrivateInternetAccess)
+- [new] Override Port/Protocol in imported configs
+- [change] Config file import improved
+- [change] All servers displayed in one tab
+- [bugfix] Crashes after hibernate
 
 version 0.2
 
-- added OpenVPN bypass feature
-- rewritten DNS management
+- [new] OpenVPN bypass
+- [change] DNS management
 

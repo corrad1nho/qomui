@@ -9,7 +9,7 @@ persist-tun
 remote-cert-tls server
 cipher AES-256-CBC
 comp-lzo no
-#route-delay 5
+auth-nocache
 verb 3
 ca /usr/share/qomui/certs/ca.crt
 cert /usr/share/qomui/certs/user.crt

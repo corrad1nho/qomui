@@ -148,7 +148,7 @@ class QomuiDbus(dbus.service.Object):
                                      '-d', self.config["alt_dns2"], '--dport', '53','-j', 'ACCEPT'])
         ipt_dns_in_add_alt = firewall.add_rule(['-I', 'INPUT','4', '-p', 'udp',
                                     '-s', self.config["alt_dns2"], '--sport', '53','-j', 'ACCEPT'])
-        self.update_dns(dns2="fallback")
+        self.update_dns()
     
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
     def block_dns(self):
@@ -179,7 +179,7 @@ class QomuiDbus(dbus.service.Object):
     def copyCerts(self, provider, certpath):
         if not os.path.exists("%s/certs" %ROOTDIR):
             os.makedirs("%s/certs" %ROOTDIR)
-        
+    
         if provider == "Airvpn":
             shutil.copyfile("%s/sshtunnel.key" % (certpath), "%s/certs/sshtunnel.key" % (ROOTDIR))
             shutil.copyfile("%s/stunnel.crt" % (certpath), "%s/certs/stunnel.crt" % (ROOTDIR))
@@ -187,6 +187,7 @@ class QomuiDbus(dbus.service.Object):
             shutil.copyfile("%s/ta.key" % (certpath), "%s/certs/ta.key" % (ROOTDIR))
             shutil.copyfile("%s/user.key" % (certpath), "%s/certs/user.key" % (ROOTDIR))
             shutil.copyfile("%s/user.crt" % (certpath), "%s/certs/user.crt" % (ROOTDIR))
+            
         elif provider == "Mullvad":
             shutil.copyfile("%s/ca.crt" % (certpath), "%s/certs/mullvad_ca.crt" % (ROOTDIR))
             shutil.copyfile("%s/crl.pem" % (certpath), "%s/certs/mullvad_crl.pem" % (ROOTDIR))
@@ -197,11 +198,45 @@ class QomuiDbus(dbus.service.Object):
             shutil.copyfile("%s/ca.rsa.4096.crt" % (certpath), "%s/certs/pia_ca.rsa.4096.crt" % (ROOTDIR))
             shutil.copyfile("%s/pia_userpass.txt" % (certpath), "%s/certs/pia_userpass.txt" % (ROOTDIR))
             
+        elif provider.find("CHANGE") != -1:
+            provider = provider.split("_")[1]
+            for f in os.listdir(certpath):
+                f_source = "%s/%s" %(certpath, f)
+                if provider in SUPPORTED_PROVIDERS:
+                    f_dest = "%s/%s" %(ROOTDIR, f)
+                else:
+                    f_dest = "%s/%s/%s" %(ROOTDIR, provider, f)
+                shutil.copyfile(f_source,f_dest)
+                self.logger.debug("copied %s to %s" %(f, f_dest))
+            
         else:
-            shutil.copytree(certpath,"%s/%s" %(ROOTDIR, provider))
-            shutil.move("%s/%s/%s-auth.txt" %(ROOTDIR, provider, provider), 
-                        "%s/certs/" % (ROOTDIR))
-  
+            for f in os.listdir(certpath):               
+                f_source = "%s/%s" %(certpath, f)
+                f_dest = "%s/%s/%s" %(ROOTDIR, provider, f)
+                if os.path.isfile(f_source):
+                    try:
+                        shutil.copyfile(f_source,f_dest)
+                        self.logger.debug("copied %s to %s" %(f, f_dest))
+                    except FileNotFoundError:
+                        if not os.path.exists("%s/%s" %(ROOTDIR, provider)):
+                            os.makedirs("%s/%s" %(ROOTDIR, provider))
+                        shutil.copyfile(f_source,f_dest)
+                        self.logger.debug("copied %s to %s" %(f, f_dest))
+                elif os.path.isdir(f_source):
+                    try:
+                        shutil.rmtree(f_dest)
+                    except (NotADirectoryError, FileNotFoundError):
+                        pass
+                    shutil.copytree(f_source,f_dest)
+                    self.logger.debug("copied folder %s to %s" %(f, f_dest))
+            
+            try:
+                auth_file = "%s/%s/%s-auth.txt" %(ROOTDIR, provider, provider)
+                shutil.copyfile(auth_file, "%s/certs/%s-auth.txt" % (ROOTDIR, provider))
+                os.remove(auth_file)
+            except FileNotFoundError:
+                pass
+        
         self.logger.debug("Copied certificates and keys to %s/certs" %ROOTDIR)
         self.logger.debug("Removed temporary files")
         for key in [file for file in os.listdir("%s/certs" % (ROOTDIR))]:
@@ -214,12 +249,18 @@ class QomuiDbus(dbus.service.Object):
         path = "%s/%s" % (ROOTDIR, provider)
         if os.path.exists(path):
             shutil.rmtree(path)
-            os.remove("%s/certs/%s-auth.txt" %(ROOTDIR, provider))
+            try:
+                os.remove("%s/certs/%s-auth.txt" %(ROOTDIR, provider))
+            except FileNotFoundError:
+                pass
     
     def update_dns(self, dns1=None, dns2=None):
         dns = open("/etc/resolv.conf", "w")
-        if dns2 is None and self.config["fallback"] == 0:
-            dns.write("nameserver %s\n" %dns1)
+        if dns1 is not None and self.config["fallback"] == 0:
+            if dns2 is not None:
+                dns.write("nameserver %s\nnameserver %s\n" % (dns1, dns2)) 
+            else:
+                dns.write("nameserver %s\n" %dns1)
         else:
             dns1 = self.config["alt_dns1"]
             dns2 = self.config["alt_dns2"]
@@ -271,7 +312,7 @@ class QomuiDbus(dbus.service.Object):
               
         if provider == "Airvpn":
             if protocol == "SSL":
-                with open("%s/ssl_" %ROOTDIR, "r") as ssl_edit:
+                with open("%s/ssl_config" %ROOTDIR, "r") as ssl_edit:
                     ssl_config = ssl_edit.readlines()
                     for line, value in enumerate(ssl_config):
                         if value.startswith("connect") is True:
@@ -411,16 +452,23 @@ class QomuiDbus(dbus.service.Object):
                     self.reply("success")
                     self.logger.info("Successfully connected to %s" %name)
                     if self.dns_found == 0:
-                        self.update_dns(dns2="fallback")
+                        self.update_dns()
                 elif line.find('TUN/TAP device') != -1:
                     self.tun = line_format.split(" ")[3]
                 elif line.find('PUSH: Received control message:') != -1:
-                    if line_format.find('dhcp-option') != -1:
-                        index = line_format.find('dhcp-option')
-                        option = line_format[index:].split(",")[0]
+                    dns_option_1 = line_format.find('dhcp-option')
+                    if dns_option_1 != -1:
+                        option = line_format[dns_option_1:].split(",")[0]
                         self.dns = option.split(" ")[2]
-                        self.update_dns(dns1=self.dns)
                         self.dns_found = 1
+                        dns_option_2 = line_format.find('dhcp-option', dns_option_1+20)
+                        if dns_option_2 != -1:
+                            option = line_format[dns_option_2:].split(",")[0]
+                            self.dns_2 = option.split(" ")[2]
+                            self.update_dns(dns1=self.dns, dns2=self.dns_2)
+                        else:
+                            self.update_dns(dns1=self.dns)
+
                 elif line.find("Restart pause, 10 second(s)") != -1:
                     self.reply("fail1")
                     self.logger.info("Connection attempt failed") 

@@ -35,156 +35,12 @@ DIRECTORY = "%s/.qomui" % (os.path.expanduser("~"))
 ROOTDIR = "/usr/share/qomui"
 supported_providers = ["Airvpn", "Mullvad", "PIA", "Manually add config files"]
 
-class Login(QtWidgets.QWidget):
-    allow = QtCore.pyqtSignal(str)
-    downloaded = QtCore.pyqtSignal(dict)
-    wait = QtCore.pyqtSignal(tuple)
-    auth = QtCore.pyqtSignal(tuple)
-    
-    def __init__ (self, parent):
-        super(Login, self).__init__(parent)
-        self.setupUi(self)
- 
-    def setupUi(self, Form):
-        Form.setObjectName(_fromUtf8("Form"))
-        self.verticalLayout = QtWidgets.QVBoxLayout(Form)
-        self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
-        self.providerChoice = QtWidgets.QComboBox(Form)
-        self.providerChoice.setObjectName(_fromUtf8("providerChoice"))
-        self.verticalLayout.addWidget(self.providerChoice)
-        self.provider_edit = QtWidgets.QLineEdit(Form)
-        self.provider_edit.setObjectName(_fromUtf8("provider_edit"))
-        self.provider_edit.setVisible(False)
-        self.verticalLayout.addWidget(self.provider_edit)
-        self.gridLayout = QtWidgets.QGridLayout(Form)
-        self.gridLayout.setObjectName(_fromUtf8("gridLayout"))
-        self.user_edit = QtWidgets.QLineEdit(Form)
-        self.user_edit.setObjectName(_fromUtf8("user_edit"))
-        self.gridLayout.addWidget(self.user_edit, 0, 0, 1, 2)
-        self.download_bt = QtWidgets.QPushButton(Form)
-        self.download_bt.setObjectName(_fromUtf8("download_bt"))
-        self.gridLayout.addWidget(self.download_bt, 0, 2, 1, 1)
-        self.pass_edit = QtWidgets.QLineEdit(Form)
-        self.pass_edit.setEchoMode(QtWidgets.QLineEdit.Password)
-        self.pass_edit.setObjectName(_fromUtf8("pass_edit"))
-        self.gridLayout.addWidget(self.pass_edit, 1, 0, 1, 2)
-        self.cancel_bt = QtWidgets.QPushButton(Form)
-        self.cancel_bt.setObjectName(_fromUtf8("cancel_bt"))
-        self.gridLayout.addWidget(self.cancel_bt, 1, 2, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout)
-        self.retranslateUi(Form)
-        QtCore.QMetaObject.connectSlotsByName(Form)
-        
-        for provider in supported_providers:
-            self.providerChoice.addItem(provider)
-        
-        self.providerChoice.activated[str].connect(self.providerChosen)
-        
-        self.download_bt.clicked.connect(self.login)
-        self.cancel_bt.clicked.connect(self.cancel)
-
-    def retranslateUi(self, Form):
-        Form.setWindowTitle(_translate("Form", "Credentials for", None))
-        self.user_edit.setPlaceholderText(_translate("Form", "Username", None))
-        self.download_bt.setText(_translate("Form", "Download", None))
-        self.download_bt.setIcon(QtGui.QIcon.fromTheme("list-add"))
-        self.pass_edit.setPlaceholderText(_translate("Form", "Password", None))
-        self.cancel_bt.setText(_translate("Form", "Cancel", None))
-        self.cancel_bt.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
-
-
-    def providerChosen(self):
-        self.provider = self.providerChoice.currentText()
-        if self.provider == "Airvpn" or self.provider == "PIA":
-            self.provider_edit.setVisible(False)
-            self.pass_edit.setVisible(True)
-            self.user_edit.setPlaceholderText(_translate("Form", "Username", None))
-            self.pass_edit.setPlaceholderText(_translate("Form", "Password", None))
-            self.download_bt.setText(_translate("Form", "Download", None))
-        elif self.provider == "Mullvad":
-            self.provider_edit.setVisible(False)
-            self.user_edit.setPlaceholderText(_translate("Form", "Account Number", None))
-            self.pass_edit.setPlaceholderText(_translate("Form", "N.A.", None))
-            self.download_bt.setText(_translate("Form", "Download", None))
-        else:
-            self.provider_edit.setVisible(True)
-            self.provider_edit.setPlaceholderText(_translate("Form", "Specify name of provider", None))
-            self.pass_edit.setVisible(True)
-            self.user_edit.setPlaceholderText(_translate("Form", "Username", None))
-            self.pass_edit.setPlaceholderText(_translate("Form", "Password", None))
-            self.download_bt.setText(_translate("Form", "Add Folder", None))
-            
-    def cancel(self):
-        self.provider_edit.setPlaceholderText(_translate("Form", "Specify name of provider", None))
-        self.user_edit.setPlaceholderText(_translate("Form", "Username", None))
-        self.pass_edit.setPlaceholderText(_translate("Form", "Password", None))
-        self.wait.emit(("stop", None))
-
-    def login(self):
-        if not os.path.exists("%s/temp" % (DIRECTORY)):
-               os.makedirs("%s/temp" % (DIRECTORY))
-        self.provider = self.providerChoice.currentText()
-        self.allow.emit(self.provider)
-        self.wait.emit(("start", self.provider))
-        if self.provider == "Airvpn":
-            username = self.user_edit.text()
-            password = self.pass_edit.text()
-            self.down_thread = AirVPNDownload(username, password)
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-            self.down_thread.importFail.connect(self.authfail)
-            self.down_thread.down_finished.connect(self.finished)
-            self.down_thread.start()
-        elif self.provider == "Mullvad":
-            account_number = self.user_edit.text()
-            self.down_thread = MullvadDownload(account_number)
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-            self.down_thread.importFail.connect(self.authfail)
-            self.down_thread.down_finished.connect(self.finished)
-            self.down_thread.start()
-        elif self.provider == "PIA":
-            username = self.user_edit.text()
-            password = self.pass_edit.text()
-            self.down_thread = PiaDownload(username, password)
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-            self.down_thread.importFail.connect(self.authfail)
-            self.down_thread.down_finished.connect(self.finished)
-            self.down_thread.start()
-        else:
-            
-            if self.provider_edit.text() == "":
-                err = QtWidgets.QMessageBox.critical(self,
-                                                "Error",
-                                                "Please enter a provider name",
-                                                QtWidgets.QMessageBox.Ok)
-            
-            else:
-                credentials = (self.user_edit.text(), self.pass_edit.text(), self.provider_edit.text())
-                try:
-                    dialog = QtWidgets.QFileDialog.getOpenFileName(self,
-                                                                    caption="Choose Folder",
-                                                                    directory = os.path.expanduser("~"),
-                                                                    filter=self.tr('OpenVPN (*.ovpn *conf);;All files (*.*)'),
-                                                                    options=QtWidgets.QFileDialog.ReadOnly)
-                    
-                    folderpath = QtCore.QFileInfo(dialog[0]).absolutePath()
-                    if folderpath != "":
-                        self.thread = AddThread(credentials, folderpath)
-                        self.thread.down_finished.connect(self.finished)
-                        self.thread.start()
-                except TypeError:
-                    print("error")
-
-    def authfail(self):
-        QtWidgets.QApplication.restoreOverrideCursor()
-        self.wait.emit(("stop", None))
-        fail_msg = QtWidgets.QMessageBox.information(self,
-                                                "Authentication failed",
-                                                "Perhaps the credentials you entered are wrong",
-                                                QtWidgets.QMessageBox.Ok)
-    def finished(self, download_dict):
-        QtWidgets.QApplication.restoreOverrideCursor()
-        self.wait.emit(("stop", None))
-        self.downloaded.emit(download_dict)
+def country_translate(cc):
+    try:
+        country = pycountry.countries.get(alpha_2=cc).name
+        return country
+    except KeyError:
+        return "Unknown"
 
 class AirVPNDownload(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(object)
@@ -334,28 +190,24 @@ class MullvadDownload(QtCore.QThread):
             with open("%s/mullvad_userpass.txt" %(certpath), "w") as passfile:
                 passfile.write("%s\nm" %(self.accountnumber))
 
-            page = self.session.get('https://mullvad.net/guides/our-vpn-servers/')
+            page = self.session.get('https://www.mullvad.net/en/servers/')
             server_page = BeautifulSoup(page.content, "lxml")
-            server_parse = server_page.find("pre").get_text()
-            formatted = io.StringIO(server_parse)
-            lines = formatted.readlines()[6:]
-            for line in lines:
-                if re.search(r" | ", line) is not None:
-                    results = line.split("|")
-                    server = results[0].replace(" ", "") + ".mullvad.net"
-                    dig_cmd = ["dig", "%s" %(server), "+short"]
-                    ip = check_output(dig_cmd).decode("utf-8")
-                    ip = ip.split("\n")[0]
-                    country_raw = results[1].strip()
+            server_parse = server_page.find("div", {"class":"section-content server-table"}).findAll('tr')
+            for entry in server_parse:
+                info = entry.findAll('td')
+                if info[1].string != "Country":
+                    server = "%s.mullvad.net" %info[0].string
+                    country_raw = info[1].string
+                    city = info[2].string
+                    ip = info[3].string
                     if country_raw == "UK":
                         country = "United Kingdom"
                     elif country_raw == "USA":
                         country = "United States"
                     elif country_raw == "Czech Rep.":
-                        country = "Czech Republic"
+                        country = "Czechia"
                     else:
                         country = country_raw
-                    city = results[2].strip()
                     self.Mullvad_server_dict[server] = {"name" : server,
                                                         "provider" :"Mullvad",
                                                         "city" : city,
@@ -437,6 +289,7 @@ class PiaDownload(QtCore.QThread):
 class AddThread(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(dict)
     importFail = QtCore.pyqtSignal(str)
+    extensions = ['.ovpn', '.conf', '.key', '.cert', '.pem']
     
     def __init__(self, credentials, folderpath):
         QtCore.QThread.__init__(self)
@@ -446,69 +299,91 @@ class AddThread(QtCore.QThread):
         self.folderpath = folderpath
     
     def run(self):
+        self.configs = [f for f in os.listdir(self.folderpath) if f.endswith('.ovpn') or f.endswith('.conf')]
+        if len(self.configs) == 0:
+            self.importFail.emit(self.provider)
+            
+        elif self.sanity_check(self.folderpath) >= 10:
+                self.importFail.emit(self.provider)
+        
+        else:
+            if os.path.exists("%s/temp/%s" % (DIRECTORY, self.provider)):
+                shutil.rmtree("%s/temp/%s" % (DIRECTORY, self.provider))
+            shutil.copytree(self.folderpath, "%s/temp/%s" % (DIRECTORY, self.provider)) 
+            self.import_configs()
+    
+    def import_configs(self):
         custom_server_dict = {}
-        shutil.copytree(self.folderpath, "%s/temp/%s" % (DIRECTORY, self.provider)) 
-        
         temp_path = "%s/temp/%s" % (DIRECTORY, self.provider)
-        
-        for f in os.listdir(temp_path):
-            temp_copy = "%s/%s" %(temp_path, f)
+        for f in self.configs:
             name = os.path.splitext(f)[0]
             copied_file = "%s/%s" % (temp_path, f)
             ip_found = 0
-            if copied_file.endswith('.ovpn') or copied_file.endswith('.conf'):
-                with open(copied_file, "r") as config:
-                    modify = config.readlines()
-                    for index, line in enumerate(modify):
-                        if line.startswith("remote "):
+            with open(copied_file, "r") as config:
+                modify = config.readlines()
+                for index, line in enumerate(modify):
+                    if line.startswith("remote "):
+                        if ip_found == 0:
                             ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
                             result = ipsearch.search(line)
                             if result is not None:
-                                if ip_found == 0:
-                                    ip = result.group()
-                                    ip_found = 1
-                                else:
-                                    modify[index] = "#%s" %line
+                                ip = result.group()
+                                ip_found = 1
                             else:
-                                if ip_found == 0:
-                                    server = line.split(" ")[1]
-                                    port = line.split(" ")[2]
-                                    try:
-                                        dig_cmd = ["dig", "%s" %(server), "+short"]
-                                        ip = check_output(dig_cmd).decode("utf-8")
-                                        ip = ip.split("\n")[0]
-                                        modify[index] = "remote %s %s" %(ip, port)
-                                        ip_found = 1
-                                    except CalledProcessError:
-                                        logging.warning("dig: resolving servername failed")
-                                else:
-                                    line = "#%s" %line
-                        elif line.startswith("auth-user-pass"):
-                            auth_file = '%s/certs/%s-auth.txt' %(ROOTDIR, self.provider)
-                            modify[index] = 'auth-user-pass %s\n' % auth_file
-                    config.close()
+                                server = line.split(" ")[1]
+                                port = line.split(" ")[2]
+                                try:
+                                    dig_cmd = ["dig", "%s" %(server), "+short"]
+                                    ip = check_output(dig_cmd).decode("utf-8")
+                                    ip = ip.split("\n")[0]
+                                    modify[index] = "remote %s %s\n" %(ip, port)
+                                    ip_found = 1
+                                except CalledProcessError:
+                                    ip = line.split(" ")[1]
+                                    logging.warning("dig: resolving servername failed")
+                        else:
+                            modify[index] = "#%s" %line
+                    elif line.startswith("auth-user-pass"):
+                        auth_file = '%s/certs/%s-auth.txt' %(ROOTDIR, self.provider)
+                        modify[index] = 'auth-user-pass %s\n' % auth_file
+                    elif line.startswith("verb "):
+                        modify[index] = 'verb 3\n'
+                    elif line.startswith("up ") or line.startswith("down "):
+                        modify[index] = "#%s" %line
+                config.close()
                             
                 with open (copied_file, "w") as file_edit:
                     file_edit.writelines(modify)
                     file_edit.close()
                     
-                country_check = check_output(["geoiplookup", "%s" %ip]).decode("utf-8")
-                cc = country_check.split(" ")[3].split(",")[0]
-                
-                try:
-                    country = pycountry.countries.get(alpha_2=cc).name
-                except KeyError:
-                    country = "undefined"
-            
-                custom_server_dict[name] = {"name": name, "provider" : self.provider, "city" : "",
+                if ip_found != 0:
+                    country_check = check_output(["geoiplookup", "%s" %ip]).decode("utf-8")
+                    cc = country_check.split(" ")[3].split(",")[0]
+                    country = country_translate(cc)
+                    
+                    custom_server_dict[name] = {"name": name, "provider" : self.provider, "city" : "",
                                                 "path" : "%s/%s" %(self.provider, f), "ip" : ip, "country" : country}
+                    
+                else:
+                    pass
+                    
         
         with open("%s/%s-auth.txt" % (temp_path, self.provider) , "w") as passfile:
             passfile.write('%s\n%s' % (self.username, self.password))
             
         custom_dict = {"server" : custom_server_dict, "provider" : self.provider, "path" : temp_path}
         
-        if bool(custom_server_dict) is False:
-            self.importFail.emit(self.provider)
-        else:
-            self.down_finished.emit(custom_dict)   
+        self.down_finished.emit(custom_dict) 
+                    
+    def sanity_check(self, path):
+        unrelated_files = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                try:
+                    ext = os.path.splitext(f)[1]
+                    if ext not in self.extensions:
+                       unrelated_files += 1 
+                except IndexError:
+                    unrelated_files += 1
+        return unrelated_files
+    

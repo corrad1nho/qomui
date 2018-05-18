@@ -20,7 +20,8 @@ import shlex
 import glob
 import configparser
 
-from qomui import update
+import update
+#from qomui import update
 
 
 try:
@@ -91,7 +92,7 @@ class FavouriteButton(QtWidgets.QAbstractButton):
 class QomuiGui(QtWidgets.QWidget):
     server_dict = {}
     protocol_dict = {}
-    country_list = []
+    country_list = ["All countries"]
     provider_list = ["All providers"]
     config_dict = {}
     fire_change = False
@@ -215,7 +216,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.tab_bt_group.addButton(self.bypass_tab_bt)
         self.bypass_tab_bt.setObjectName(_fromUtf8("bypass_tab_bt"))
         self.verticalLayout_3.addWidget(self.bypass_tab_bt)
-        
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_3.addItem(spacerItem)
         self.gridLayout.addLayout(self.verticalLayout_3, 2, 0, 1, 1)
@@ -242,7 +242,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.verticalLayout.addLayout(self.horizontalLayout_3)
         self.serverListWidget = QtWidgets.QListWidget(self.serverTab)
         self.serverListWidget.setObjectName(_fromUtf8("serverListWidget"))
-        self.serverListWidget.setLayoutMode(QtWidgets.QListWidget.Batched)
         self.serverListWidget.setBatchSize(10)
         self.serverListWidget.setUniformItemSizes(True)
         self.verticalLayout.addWidget(self.serverListWidget)
@@ -260,6 +259,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.add_server_bt = QtWidgets.QPushButton(self.serverTab)
         self.add_server_bt.setObjectName(_fromUtf8("add_server_bt"))
         self.horizontalLayout.addWidget(self.add_server_bt)
+        self.modify_server_bt = QtWidgets.QPushButton(self.serverTab)
+        self.modify_server_bt.setObjectName(_fromUtf8("modify_server_bt"))
+        self.horizontalLayout.addWidget(self.modify_server_bt)
         self.del_server_bt = QtWidgets.QPushButton(self.serverTab)
         self.del_server_bt.setObjectName(_fromUtf8("del_server_bt"))
         self.horizontalLayout.addWidget(self.del_server_bt)
@@ -384,7 +386,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.tabWidget.addWidget(self.options_tab)
         self.provider_tab = QtWidgets.QWidget()
         self.provider_tab.setObjectName(_fromUtf8("provider_tab"))
-        
         self.verticalLayout_30 = QtWidgets.QVBoxLayout(self.provider_tab)
         self.verticalLayout_30.setObjectName("verticalLayout_30")
         font = QtGui.QFont()
@@ -396,7 +397,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.verticalLayout_30.addWidget(self.addProviderLabel)
         self.providerChoice = QtWidgets.QComboBox(Form)
         self.providerChoice.setObjectName(_fromUtf8("providerChoice"))
-        
         self.verticalLayout_30.addWidget(self.providerChoice)
         self.provider_edit = QtWidgets.QLineEdit(Form)
         self.provider_edit.setObjectName(_fromUtf8("provider_edit"))
@@ -415,7 +415,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.pass_edit.setObjectName(_fromUtf8("pass_edit"))
         self.gridLayout_3.addWidget(self.pass_edit, 1, 0, 1, 2)
         self.verticalLayout_30.addLayout(self.gridLayout_3)
-        
         self.delProviderLabel = QtWidgets.QLabel(self.provider_tab)
         self.delProviderLabel.setFont(font)
         self.delProviderLabel.setObjectName("delProviderLabel")
@@ -524,6 +523,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.download_bt.clicked.connect(self.login)
         self.random_server_bt.clicked.connect(self.chooseRandomServer)
         self.savePortButton.clicked.connect(self.overrideProtocol)
+        self.modify_server_bt.clicked.connect(self.modifyServer)
 
     def retranslateUi(self, Form):
         Form.setWindowTitle(_translate("Form", "Qomui", None))
@@ -536,6 +536,8 @@ class QomuiGui(QtWidgets.QWidget):
         self.random_server_bt.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
         self.add_server_bt.setText(_translate("Form", "Add Servers", None))
         self.add_server_bt.setIcon(QtGui.QIcon.fromTheme("list-add"))
+        self.modify_server_bt.setText(_translate("Form", "Modify", None))
+        self.modify_server_bt.setIcon(QtGui.QIcon.fromTheme("edit"))
         self.del_server_bt.setText(_translate("Form", "Delete", None))
         self.del_server_bt.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
         self.autoconnect_check.setText(_translate("Form", "Autoconnect", None))
@@ -552,13 +554,13 @@ class QomuiGui(QtWidgets.QWidget):
         self.cancel_bt.setText(_translate("Form", "Cancel", None))
         self.cancel_bt.setIcon(QtGui.QIcon.fromTheme("dialog-close"))
         self.firewall_edit_bt.setText(_translate("Form", "Edit firewall rules", None))
-        self.firewall_edit_bt.setIcon(QtGui.QIcon.fromTheme("configure"))
+        self.firewall_edit_bt.setIcon(QtGui.QIcon.fromTheme("edit"))
         self.add_app_bt.setText(_translate("Form", "Add Application", None))
         self.add_app_bt.setIcon(QtGui.QIcon.fromTheme("list-add"))
         self.del_app_bt.setText(_translate("Form", "Remove", None))
         self.del_app_bt.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
         self.protocolLabel.setText(_translate("Form", "Choose protocol and port:", None))
-        self.addProviderLabel.setText(_translate("Form", "Add provider:", None))
+        self.addProviderLabel.setText(_translate("Form", "Add/update provider:", None))
         self.delProviderLabel.setText(_translate("Form", "Delete provider:", None))
         self.delProviderButton.setText(_translate("Form", "Delete", None))
         self.delProviderButton.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
@@ -753,7 +755,7 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             with open('%s/server.json' % (DIRECTORY), 'r') as sload:
                 self.server_dict = json.load(sload)
-                self.popBoxes()
+                self.popBoxes(country='All countries')
     
         except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
             self.logger.error('%s: Could not open %s/_server.json' % (e, DIRECTORY))
@@ -793,18 +795,8 @@ class QomuiGui(QtWidgets.QWidget):
                     try:
                         if self.ovpn_dict["favourite"] == "on":
                             self.favouriteButton.setChecked(True)
-                        else:
-                            try:
-                                self.countryBox.setCurrentIndex(sorted(self.country_list).index(self.ovpn_dict["country"]))
-                                self.filterList()
-                            except ValueError:
-                                pass
                     except KeyError:
-                        try:
-                            self.countryBox.setCurrentIndex(sorted(self.country_list).index(self.ovpn_dict["country"]))
-                            self.filterList()
-                        except ValueError:
-                            pass
+                        pass
                     
         except (FileNotFoundError,json.decoder.JSONDecodeError, KeyError) as e:
             self.logger.error('Could not open %s/last_server.json' % (DIRECTORY))
@@ -859,7 +851,6 @@ class QomuiGui(QtWidgets.QWidget):
                 self.connect_thread(self.ovpn_dict)
                 self.qomui_service.bypass(self.user, self.group)
         elif networkstate != 70 and networkstate != 60:
-            #self.qomui_service.bypass(self.user, self.group)
             self.logger.info("Lost network connection - VPN tunnel terminated")
             self.kill()
         
@@ -913,6 +904,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.down_thread.importFail.connect(self.importFail)
             self.down_thread.down_finished.connect(self.downloaded)
             self.down_thread.start()
+            self.update_bar("start", provider)
         elif provider == "PIA":
             username = self.user_edit.text()
             password = self.pass_edit.text()
@@ -921,19 +913,19 @@ class QomuiGui(QtWidgets.QWidget):
             self.down_thread.importFail.connect(self.importFail)
             self.down_thread.down_finished.connect(self.downloaded)
             self.down_thread.start()
+            self.update_bar("start", provider)
         else:
-            if self.provider_edit.text() == "":
+            provider = self.provider_edit.text()
+            if provider == "":
                 err = QtWidgets.QMessageBox.critical(self,
                                                 "Error",
                                                 "Please enter a provider name",
                                                 QtWidgets.QMessageBox.Ok)
                 
-            elif self.provider_edit.text() in self.provider_list:
-                err = QtWidgets.QMessageBox.critical(self,
-                                                "Provider already exists",
-                                                "Please choose another name",
-                                                QtWidgets.QMessageBox.Ok)
-            
+            elif provider in SUPPORTED_PROVIDERS:
+                self.provider = provider
+                self.login()
+                
             else:
                 credentials = (self.user_edit.text(), self.pass_edit.text(), self.provider_edit.text())
                 try:
@@ -949,11 +941,10 @@ class QomuiGui(QtWidgets.QWidget):
                         self.thread.down_finished.connect(self.downloaded)
                         self.thread.importFail.connect(self.importFail)
                         self.thread.start()
+                        self.update_bar("start", provider)
                 except TypeError:
                     pass
                     
-        self.update_bar("start", provider)
-            
     def importFail(self, provider):
         QtWidgets.QApplication.restoreOverrideCursor()
         self.update_bar("stop", None)
@@ -961,8 +952,8 @@ class QomuiGui(QtWidgets.QWidget):
             header = "Authentication failed"
             msg = "Perhaps the credentials you entered are wrong"
         else:
-            header = "No config files found"
-            msg = "Are you sure this folder contains config files?" 
+            header = "Import Error"
+            msg = "No config files found or folder seems\nto contain many unrelated files" 
             
         fail_msg = QtWidgets.QMessageBox.information(self,
                                                 header,
@@ -996,9 +987,7 @@ class QomuiGui(QtWidgets.QWidget):
             with open ("%s/server.json" % DIRECTORY, "w") as s:
                 json.dump(self.server_dict, s)
             self.popBoxes()
-        elif ret == 0:
-            pass
-                
+   
     def update_bar(self, text, provider):
         if text == "stop":
             self.WaitBar.setVisible(False)
@@ -1015,23 +1004,34 @@ class QomuiGui(QtWidgets.QWidget):
                                                 QtWidgets.QMessageBox.Ok)
         
         provider = content["provider"]
-        self.provider_list.append(provider)
+        if provider not in self.provider_list:
+            self.provider_list.append(provider)
         self.copyfiles(provider, content["path"])
+        find_favourites = []
+        for k, v in content["server"].items():
+            try:
+                if self.server_dict[k]["favourite"] == "on":
+                    content["server"][k]["favourite"] = "on"
+            except KeyError:
+                pass
         self.server_dict.update(content["server"])
+        
+        try:
+            if 'selected' in self.protocol_dict[provider].keys():
+                content["protocol"]["selected"] = self.protocol_dict[provider]["selected"]
+            else:
+                content["protocol"]["selected"] = "protocol_1"
+        except KeyError:
+            pass
+        
+        
         try:
             self.protocol_dict[provider] = (content["protocol"])
         except KeyError:
             pass
+        
         with open ("%s/server.json" % DIRECTORY, "w") as s:
             json.dump(self.server_dict, s)
-        
-        try:
-            if 'selected' in self.protocol_dict[provider].keys():
-                pass
-            else:
-                self.protocol_dict[provider]["selected"] = "protocol_1"
-        except KeyError:
-            pass
         
         with open ("%s/protocol.json" % DIRECTORY, "w") as p:
             json.dump(self.protocol_dict, p) 
@@ -1055,17 +1055,21 @@ class QomuiGui(QtWidgets.QWidget):
         if copy == "copied":
             shutil.rmtree("%s/temp/" % (DIRECTORY))
 
-    def popBoxes(self):
-        self.country_list = []
+    def popBoxes(self, country=None):
+        self.country_list = ["All countries"]
         self.provider_list = ["All providers"]
-        for k,v in self.server_dict.items():
+        for k,v in (self.server_dict.items()):
             if v["country"] not in self.country_list:
                 self.country_list.append(v["country"])
+                flag = '%s/flags/%s.png' % (ROOTDIR, v["country"])
+                if not os.path.isfile(flag):
+                    flag = '%s/flags/Unknown.png' % ROOTDIR
+                pixmap = QtGui.QPixmap(flag).scaled(25, 25, transformMode=QtCore.Qt.SmoothTransformation)
+                setattr(self, v["country"] + "_pixmap", pixmap)
             elif v["provider"] not in self.provider_list:
                 self.provider_list.append(v["provider"])
-                self.popProviderBox()
-                self.popDeleteProviderBox()
-                
+        self.popProviderBox()
+        self.popDeleteProviderBox()
         self.countryBox.clear()
         self.providerBox.clear()
         if len(self.provider_list) <= 2 :
@@ -1078,51 +1082,69 @@ class QomuiGui(QtWidgets.QWidget):
         for index, provider in enumerate(self.provider_list):
             self.providerBox.addItem(provider)
             self.providerBox.setItemText(index, provider)
-        self.filterList()
+        self.filterList(display="all")
         
     def show_favs(self, state):
         self.random_server_bt.setVisible(True)
-        self.serverListWidget.clear()
         if state == True:
+            i = 0
             for key, val in self.server_dict.items():
                 try:
                     if val["favourite"] == "on":
-                        self.pop_ServerList(key, val)
+                        self.serverListWidget.setRowHidden(val["index"], False)
+                    else:
+                        self.serverListWidget.setRowHidden(val["index"], True)
                 except KeyError:
-                    pass
+                    self.serverListWidget.setRowHidden(val["index"], True)
         elif state == False:
             self.filterList()
                     
 
-    def filterList(self, *arg):
+    def filterList(self, *arg, display="filter"):
         self.random_server_bt.setVisible(False)
-        self.serverListWidget.clear()
-        if self.favouriteButton.isChecked() == True:
-            self.favouriteButton.setChecked(False)
         country = self.countryBox.currentText()
         provider = self.providerBox.currentText()
-        for key, val in self.server_dict.items():
-            if val["provider"] == provider or provider == "All providers":
-                if val["country"] == country or country == "All countries":
-                    self.pop_ServerList(key, val)
-        
-    def pop_ServerList(self, key, val):
+        if self.favouriteButton.isChecked() == True:
+            self.favouriteButton.setChecked(False)
+        if display == "all":
+            self.serverListWidget.clear()
+            i = 0
+            for key,val in sorted(self.server_dict.items(), key=lambda s: s[0].upper()):
+                self.server_dict[key].update({"index" : i})
+                i += 1
+                self.pop_ServerList(key, val)
+        else:
+            for key, val in self.server_dict.items():
+                if val["provider"] == provider or provider == "All providers":
+                    if val["country"] == country or country == "All countries":
+                        self.serverListWidget.setRowHidden(val["index"], False)
+                    else:
+                        self.serverListWidget.setRowHidden(val["index"], True)
+                else:
+                    self.serverListWidget.setRowHidden(val["index"], True)
+
+    
+    def pop_ServerList(self, key, val, insert=None):
         self.Item = ServerWidget()
-        self.ListItem = QtWidgets.QListWidgetItem(self.serverListWidget)
+        self.ListItem = QtWidgets.QListWidgetItem()
         self.ListItem.setData(QtCore.Qt.UserRole, key)
         self.ListItem.setSizeHint(QtCore.QSize(100, 50))
+        if insert is None:
+            self.serverListWidget.addItem(self.ListItem)
+        else:
+            self.serverListWidget.insertItem(insert, self.ListItem)
+        self.serverListWidget.setItemWidget(self.ListItem, self.Item)
         try: 
             fav = val["favourite"]
         except KeyError:
             fav = 1
-        self.Item.setText(val["name"], val["provider"], val["country"], 
+        self.Item.setText(val["name"], val["provider"], 
+                          getattr(self, "%s_pixmap" %val["country"]), 
                           val["city"], fav=fav)
-        self.serverListWidget.addItem(self.ListItem)
-        self.serverListWidget.setItemWidget(self.ListItem, self.Item)
         self.Item.establish.connect(self.establish)
         self.Item.establish_hop.connect(self.createHop)
         self.Item.fav_sig.connect(self.change_favourite)
-                        
+
     def popProviderBox(self):
         self.providerSelect.clear()
         for provider in sorted(self.provider_list):
@@ -1233,9 +1255,14 @@ class QomuiGui(QtWidgets.QWidget):
             
     
     def createHop(self, server):
-        current_dict = self.server_dict[server]
-        self.create_server_dict(current_dict, 1)
-        self.setHop()
+        try:
+            current_dict = self.server_dict[server].copy()
+            current_dict.pop("index")
+            self.create_server_dict(current_dict, 1)
+            self.setHop()
+        except KeyError:
+            self.show_failmsg("Server not found",
+                              "Server does not exist (anymore)\nHave you deleted the server?")
         
     def setHop(self):
         self.hop_choice = 2
@@ -1265,7 +1292,12 @@ class QomuiGui(QtWidgets.QWidget):
         
     
     def establish(self, server, random=None):
-        current_dict = self.server_dict[server]
+        try:
+            current_dict = self.server_dict[server].copy()
+        except KeyError:
+            self.show_failmsg("Server not found",
+                              "Server does not exist (anymore)\nHave you deleted the server?")
+            
         QtWidgets.QApplication.restoreOverrideCursor()
         self.kill()
         self.create_server_dict(current_dict, 0)
@@ -1277,7 +1309,8 @@ class QomuiGui(QtWidgets.QWidget):
             
         if random is not None:
             self.ovpn_dict.update({"random" : "on"})
-            
+        
+        self.ovpn_dict.pop("index")
         self.connect_thread(self.ovpn_dict)
         
     def create_server_dict(self, current_dict, h):
@@ -1345,28 +1378,29 @@ class QomuiGui(QtWidgets.QWidget):
                 
         elif reply == "fail1":
             self.kill()
-            self.failmsg = QtWidgets.QMessageBox(self)
-            self.failmsg.setIcon(QtWidgets.QMessageBox.Critical)
-            self.failmsg.setText("Connection attempt failed")
-            self.failmsg.setInformativeText("Application was unable to connect to server\nSee log for further information")
-            self.failmsg.setWindowModality(QtCore.Qt.WindowModal)
-            self.failmsg.show()
+            self.show_failmsg("Connection attempt failed",
+                              "Application was unable to connect to server\nSee log for further information")
             QtWidgets.QApplication.restoreOverrideCursor()
     
         elif reply == "fail2":
             self.kill()
-            self.failmsg = QtWidgets.QMessageBox(self)
-            self.failmsg.setIcon(QtWidgets.QMessageBox.Critical)
-            self.failmsg.setText("Connection attempt failed")
-            self.failmsg.setInformativeText("Authentication error while trying to connect\nMaybe your account is expired or connection limit is exceeded")
-            self.failmsg.setWindowModality(QtCore.Qt.WindowModal)
-            self.failmsg.show()
+            self.show_failmsg("Connection attempt failed",
+                              "Authentication error while trying to connect\nMaybe your account is expired or connection limit is exceeded")
             QtWidgets.QApplication.restoreOverrideCursor()
             
         elif reply == "kill":
             self.tray.setIcon(QtGui.QIcon("%s/qomui.png" % (ROOTDIR)))
             QtWidgets.QApplication.restoreOverrideCursor()
             self.ActiveWidget.setVisible(False)
+            
+    def show_failmsg(self, text, information):
+        self.failmsg = QtWidgets.QMessageBox(self)
+        self.failmsg.setIcon(QtWidgets.QMessageBox.Critical)
+        self.failmsg.setText(text)
+        self.failmsg.setInformativeText(information)
+        self.failmsg.setWindowModality(QtCore.Qt.WindowModal)
+        self.failmsg.show()
+        
             
     def activeWidget(self, current_server, hop_dict):
         tun = self.qomui_service.return_tun_device()
@@ -1464,6 +1498,60 @@ class QomuiGui(QtWidgets.QWidget):
         except CalledProcessError:
             logging.error("Could not start %s" %app)
         
+    def modifyServer(self):
+        if self.serverListWidget.isVisible() is False:
+            item = self.serverListFilterWidget.currentItem()
+            data = item.data(QtCore.Qt.UserRole)
+            self.modify_row = self.serverListFilterWidget.row(item)
+        else:
+            item = self.serverListWidget.currentItem()
+            data = item.data(QtCore.Qt.UserRole)
+            self.modify_row = self.serverListWidget.row(item)
+        try:
+            editor = ModifyServer(key=data, server_info=self.server_dict[data])
+            editor.modified.connect(self.apply_edit)
+            editor.exec_()
+        except (UnboundLocalError, KeyError):
+            pass
+        
+    def apply_edit(self, modifications):
+        key = modifications["key"]
+        val = modifications["info_update"]
+        provider = val["provider"]
+        new_config =  modifications["config_change"]
+        row = self.modify_row
+        self.server_dict.pop(key)
+        key_update = val["name"]
+        self.server_dict[key_update] = val
+        self.serverListWidget.takeItem(row)
+        self.pop_ServerList(key_update, val, insert=row)
+        with open ("%s/server.json" % DIRECTORY, "w") as s:
+            json.dump(self.server_dict, s) 
+        
+        if len(new_config) != 0:
+            if provider in SUPPORTED_PROVIDERS:
+                temp_file = "%s/temp/%s_config" %(DIRECTORY, provider)
+                with open(temp_file, "w") as config_change:
+                    config_change.writelines(new_config)
+            else:
+                temp_file = "%s/temp/%s" %(DIRECTORY, val["path"].split("/")[1])
+                if modifications["apply_all"] == 1:
+                    for k, v in self.server_dict.items():
+                        if v["provider"] == provider:
+                            with open("%s/temp/%s" %(DIRECTORY, v["path"].split("/")[1]), "w") as config_change:
+                                index = modifications["index"]
+                                rpl = new_config[index].split(" ")
+                                ip_insert = "%s %s %s" %(rpl[0], v["ip"], rpl[2])
+                                new_config[index] = ip_insert
+                                config_change.writelines(new_config)
+                    
+            self.qomui_service.copyCerts("CHANGE_%s" %provider, "%s/temp" %(DIRECTORY))
+                                
+        
+    def search_listitem(self, key):
+        for row in range(self.serverListWidget.count()):
+            if self.serverListWidget.item(row).data(QtCore.Qt.UserRole) == key:
+                return row
         
 class ServerWidget(QtWidgets.QWidget):
     establish = QtCore.pyqtSignal(str)
@@ -1471,7 +1559,7 @@ class ServerWidget(QtWidgets.QWidget):
     fav_sig = QtCore.pyqtSignal(tuple)
     
     def __init__ (self, parent=None):
-        super(ServerWidget, self).__init__(parent)
+        super(ServerWidget, self).__init__(parent=None)
         self.setMouseTracking(True)
         self.setupUi(self)
             
@@ -1480,8 +1568,7 @@ class ServerWidget(QtWidgets.QWidget):
         self.horizontalLayout = QtWidgets.QHBoxLayout(Form)
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         self.country_lbl = QtWidgets.QLabel(Form)
-        self.country_lbl.setMinimumSize(QtCore.QSize(30, 30))
-        self.country_lbl.setMaximumSize(QtCore.QSize(30, 30))
+        self.country_lbl.setFixedSize(QtCore.QSize(30, 30))
         self.country_lbl.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.country_lbl.setObjectName(_fromUtf8("country_lbl"))
         self.horizontalLayout.addWidget(self.country_lbl)
@@ -1510,19 +1597,26 @@ class ServerWidget(QtWidgets.QWidget):
         self.connect_bt.setVisible(False)
         self.connect_bt.setObjectName(_fromUtf8("connect_bt"))
         self.horizontalLayout.addWidget(self.connect_bt)
-        self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
         self.connect_bt.clicked.connect(self.signal)
         self.hop_bt.clicked.connect(self.hop_signal)
         self.FavouriteButton.toggled.connect(self.fav_change)
-
-    def retranslateUi(self, Form):
-        Form.setWindowTitle(_translate("Form", "Form", None))
-        
+    
     def setText(self, name, provider, country, city, button = "connect", fav = 0):
         self.name = name
         self.provider = provider
         self.fav = fav
+        if self.provider != "bypass":
+            try:
+                self.country_lbl.setPixmap(country)
+            except TypeError:
+                flag = '%s/flags/%s.png' % (ROOTDIR, country)
+                if not os.path.isfile(flag):
+                    flag = '%s/flags/Unknown.png' % ROOTDIR
+                self.country_lbl.setPixmap(QtGui.QPixmap(flag).scaled(25, 25, transformMode=QtCore.Qt.SmoothTransformation))
+        else:
+            icon = QtGui.QIcon.fromTheme(country)
+            self.country_lbl.setPixmap(icon.pixmap(25,25))
         font = QtGui.QFont()
         font.setBold(True)
         font.setWeight(75)
@@ -1532,11 +1626,6 @@ class ServerWidget(QtWidgets.QWidget):
         self.name_lbl.setFont(font)
         self.name_lbl.setText(self.name)
         self.city_lbl.setText(city)
-        if self.provider != "bypass":
-            self.country_lbl.setPixmap(QtGui.QPixmap('%s/flags/%s.png' % (ROOTDIR, country)).scaled(25, 25, transformMode=QtCore.Qt.SmoothTransformation))
-        else:
-            icon = QtGui.QIcon.fromTheme(country)
-            self.country_lbl.setPixmap(icon.pixmap(25,25))
         try:
             self.connect_bt.setText(_translate("Form", button, None))
         except AttributeError:
@@ -2008,6 +2097,156 @@ class AppSelector(QtWidgets.QDialog):
         self.app_chosen.emit(self.app_list[self.app_list_widget.currentRow()])
         self.hide()
         
+class ModifyServer(QtWidgets.QDialog):
+    modified = QtCore.pyqtSignal(dict)
+    
+    def __init__ (self, key=None, server_info=None, parent=None):
+        super(ModifyServer, self).__init__(parent)
+        self.key = key
+        self.server_info = server_info
+        self.config_change = 0
+        self.provider = self.server_info["provider"]
+        self.setupUi(self)
+        self.loadConfig()
+    
+    def setupUi(self, Dialog):
+        Dialog.setObjectName("Dialog")
+        Dialog.resize(419, 480)
+        self.verticalLayout = QtWidgets.QVBoxLayout(Dialog)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.nameLabel = QtWidgets.QLabel(Dialog)
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.nameLabel.setFont(font)
+        self.nameLabel.setObjectName("nameLabel")
+        self.verticalLayout.addWidget(self.nameLabel)
+        self.nameEdit = QtWidgets.QLineEdit(Dialog)
+        self.nameEdit.setObjectName("nameEdit")
+        self.verticalLayout.addWidget(self.nameEdit)
+        self.countryLabel = QtWidgets.QLabel(Dialog)
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.countryLabel.setFont(font)
+        self.countryLabel.setObjectName("countryLabel")
+        self.verticalLayout.addWidget(self.countryLabel)
+        self.horizontalLayout = QtWidgets.QHBoxLayout()
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.countryEdit = QtWidgets.QLineEdit(Dialog)
+        self.countryEdit.setObjectName("countryEdit")
+        self.horizontalLayout.addWidget(self.countryEdit)
+        self.countryHintLabel = QtWidgets.QLabel(Dialog)
+        self.countryHintLabel.setObjectName("countryHintLabel")
+        self.horizontalLayout.addWidget(self.countryHintLabel)
+        self.verticalLayout.addLayout(self.horizontalLayout)
+        self.line = QtWidgets.QFrame(Dialog)
+        self.line.setFrameShape(QtWidgets.QFrame.HLine)
+        self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.line.setObjectName("line")
+        self.verticalLayout.addWidget(self.line)
+        self.configLabel = QtWidgets.QLabel(Dialog)
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.configLabel.setFont(font)
+        self.configLabel.setObjectName("configLabel")
+        self.verticalLayout.addWidget(self.configLabel)
+        self.changeAllBox = QtWidgets.QCheckBox(Dialog)
+        self.changeAllBox.setCheckable(True)
+        self.changeAllBox.setChecked(True)
+        self.changeAllBox.setObjectName("changeAllBox")
+        self.verticalLayout.addWidget(self.changeAllBox)
+        self.configBrowser = QtWidgets.QTextEdit(Dialog)
+        self.configBrowser.setObjectName("configBrowser")
+        self.verticalLayout.addWidget(self.configBrowser)
+        self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.verticalLayout.addWidget(self.buttonBox)
+        self.retranslateUi(Dialog)
+        self.changeAllBox.toggled.connect(self.blockOption)
+        self.buttonBox.accepted.connect(self.acceptChange)
+        self.buttonBox.rejected.connect(self.rejectChange)
+        self.configBrowser.textChanged.connect(self.configChange)
+        QtCore.QMetaObject.connectSlotsByName(Dialog)
+
+    def retranslateUi(self, Dialog):
+        _translate = QtCore.QCoreApplication.translate
+        Dialog.setWindowTitle(_translate("Dialog", "Edit server"))
+        self.nameLabel.setText(_translate("Dialog", "Name:"))
+        self.nameEdit.setText(self.server_info["name"])
+        self.countryLabel.setText(_translate("Dialog", "Country:"))
+        self.countryHintLabel.setText(_translate("Dialog", "Preferably use country codes\n"
+                                                 "Example: US for United States"))
+        self.countryEdit.setText(self.server_info["country"])
+        self.configLabel.setText(_translate("Dialog", "Edit Configuration File:"))
+        self.changeAllBox.setText(_translate("Dialog", 
+                                             "Apply changes to all configuration files of %s" %self.provider))
+    
+    def blockOption(self, state):
+        if self.provider in SUPPORTED_PROVIDERS and state is False:
+            self.changeAllBox.setChecked(True)
+    
+    def loadConfig(self):
+        if self.provider in SUPPORTED_PROVIDERS:
+            config = "%s/%s_config" %(ROOTDIR, self.provider)
+        else:
+            config = "%s/%s" %(ROOTDIR, self.server_info["path"])
+            
+        with open (config, "r") as config_edit:
+            self.old_config = config_edit.readlines()
+            for line in self.old_config:
+                self.configBrowser.append(line.split("\n")[0])
+                
+    def configChange(self):
+        self.config_change = 1
+                    
+    def rejectChange(self):
+        self.hide()
+        
+    def acceptChange(self):
+        change_all = 0
+        self.server_info["name"] = self.nameEdit.text()
+        country_change = self.countryEdit.text()
+        if len(country_change) == 2:
+            country = update.country_translate(country_change)
+            if country == "Unknown":
+                country = country_change
+        else:
+            country = country_change
+        self.server_info["country"] = country
+        if self.config_change == 1:
+            new_config = []
+            remote_index = 0
+            new_config = self.configBrowser.toPlainText().split("\n")
+            for index, line in enumerate(new_config):
+                if line.startswith("remote "):
+                    remote_index = index
+                line_format = "%s\n" %(line)
+                new_config[index] = line_format
+            if new_config != self.old_config:
+                if self.provider in SUPPORTED_PROVIDERS:
+                    temp_file = "%s_config" %self.provider
+                else:
+                    temp_file = self.server_info["path"].split("/")[1]
+                temp_folder = "%s/temp" % DIRECTORY
+                if not os.path.exists(temp_folder):
+                    os.makedirs(temp_folder)
+                with open("%s/%s" %(temp_folder, temp_file), "w") as update_config:
+                    update_config.writelines(new_config)
+            else:
+                new_config = []
+                
+        if self.changeAllBox.isChecked() == True:
+            change_all = 1
+            
+        change_dict = {"info_update" : self.server_info, "key" : self.key, "config_change" : new_config, 
+                       "index" : remote_index, "apply_all" : change_all} 
+        self.modified.emit(change_dict)
+        self.hide()
+                        
 def main():
     if not os.path.exists("%s/.qomui" % (os.path.expanduser("~"))):
         os.makedirs("%s/.qomui" % (os.path.expanduser("~")))

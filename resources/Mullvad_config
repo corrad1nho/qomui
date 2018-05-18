@@ -10,12 +10,9 @@ remote-cert-tls server
 cipher AES-256-CBC
 comp-lzo 
 tun-ipv6
-#ping-restart 60
+sndbuf 524288
+rcvbuf 524288
 verb 3
-#ca /usr/share/qomui/certs/ca_mullvad.crt
-#cert /usr/share/qomui/certs/mullvad.crt
-#key /usr/share/qomui/certs/mullvad.key
-#crl-verify /usr/share/qomui/certs/crl_mullvad.pem
 
 auth-user-pass /usr/share/qomui/certs/mullvad_userpass.txt
 ca /usr/share/qomui/certs/mullvad_ca.crt
