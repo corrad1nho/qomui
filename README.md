@@ -101,7 +101,8 @@ version 0.4:
 - [new] Check and sort servers by latency
 - [new] Additional info for active connection displayed 
 - [bugfix] Disable ipv6 option status not displayed correctly
-- [bugfix] Loading list of installed application fails
+- [bugfix] List of applications is empty if not all default application directories exist
+- [bugfix] Minimizing/maximizing window does not work on Mint Cinnamon 18.3
 
 version 0.3.1
 - [new] Modify imported servers and config files
