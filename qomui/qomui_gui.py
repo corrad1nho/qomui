@@ -662,8 +662,9 @@ class QomuiGui(QtWidgets.QWidget):
         else:
             self.setWindowState(QtCore.Qt.WindowActive)
             self.showNormal()
-
-    def changeEvent(self, event):
+    
+    #Minimize/Maximize does not work if active!
+    """def changeEvent(self, event):
         if event.type() == QtCore.QEvent.WindowStateChange:
             if self.windowState() & QtCore.Qt.WindowMinimized:
                 if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable() == False:
@@ -672,7 +673,7 @@ class QomuiGui(QtWidgets.QWidget):
                     self.hide()
             elif self.windowState() & QtCore.Qt.WindowActive:
                 self.setWindowState(QtCore.Qt.WindowActive)
-                self.showNormal()
+                self.showNormal()"""
 
     def closeEvent(self, event):
         closemsg = QtWidgets.QMessageBox()
@@ -1114,7 +1115,6 @@ class QomuiGui(QtWidgets.QWidget):
             self.providerBox.addItem(provider)
             self.providerBox.setItemText(index, provider)
         self.filterList(display="all")
-        print(self.config_dict)
         if self.config_dict["latency_check"] == 1:
             self.get_latency()
         
@@ -2181,8 +2181,8 @@ class AppSelector(QtWidgets.QDialog):
                        "/usr/local/share/applications"
                        ]
         
-        try:
-            for d in directories:
+        for d in directories:
+            try:
                 for f in os.listdir(d):
                     if f.endswith(".desktop"):
                         desktop_file = os.path.join(d, f)
@@ -2199,8 +2199,8 @@ class AppSelector(QtWidgets.QDialog):
                             name = c["Desktop Entry"]["Name"]
                             icon = c["Desktop Entry"]["Icon"]
                             self.app_list.append((name, icon, desktop_file))
-        except:
-            pass
+            except:
+                pass
         
         self.app_list = sorted(self.app_list)
         self.popAppList()
