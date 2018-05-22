@@ -19,9 +19,10 @@ import shutil
 import shlex
 import glob
 import configparser
+import requests
+import bisect
 
-import update
-#from qomui import update
+from qomui import update, latency
 
 
 try:
@@ -156,7 +157,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.logger.addHandler(handler)
         primary_screen_geometry = QtWidgets.QDesktopWidget().availableGeometry(QtWidgets.QDesktopWidget().primaryScreen())
         positioning = primary_screen_geometry.bottomRight()
-        self.setGeometry(QtCore.QRect(positioning.x(), positioning.y(), 550, 670))
+        self.setGeometry(QtCore.QRect(positioning.x(), positioning.y(), 550, 720))
         self.qomui_service.disconnect()
         self.qomui_service.save_default_dns()
         
@@ -305,6 +306,17 @@ class QomuiGui(QtWidgets.QWidget):
         self.minimize_label.setIndent(20)
         self.minimize_label.setFont(cfont)
         self.verticalLayout_5.addWidget(self.minimize_label)
+        self.lat_check = QtWidgets.QCheckBox(self.options_tab)
+        self.lat_check.setFont(font)
+        self.lat_check.setObjectName(_fromUtf8("lat_check"))
+        self.verticalLayout_5.addWidget(self.lat_check)
+        self.lat_label = QtWidgets.QLabel(self.options_tab)
+        self.lat_label.setObjectName(_fromUtf8("lat_check"))
+        self.lat_label.setWordWrap(True)
+        self.lat_label.setIndent(20)
+        self.lat_label.setFont(cfont)
+        self.verticalLayout_5.addWidget(self.lat_label)
+        self.ipv6_label = QtWidgets.QLabel(self.options_tab)
         self.ipv6_check = QtWidgets.QCheckBox(self.options_tab)
         self.ipv6_check.setFont(font)
         self.ipv6_check.setObjectName(_fromUtf8("ipv6_check"))
@@ -544,6 +556,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.minimize_check.setText(_translate("Form", "Start minimized", None))
         self.firewall_check.setText(_translate("Form", "Activate Firewall     ", None))
         self.bypass_check.setText(_translate("Form", "Allow OpenVPN bypass", None))
+        self.lat_check.setText(_translate("Form", "Perform latency check", None))
         self.ipv6_check.setText(_translate("Form", "Disable IPv6", None))
         self.dns_check.setText(_translate("Form", "Use always", None))
         self.alt_dns_lbl.setText(_translate("Form", "Alternative DNS Servers:", None))
@@ -582,11 +595,14 @@ class QomuiGui(QtWidgets.QWidget):
         self.ipv6_label.setText(_translate("Form", 
                                           "Disables ipv6 stack systemwide", 
                                           None))
+        self.lat_label.setText(_translate("Form", 
+                                          "Sort servers by latency - allow ping", 
+                                          None))
         self.bypass_label.setText(_translate("Form", 
                                           "Allow applications to run outside VPN tunnel", 
                                           None))
         self.firewall_label.setText(_translate("Form", 
-                                          "Block connections outside VPN tunnel - protects against IPv6 and DNS leaks", 
+                                          "Block connections outside VPN tunnel - leak protection", 
                                           None))
         self.dns_label.setText(_translate("Form", 
                                           "By default Qomui will try to use the DNS server by your provider. Otherwise, it will fall back to the alternative DNS servers", 
@@ -705,6 +721,11 @@ class QomuiGui(QtWidgets.QWidget):
         elif self.dns_check.checkState() == 0:
             new_config_dict["fallback"] = 0
             
+        if self.lat_check.checkState() == 2:
+            new_config_dict["latency_check"] = 1
+        elif self.lat_check.checkState() == 0:
+            new_config_dict["latency_check"] = 0
+            
         if self.bypass_check.checkState() == 2:
             new_config_dict["bypass"] = 1
             self.bypass_tab_bt.setVisible(True)
@@ -724,14 +745,14 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             update = check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
-            if self.config_dict != new_config_dict or self.fire_change is True:
-                self.qomui_service.load_firewall()
+            self.qomui_service.load_firewall()
             self.qomui_service.bypass(self.user, self.group)
-            self.qomui_service.disable_ipv6(new_config_dict["ipv6_disable"])
             QtWidgets.QMessageBox.information(self,
                                             "Updated",
                                             "Configuration updated successfully",
                                             QtWidgets.QMessageBox.Ok)
+            if new_config_dict["latency_check"] == 1 and self.config_dict["latency_check"] == 0:
+                self.get_latency()
             self.config_dict = new_config_dict
 
         except CalledProcessError as e:
@@ -745,6 +766,18 @@ class QomuiGui(QtWidgets.QWidget):
         self.user = check_output(['id', '-u', '-n']).decode("utf-8").split("\n")[0]
         self.group = check_output(['id', '-g', '-n']).decode("utf-8").split("\n")[0]
         self.logger.debug("Reading configuration files from %s" %(DIRECTORY))
+        
+        try:
+            with open('%s/config.json' % (ROOTDIR), 'r') as config:
+                self.config_dict = json.load(config)
+                if self.config_dict["minimize"] == 0:
+                    self.setWindowState(QtCore.Qt.WindowActive)
+                if self.config_dict["bypass"] == 1:
+                    self.qomui_service.bypass(self.user, self.group)
+                    self.bypass_tab_bt.setVisible(True)
+                self.setOptiontab(self.config_dict)        
+        except (FileNotFoundError,json.decoder.JSONDecodeError, KeyError) as e:
+            self.logger.error('%s: Could not open %s/config.json' % (e, DIRECTORY))
         
         try:
             with open('%s/protocol.json' % (DIRECTORY), 'r') as pload:
@@ -766,18 +799,6 @@ class QomuiGui(QtWidgets.QWidget):
                 self.popBypassApps()
         except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
             self.logger.error('%s: Could not open %s/bypass_apps.json' % (e, DIRECTORY))
-
-        try:
-            with open('%s/config.json' % (ROOTDIR), 'r') as config:
-                self.config_dict = json.load(config)
-                if self.config_dict["minimize"] == 0:
-                    self.setWindowState(QtCore.Qt.WindowActive)
-                if self.config_dict["bypass"] == 1:
-                    self.qomui_service.bypass(self.user, self.group)
-                    self.bypass_tab_bt.setVisible(True)
-                self.setOptiontab(self.config_dict)        
-        except (FileNotFoundError,json.decoder.JSONDecodeError, KeyError) as e:
-            self.logger.error('%s: Could not open %s/config.json' % (e, DIRECTORY))
 
         try:
             with open('%s/last_server.json' % (DIRECTORY), 'r') as lserver:
@@ -826,11 +847,21 @@ class QomuiGui(QtWidgets.QWidget):
             self.firewall_check.setChecked(False)
         elif config["firewall"] == 1:
             self.firewall_check.setChecked(True)
-        
+            
+        if config["ipv6_disable"] == 0:
+            self.ipv6_check.setChecked(False)
+        elif config["ipv6_disable"] == 1:
+            self.ipv6_check.setChecked(True)
+            
         if config["minimize"] == 0:
             self.minimize_check.setChecked(False)
         elif config["minimize"] == 1:
             self.minimize_check.setChecked(True)
+            
+        if config["latency_check"] == 0:
+            self.lat_check.setChecked(False)
+        elif config["latency_check"] == 1:
+            self.lat_check.setChecked(True)
             
         if config["bypass"] == 0:
             self.bypass_check.setChecked(False)
@@ -1083,19 +1114,53 @@ class QomuiGui(QtWidgets.QWidget):
             self.providerBox.addItem(provider)
             self.providerBox.setItemText(index, provider)
         self.filterList(display="all")
+        print(self.config_dict)
+        if self.config_dict["latency_check"] == 1:
+            self.get_latency()
         
+    def get_latency(self):
+        gateway = self.qomui_service.default_gateway_check()["interface"]
+        self.latency_list = []
+        self.latThread = latency.LatencyCheck(self.server_dict, gateway)
+        self.latThread.lat_signal.connect(self.show_latency)
+        self.latThread.start()
+        
+    def show_latency(self, result):
+        hidden = False
+        server = result[0]
+        latency_string = result[1]
+        latency_float = result[2]
+        old_index = self.index_list.index(server)
+        bisect.insort(self.latency_list, latency_float)
+        update_index = self.latency_list.index(latency_float)
+        rm = self.index_list.index(server)
+        self.index_list.pop(rm)
+        self.index_list.insert(update_index, server)
+        if getattr(self, server).isHidden() == True:
+            hidden = True
+        self.serverListWidget.takeItem(old_index)
+        self.pop_ServerList(server, self.server_dict[server], insert=update_index)
+        self.serverListWidget.setRowHidden(update_index, hidden)
+        getattr(self, server).display_latency(latency_string)
+        
+        
+    
     def show_favs(self, state):
         self.random_server_bt.setVisible(True)
         if state == True:
             i = 0
             for key, val in self.server_dict.items():
+                index = self.index_list.index(key)
                 try:
                     if val["favourite"] == "on":
-                        self.serverListWidget.setRowHidden(val["index"], False)
+                        self.serverListWidget.setRowHidden(index, False)
+                        getattr(self, key).setHidden(False)
                     else:
-                        self.serverListWidget.setRowHidden(val["index"], True)
+                        self.serverListWidget.setRowHidden(index, True)
+                        getattr(self, key).setHidden(True)
                 except KeyError:
-                    self.serverListWidget.setRowHidden(val["index"], True)
+                    self.serverListWidget.setRowHidden(index, True)
+                    getattr(self, key).setHidden(True)
         elif state == False:
             self.filterList()
                     
@@ -1107,25 +1172,32 @@ class QomuiGui(QtWidgets.QWidget):
         if self.favouriteButton.isChecked() == True:
             self.favouriteButton.setChecked(False)
         if display == "all":
+            self.index_list = []
             self.serverListWidget.clear()
-            i = 0
             for key,val in sorted(self.server_dict.items(), key=lambda s: s[0].upper()):
-                self.server_dict[key].update({"index" : i})
-                i += 1
+                try:
+                    val.pop("index")
+                except KeyError:
+                    pass
+                self.index_list.append(key)
                 self.pop_ServerList(key, val)
         else:
             for key, val in self.server_dict.items():
+                index = self.index_list.index(key)
                 if val["provider"] == provider or provider == "All providers":
                     if val["country"] == country or country == "All countries":
-                        self.serverListWidget.setRowHidden(val["index"], False)
+                        self.serverListWidget.setRowHidden(index, False)
+                        getattr(self, key).setHidden(False)
                     else:
-                        self.serverListWidget.setRowHidden(val["index"], True)
+                        self.serverListWidget.setRowHidden(index, True)
+                        getattr(self, key).setHidden(True)
                 else:
-                    self.serverListWidget.setRowHidden(val["index"], True)
+                    self.serverListWidget.setRowHidden(index, True)
+                    getattr(self, key).setHidden(True)
 
     
     def pop_ServerList(self, key, val, insert=None):
-        self.Item = ServerWidget()
+        setattr(self, key, ServerWidget())
         self.ListItem = QtWidgets.QListWidgetItem()
         self.ListItem.setData(QtCore.Qt.UserRole, key)
         self.ListItem.setSizeHint(QtCore.QSize(100, 50))
@@ -1133,17 +1205,17 @@ class QomuiGui(QtWidgets.QWidget):
             self.serverListWidget.addItem(self.ListItem)
         else:
             self.serverListWidget.insertItem(insert, self.ListItem)
-        self.serverListWidget.setItemWidget(self.ListItem, self.Item)
+        self.serverListWidget.setItemWidget(self.ListItem, getattr(self, key))
         try: 
             fav = val["favourite"]
         except KeyError:
             fav = 1
-        self.Item.setText(val["name"], val["provider"], 
+        getattr(self, key).setText(val["name"], val["provider"], 
                           getattr(self, "%s_pixmap" %val["country"]), 
                           val["city"], fav=fav)
-        self.Item.establish.connect(self.establish)
-        self.Item.establish_hop.connect(self.createHop)
-        self.Item.fav_sig.connect(self.change_favourite)
+        getattr(self, key).establish.connect(self.establish)
+        getattr(self, key).establish_hop.connect(self.createHop)
+        getattr(self, key).fav_sig.connect(self.change_favourite)
 
     def popProviderBox(self):
         self.providerSelect.clear()
@@ -1257,7 +1329,6 @@ class QomuiGui(QtWidgets.QWidget):
     def createHop(self, server):
         try:
             current_dict = self.server_dict[server].copy()
-            current_dict.pop("index")
             self.create_server_dict(current_dict, 1)
             self.setHop()
         except KeyError:
@@ -1310,7 +1381,6 @@ class QomuiGui(QtWidgets.QWidget):
         if random is not None:
             self.ovpn_dict.update({"random" : "on"})
         
-        self.ovpn_dict.pop("index")
         self.connect_thread(self.ovpn_dict)
         
     def create_server_dict(self, current_dict, h):
@@ -1351,7 +1421,6 @@ class QomuiGui(QtWidgets.QWidget):
             self.hop_server_dict = current_dict
         else:
             self.ovpn_dict = current_dict
-            
           
     def log_check(self, reply):
         if reply == "success":
@@ -1401,7 +1470,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.failmsg.setWindowModality(QtCore.Qt.WindowModal)
         self.failmsg.show()
         
-            
     def activeWidget(self, current_server, hop_dict):
         tun = self.qomui_service.return_tun_device()
         self.ActiveWidget.setText(current_server, hop_dict, tun)
@@ -1560,6 +1628,8 @@ class ServerWidget(QtWidgets.QWidget):
     
     def __init__ (self, parent=None):
         super(ServerWidget, self).__init__(parent=None)
+        self.hidden = False
+        self.fav = 0
         self.setMouseTracking(True)
         self.setupUi(self)
             
@@ -1605,6 +1675,7 @@ class ServerWidget(QtWidgets.QWidget):
     def setText(self, name, provider, country, city, button = "connect", fav = 0):
         self.name = name
         self.provider = provider
+        self.city = city
         self.fav = fav
         if self.provider != "bypass":
             try:
@@ -1625,7 +1696,7 @@ class ServerWidget(QtWidgets.QWidget):
             self.FavouriteButton.setChecked(True)
         self.name_lbl.setFont(font)
         self.name_lbl.setText(self.name)
-        self.city_lbl.setText(city)
+        self.city_lbl.setText(self.city)
         try:
             self.connect_bt.setText(_translate("Form", button, None))
         except AttributeError:
@@ -1666,6 +1737,19 @@ class ServerWidget(QtWidgets.QWidget):
 
     def signal(self):
         self.establish.emit(self.name)
+        
+    def display_latency(self, latency):
+        self.latency = latency
+        if self.city != "":
+            self.city_lbl.setText("%s - %s" %(self.city, self.latency))
+        else:
+            self.city_lbl.setText(latency)
+        
+    def setHidden(self, state):
+        self.hidden = state
+    
+    def isHidden(self):
+        return self.hidden
     
     def hop_signal(self):
         self.establish_hop.emit(self.name)
@@ -1791,10 +1875,13 @@ class ActiveWidget(QtWidgets.QWidget):
         self.up_stat_blb = QtWidgets.QLabel(ConnectionWidget)
         self.up_stat_blb.setObjectName(_fromUtf8("up_stat_blb"))
         self.horizontalLayout.addWidget(self.up_stat_blb)
-        self.Pinglabel = QtWidgets.QLabel(ConnectionWidget)
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
+        self.time_lbl = QtWidgets.QLabel(ConnectionWidget)
+        self.time_lbl.setObjectName(_fromUtf8("time_lbl"))
+        self.time_lbl.setFont(font)
+        self.horizontalLayout.addWidget(self.time_lbl)
+        self.time_stat_lbl = QtWidgets.QLabel(ConnectionWidget)
+        self.time_stat_lbl.setObjectName(_fromUtf8("time_stat_lbl"))
+        self.horizontalLayout.addWidget(self.time_stat_lbl)
         spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem2)
         self.verticalLayout.addLayout(self.horizontalLayout)
@@ -1824,14 +1911,14 @@ class ActiveWidget(QtWidgets.QWidget):
 
     def retranslateUi(self, ConnectionWidget):
         ConnectionWidget.setWindowTitle(_translate("ConnectionWidget", "Form", None))
+        self.status_label.setText(_translate("ConnectionWidget", "Active Connection", None))
         self.down_lbl.setText(_translate("ConnectionWidget", "Download:", None))
         self.up_lbl.setText(_translate("ConnectionWidget", "Upload:", None))
+        self.time_lbl.setText(_translate("ConnectionWidget", "Time:", None))
 
     def setText(self, server_dict, hop_dict, tun):
         self.tun = tun
         if hop_dict is not None:
-            self.status_label.setText(_translate("ConnectionWidget", 
-                                                 "Active Connection - Double Hop", None))
             self.hopWidget.setVisible(True)
             self.status_hop_label.setVisible(True)
             self.status_hop_label.setText(_translate("HopWidget", "via", None))
@@ -1846,7 +1933,6 @@ class ActiveWidget(QtWidgets.QWidget):
         else:
             self.hopWidget.setVisible(False)
             self.status_hop_label.setVisible(False)
-            self.status_label.setText(_translate("ConnectionWidget", "Active Connection", None))
         
         try:
             city = server_dict["city"]
@@ -1859,8 +1945,16 @@ class ActiveWidget(QtWidgets.QWidget):
             
         self.calc_Thread = NetMon(self.tun)
         self.calc_Thread.stat.connect(self.statcount)
+        self.calc_Thread.ip.connect(self.show_ip)
+        self.calc_Thread.time.connect(self.update_time)
         self.calc_Thread.start()
+    
+    def show_ip(self, ip):
+        self.status_label.setText("Active connection - IP: %s" %ip)
         
+    def update_time(self, t):
+        self.time_stat_lbl.setText(t)
+    
     def statcount(self, update):
         DLrate = update[0]
         DLacc = update[1]
@@ -1885,20 +1979,34 @@ class LineWidget(QtWidgets.QWidget):
         
 class NetMon(QtCore.QThread):
     stat = QtCore.pyqtSignal(list)
+    ip = QtCore.pyqtSignal(str)
+    time = QtCore.pyqtSignal(str)
     
     def __init__(self, tun):
         QtCore.QThread.__init__(self)
         self.tun = tun
         
     def run(self):
+        check_url = "https://ipinfo.io/ip"
+        try:
+            ip = requests.get(check_url).content.decode("utf-8").split("\n")[0]
+            self.ip.emit(ip)
+        except:
+            logging.debug("Could not determine external ip address")
         t0 = time.time()
         counter = psutil.net_io_counters(pernic=True)['tun0']
         stat = (counter.bytes_recv, counter.bytes_sent)
         accum = (0, 0)
+        start_time = time.time()
  
         while True:
             last_stat = stat
             time.sleep(1)
+            time_measure = time.time()
+            elapsed = time_measure - start_time
+            return_time = self.time_format(int(elapsed))
+            self.time.emit(return_time)
+            
             try:
                 counter = psutil.net_io_counters(pernic=True)['tun0']
                 t1 = time.time()
@@ -1909,6 +2017,19 @@ class NetMon(QtCore.QThread):
                 self.stat.emit([DLrate, DLacc, ULrate, ULacc])                     
             except KeyError:
                    break
+               
+    def time_format(self, e):
+        calc = '{:02d}d {:02d}h {:02d}m {:02d}s'.format(e // 86400, (e % 86400 // 3600), (e % 3600 // 60), e % 60)
+        split = calc.split(" ")
+        if split[0] == "00d" and split[1] == "00h":
+            return ("%s %s" % (split[2], split[3]))
+        elif split[0] == "00d" and split[1] != "00h":
+            return ("%s %s" % (split[1], split[2]))
+        else:
+            return ("%s %s" % (split[0], split[1]))
+            
+        
+        
 
 class FirewallEditor(QtWidgets.QDialog):
     rule_change = QtCore.pyqtSignal()
@@ -2078,7 +2199,7 @@ class AppSelector(QtWidgets.QDialog):
                             name = c["Desktop Entry"]["Name"]
                             icon = c["Desktop Entry"]["Icon"]
                             self.app_list.append((name, icon, desktop_file))
-        except FileNotFoundError:
+        except:
             pass
         
         self.app_list = sorted(self.app_list)

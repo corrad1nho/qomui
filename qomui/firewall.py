@@ -123,7 +123,17 @@ def save_existing_rules_6(firewall_rules):
                 saved_rules_6.append(rule)
             match = 0
 
-apply_rules(0)
 
+def allow_ping(opt):
+    if opt == 1:
+        try:
+            with open ("%s/firewall.json" %(rootdir), "r") as f:
+                firewall_rules = json.load(f)
+            for rule in firewall_rules["allowping"]:
+                    add_rule(rule)
+        except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
+            logging.debug("Could not read firewall configuration file")
+        
+    
 
 

@@ -90,6 +90,7 @@ class QomuiDbus(dbus.service.Object):
                 self.config = json.load(c)
                 firewall.apply_rules(self.config["firewall"])
                 self.disable_ipv6(self.config["ipv6_disable"])
+                firewall.allow_ping(self.config["latency_check"])
         except KeyError:
             self.logger.warning('Could not read all values from  file')
             
@@ -274,10 +275,7 @@ class QomuiDbus(dbus.service.Object):
         except AttributeError:
             pass
         try:
-            default_route = check_output(["ip", "route", "show", "default"]).decode("utf-8")
-            parse_route = default_route.split(" ")
-            self.default_interface = parse_route[4]
-            default_gateway = parse_route[2]
+            default_gateway = self.default_gateway_check()["gateway"]
             try:
                 if self.config["bypass"] == 1:
                     pid = bypass.create_cgroup(user, group, self.default_interface, default_gateway)
@@ -291,6 +289,16 @@ class QomuiDbus(dbus.service.Object):
                 self.logger.warning('Could not read all values from  file')
         except (CalledProcessError, IndexError):
             self.logger.info('Could not create cgroup for bypass - no network connectivity')
+            
+    
+    @dbus.service.method(BUS_NAME, in_signature='', out_signature='a{ss}')
+    def default_gateway_check(self):
+        default_route = check_output(["ip", "route", "show", "default"]).decode("utf-8")
+        parse_route = default_route.split(" ")
+        self.default_interface = parse_route[4]
+        default_gateway = parse_route[2]
+        default_interface = parse_route[4]
+        return {"gateway" : default_gateway, "interface" : default_interface}
         
     @dbus.service.signal(BUS_NAME, signature='s')
     def reply(self, msg):
