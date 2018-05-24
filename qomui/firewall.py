@@ -22,7 +22,7 @@ def add_rule(rule):
         elif check[2] == "-A":
             check[2] = "-C"
         apply_rule = check_call(ip_cmd + check)
-        logging.debug("iptables: rule already exists")
+        logging.debug("iptables: %s already exists" %rule)
         a = 0
     except (IndexError, CalledProcessError):
         pass
@@ -125,15 +125,17 @@ def save_existing_rules_6(firewall_rules):
 
 
 def allow_ping(opt):
+    logging.info("pingeling")
     if opt == 1:
         try:
             with open ("%s/firewall.json" %(rootdir), "r") as f:
                 firewall_rules = json.load(f)
             for rule in firewall_rules["allowping"]:
                     add_rule(rule)
+            logging.info("iptables: Ping allowed")
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
             logging.debug("Could not read firewall configuration file")
         
-    
 
+    
 

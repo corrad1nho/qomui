@@ -10,7 +10,6 @@ data_files = [
         ('/usr/share/icons/hicolor/scalable/apps/', ['resources/qomui.svg']),
         ('/usr/share/qomui/', ['resources/Airvpn_config',
                           'resources/PIA_config',    
-                          'resources/config.json',
                           'resources/default_config.json',
                           'resources/firewall.json',
                           'resources/firewall_default.json',
@@ -39,7 +38,7 @@ class CustomInstall(install):
 
 
 setup(name="qomui",
-      version="0.4",
+      version="0.4.1",
       packages=['qomui'],
       include_package_data=True,
       install_requires=[

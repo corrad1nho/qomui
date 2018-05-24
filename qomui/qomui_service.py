@@ -85,14 +85,23 @@ class QomuiDbus(dbus.service.Object):
 
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
     def load_firewall(self):
+        
         try:
             with open('%s/config.json' % (ROOTDIR), 'r') as c:
                 self.config = json.load(c)
-                firewall.apply_rules(self.config["firewall"])
-                self.disable_ipv6(self.config["ipv6_disable"])
-                firewall.allow_ping(self.config["latency_check"])
+                
+        except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
+            self.logger.error('%s: Could not open %s/config.json - loading default configuration' % (e, DIRECTORY))
+            with open('%s/default_config.json' % (ROOTDIR), 'r') as c:
+                self.config = json.load(c)
+                
+        try: 
+            firewall.apply_rules(self.config["firewall"])
+            self.disable_ipv6(self.config["ipv6_disable"])
+            firewall.allow_ping(self.config["ping"])
+            
         except KeyError:
-            self.logger.warning('Could not read all values from  file')
+            self.logger.warning('Could not read all values from config file')
             
     @dbus.service.method(BUS_NAME, in_signature='i', out_signature='')
     def disable_ipv6(self, i):
@@ -274,8 +283,9 @@ class QomuiDbus(dbus.service.Object):
             self.kill_pid(self.dnsmasq_pid)
         except AttributeError:
             pass
-        try:
-            default_gateway = self.default_gateway_check()["gateway"]
+        
+        default_gateway = self.default_gateway_check()["gateway"]
+        if default_gateway != "None":
             try:
                 if self.config["bypass"] == 1:
                     pid = bypass.create_cgroup(user, group, self.default_interface, default_gateway)
@@ -287,18 +297,19 @@ class QomuiDbus(dbus.service.Object):
                         pass
             except KeyError:
                 self.logger.warning('Could not read all values from  file')
-        except (CalledProcessError, IndexError):
-            self.logger.info('Could not create cgroup for bypass - no network connectivity')
-            
     
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='a{ss}')
     def default_gateway_check(self):
-        default_route = check_output(["ip", "route", "show", "default"]).decode("utf-8")
-        parse_route = default_route.split(" ")
-        self.default_interface = parse_route[4]
-        default_gateway = parse_route[2]
-        default_interface = parse_route[4]
-        return {"gateway" : default_gateway, "interface" : default_interface}
+        try:
+            default_route = check_output(["ip", "route", "show", "default", "0.0.0.0/0"]).decode("utf-8")
+            parse_route = default_route.split(" ")
+            self.default_interface = parse_route[4]
+            default_gateway = parse_route[2]
+            default_interface = parse_route[4]
+            return {"gateway" : default_gateway, "interface" : default_interface}
+        except (CalledProcessError, IndexError):
+            self.logger.info('Could not identify default gateway - no network connectivity')
+            return {"gateway" : "None", "interface" : "None"}
         
     @dbus.service.signal(BUS_NAME, signature='s')
     def reply(self, msg):

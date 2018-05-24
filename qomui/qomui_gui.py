@@ -157,7 +157,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.logger.addHandler(handler)
         primary_screen_geometry = QtWidgets.QDesktopWidget().availableGeometry(QtWidgets.QDesktopWidget().primaryScreen())
         positioning = primary_screen_geometry.bottomRight()
-        self.setGeometry(QtCore.QRect(positioning.x(), positioning.y(), 550, 720))
+        self.setGeometry(QtCore.QRect(positioning.x(), positioning.y(), 550, 730))
         self.qomui_service.disconnect()
         self.qomui_service.save_default_dns()
         
@@ -284,6 +284,8 @@ class QomuiGui(QtWidgets.QWidget):
         font.setBold(True)
         font.setWeight(75)
         font.setKerning(False)
+        self.empty = QtWidgets.QLabel(self.options_tab)
+        self.verticalLayout_5.addWidget(self.empty)
         self.autoconnect_check = QtWidgets.QCheckBox(self.options_tab)
         self.autoconnect_check.setObjectName(_fromUtf8("autoconnect_check"))
         self.autoconnect_check.setFont(font)
@@ -306,10 +308,10 @@ class QomuiGui(QtWidgets.QWidget):
         self.minimize_label.setIndent(20)
         self.minimize_label.setFont(cfont)
         self.verticalLayout_5.addWidget(self.minimize_label)
-        self.lat_check = QtWidgets.QCheckBox(self.options_tab)
-        self.lat_check.setFont(font)
-        self.lat_check.setObjectName(_fromUtf8("lat_check"))
-        self.verticalLayout_5.addWidget(self.lat_check)
+        self.ping_check = QtWidgets.QCheckBox(self.options_tab)
+        self.ping_check.setFont(font)
+        self.ping_check.setObjectName(_fromUtf8("lat_check"))
+        self.verticalLayout_5.addWidget(self.ping_check)
         self.lat_label = QtWidgets.QLabel(self.options_tab)
         self.lat_label.setObjectName(_fromUtf8("lat_check"))
         self.lat_label.setWordWrap(True)
@@ -364,10 +366,10 @@ class QomuiGui(QtWidgets.QWidget):
         self.alt_dns_lbl.setFont(font)
         self.alt_dns_lbl.setObjectName(_fromUtf8("alt_dns_lbl"))
         self.verticalLayout_5.addWidget(self.alt_dns_lbl)
-        self.dns_check = QtWidgets.QCheckBox(self.options_tab)
-        self.dns_check.setFont(font)
-        self.dns_check.setObjectName(_fromUtf8("dns_check"))
-        self.verticalLayout_5.addWidget(self.dns_check)
+        self.use_alt_dns_check = QtWidgets.QCheckBox(self.options_tab)
+        self.use_alt_dns_check.setFont(font)
+        self.use_alt_dns_check.setObjectName(_fromUtf8("dns_check"))
+        self.verticalLayout_5.addWidget(self.use_alt_dns_check)
         self.alt_dns_edit1 = QtWidgets.QLineEdit(self.options_tab)
         self.alt_dns_edit1.setObjectName(_fromUtf8("alt_dns_edit1"))
         self.verticalLayout_5.addWidget(self.alt_dns_edit1)
@@ -556,9 +558,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.minimize_check.setText(_translate("Form", "Start minimized", None))
         self.firewall_check.setText(_translate("Form", "Activate Firewall     ", None))
         self.bypass_check.setText(_translate("Form", "Allow OpenVPN bypass", None))
-        self.lat_check.setText(_translate("Form", "Perform latency check", None))
+        self.ping_check.setText(_translate("Form", "Perform latency check", None))
         self.ipv6_check.setText(_translate("Form", "Disable IPv6", None))
-        self.dns_check.setText(_translate("Form", "Use always", None))
+        self.use_alt_dns_check.setText(_translate("Form", "Use always", None))
         self.alt_dns_lbl.setText(_translate("Form", "Alternative DNS Servers:", None))
         self.default_bt.setText(_translate("Form", "Restore defaults", None))
         self.default_bt.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
@@ -615,7 +617,6 @@ class QomuiGui(QtWidgets.QWidget):
             self.providerChoice.addItem(provider)
         self.providerChoice.addItem("Manually add config file folder")
 
-
     def tabswitch(self):
         button = self.sender().text().replace("&", "")
         if button == "Server":
@@ -635,7 +636,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.tabWidget.setCurrentIndex(3) 
     
     def systemtray(self):
-        self.trayicon = QtGui.QIcon("%s/qomui.png" % (ROOTDIR))
+        self.trayicon = QtGui.QIcon.fromTheme("qomui")
         self.tray = QtWidgets.QSystemTrayIcon()
         if self.tray.isSystemTrayAvailable() == False:
             self.setWindowState(QtCore.Qt.WindowActive)
@@ -663,18 +664,6 @@ class QomuiGui(QtWidgets.QWidget):
             self.setWindowState(QtCore.Qt.WindowActive)
             self.showNormal()
     
-    #Minimize/Maximize does not work if active!
-    """def changeEvent(self, event):
-        if event.type() == QtCore.QEvent.WindowStateChange:
-            if self.windowState() & QtCore.Qt.WindowMinimized:
-                if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable() == False:
-                    event.accept()
-                else:
-                    self.hide()
-            elif self.windowState() & QtCore.Qt.WindowActive:
-                self.setWindowState(QtCore.Qt.WindowActive)
-                self.showNormal()"""
-
     def closeEvent(self, event):
         closemsg = QtWidgets.QMessageBox()
         closemsg.setText("Do you want to exit program or minimize to tray?")
@@ -717,15 +706,15 @@ class QomuiGui(QtWidgets.QWidget):
         elif self.minimize_check.checkState() == 0:
             new_config_dict["minimize"] = 0
             
-        if self.dns_check.checkState() == 2:
+        if self.use_alt_dns_check.checkState() == 2:
             new_config_dict["fallback"] = 1
-        elif self.dns_check.checkState() == 0:
+        elif self.use_alt_dns_check.checkState() == 0:
             new_config_dict["fallback"] = 0
             
-        if self.lat_check.checkState() == 2:
-            new_config_dict["latency_check"] = 1
-        elif self.lat_check.checkState() == 0:
-            new_config_dict["latency_check"] = 0
+        if self.ping_check.checkState() == 2:
+            new_config_dict["ping"] = 1
+        elif self.ping_check.checkState() == 0:
+            new_config_dict["ping"] = 0
             
         if self.bypass_check.checkState() == 2:
             new_config_dict["bypass"] = 1
@@ -752,7 +741,9 @@ class QomuiGui(QtWidgets.QWidget):
                                             "Updated",
                                             "Configuration updated successfully",
                                             QtWidgets.QMessageBox.Ok)
-            if new_config_dict["latency_check"] == 1 and self.config_dict["latency_check"] == 0:
+            
+
+            if new_config_dict["ping"] == 1:
                 self.get_latency()
             self.config_dict = new_config_dict
 
@@ -778,8 +769,12 @@ class QomuiGui(QtWidgets.QWidget):
                     self.bypass_tab_bt.setVisible(True)
                 self.setOptiontab(self.config_dict)        
         except (FileNotFoundError,json.decoder.JSONDecodeError, KeyError) as e:
-            self.logger.error('%s: Could not open %s/config.json' % (e, DIRECTORY))
-        
+            self.logger.error('%s: Could not open %s/config.json - loading default configuration' % (e, DIRECTORY))
+            with open('%s/default_config.json' % (ROOTDIR), 'r') as config:
+                self.config_dict = json.load(config)
+                self.setWindowState(QtCore.Qt.WindowActive)
+                self.setOptiontab(self.config_dict)  
+                
         try:
             with open('%s/protocol.json' % (DIRECTORY), 'r') as pload:
                 self.protocol_dict = json.load(pload)
@@ -839,46 +834,20 @@ class QomuiGui(QtWidgets.QWidget):
         except KeyError:
             pass
         
-        if config["autoconnect"] == 0:
-            self.autoconnect_check.setChecked(False)
-        elif config["autoconnect"] == 1:
-            self.autoconnect_check.setChecked(True)
-            
-        if config["firewall"] == 0:
-            self.firewall_check.setChecked(False)
-        elif config["firewall"] == 1:
-            self.firewall_check.setChecked(True)
-            
-        if config["ipv6_disable"] == 0:
-            self.ipv6_check.setChecked(False)
-        elif config["ipv6_disable"] == 1:
-            self.ipv6_check.setChecked(True)
-            
-        if config["minimize"] == 0:
-            self.minimize_check.setChecked(False)
-        elif config["minimize"] == 1:
-            self.minimize_check.setChecked(True)
-            
-        if config["latency_check"] == 0:
-            self.lat_check.setChecked(False)
-        elif config["latency_check"] == 1:
-            self.lat_check.setChecked(True)
-            
-        if config["bypass"] == 0:
-            self.bypass_check.setChecked(False)
-        elif config["bypass"] == 1:
-            self.bypass_check.setChecked(True)
-            
-        if config["fallback"] == 0:
-            self.dns_check.setChecked(False)
-        elif config["fallback"] == 1:
-            self.dns_check.setChecked(True)
-    
+        for k, v in config.items():
+            try:
+                if v == 0:
+                    getattr(self, "%s_check" %k).setChecked(False)
+                elif v == 1:
+                    getattr(self, "%s_check" %k).setChecked(True)
+            except AttributeError:
+                pass
     
     def networkstate(self, networkstate):
         if networkstate == 70 or networkstate == 60:
             self.logger.info("Detected new network connection")
             self.qomui_service.save_default_dns()
+            self.get_latency()
             if self.ovpn_dict is not None:
                 self.connect_thread(self.ovpn_dict)
                 self.qomui_service.bypass(self.user, self.group)
@@ -1115,15 +1084,19 @@ class QomuiGui(QtWidgets.QWidget):
             self.providerBox.addItem(provider)
             self.providerBox.setItemText(index, provider)
         self.filterList(display="all")
-        if self.config_dict["latency_check"] == 1:
-            self.get_latency()
+        try:
+            if self.config_dict["ping"] == 1:
+                self.get_latency()
+        except KeyError:
+            pass
         
     def get_latency(self):
         gateway = self.qomui_service.default_gateway_check()["interface"]
-        self.latency_list = []
-        self.latThread = latency.LatencyCheck(self.server_dict, gateway)
-        self.latThread.lat_signal.connect(self.show_latency)
-        self.latThread.start()
+        if gateway != "None": 
+            self.latency_list = []
+            self.latThread = latency.LatencyCheck(self.server_dict, gateway)
+            self.latThread.lat_signal.connect(self.show_latency)
+            self.latThread.start()
         
     def show_latency(self, result):
         hidden = False
@@ -1385,30 +1358,27 @@ class QomuiGui(QtWidgets.QWidget):
         
     def create_server_dict(self, current_dict, h):
         provider = current_dict["provider"]
-        if provider == "Airvpn":
-            mode = self.protocol_dict["Airvpn"]["selected"]
-            port = self.protocol_dict["Airvpn"][mode]["port"]
-            protocol = self.protocol_dict["Airvpn"][mode]["protocol"]
+        if provider in SUPPORTED_PROVIDERS:
+            
+            try:
+                mode = self.protocol_dict[provider]["selected"]
+            except KeyError:
+                mode = self.protocol_dict["protocol_1"]
+                
+            port = self.protocol_dict[provider][mode]["port"]
+            protocol = self.protocol_dict[provider][mode]["protocol"]
+            
+            if provider == "Airvpn":
+                if self.protocol_dict["Airvpn"][mode]["ip"] == "Primary":
+                    ip = current_dict["prim_ip"]
+                
+                elif self.protocol_dict["Airvpn"][mode]["ip"] == "Alternative":
+                    ip = current_dict["alt_ip"]
+                current_dict.update({"ip" : ip, "port": port, "protocol": protocol, "prot_index": mode})
+            
+            else:
+                current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
 
-            if self.protocol_dict["Airvpn"][mode]["ip"] == "Primary":
-                ip = current_dict["prim_ip"]
-            
-            elif self.protocol_dict["Airvpn"][mode]["ip"] == "Alternative":
-                ip = current_dict["alt_ip"]
-            current_dict.update({"ip" : ip, "port": port, "protocol": protocol, "prot_index": mode})
-            
-        elif provider == "Mullvad":
-            mode = self.protocol_dict["Mullvad"]["selected"]
-            port = self.protocol_dict["Mullvad"][mode]["port"]
-            protocol = self.protocol_dict["Mullvad"][mode]["protocol"]
-            current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
-            
-        elif provider == "PIA":
-            mode = self.protocol_dict["PIA"]["selected"]
-            port = self.protocol_dict["PIA"][mode]["port"]
-            protocol = self.protocol_dict["PIA"][mode]["protocol"]
-            current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
-        
         else:
             try: 
                 port = self.protocol_dict[provider]["port"]
@@ -1431,7 +1401,7 @@ class QomuiGui(QtWidgets.QWidget):
                 try:
                     self.tray.setIcon(QtGui.QIcon('%s/flags/%s.png' % (ROOTDIR, self.ovpn_dict["country"])))
                 except KeyError:
-                    self.tray.setIcon(QtGui.QIcon("%s/qomui.png" % (ROOTDIR)))
+                    self.tray.setIcon(QtGui.QIcon(self.trayicon))
                 
                 QtWidgets.QApplication.restoreOverrideCursor()
             
@@ -2027,9 +1997,6 @@ class NetMon(QtCore.QThread):
             return ("%s %s" % (split[1], split[2]))
         else:
             return ("%s %s" % (split[0], split[1]))
-            
-        
-        
 
 class FirewallEditor(QtWidgets.QDialog):
     rule_change = QtCore.pyqtSignal()

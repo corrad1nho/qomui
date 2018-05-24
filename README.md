@@ -97,6 +97,14 @@ The idea is taken from [this post on severfault.com](https://serverfault.com/que
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.4.1:
+- [bugfix] Crashes if no port/protocol selected
+- [bugfix] Crashes while performing latency checks if not connected to a network
+- [bugfix] Config file overwritten after updating Qomui
+- [bugfix] Tray icon not displayed on Linux Mint Cinnamon 18.3
+- [bugfix] Cannot toggle "autoconnect" option
+- [bugfix] Crashes if checking latencies while new servers are added
+
 version 0.4:
 - [new] Check and sort servers by latency
 - [new] Additional info for active connection displayed 
@@ -121,7 +129,6 @@ version 0.3
 - [bugfix] Crashes after hibernate
 
 version 0.2
-
 - [new] OpenVPN bypass
 - [change] DNS management
 
