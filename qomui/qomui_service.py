@@ -91,7 +91,7 @@ class QomuiDbus(dbus.service.Object):
                 self.config = json.load(c)
                 
         except (FileNotFoundError,json.decoder.JSONDecodeError) as e:
-            self.logger.error('%s: Could not open %s/config.json - loading default configuration' % (e, DIRECTORY))
+            self.logger.error('%s: Could not open %s/config.json - loading default configuration' % (e, ROOTDIR))
             with open('%s/default_config.json' % (ROOTDIR), 'r') as c:
                 self.config = json.load(c)
                 
