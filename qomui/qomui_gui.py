@@ -769,7 +769,7 @@ class QomuiGui(QtWidgets.QWidget):
                     self.bypass_tab_bt.setVisible(True)
                 self.setOptiontab(self.config_dict)        
         except (FileNotFoundError,json.decoder.JSONDecodeError, KeyError) as e:
-            self.logger.error('%s: Could not open %s/config.json - loading default configuration' % (e, DIRECTORY))
+            self.logger.error('%s: Could not open %s/config.json - loading default configuration' % (e, ROOTDIR))
             with open('%s/default_config.json' % (ROOTDIR), 'r') as config:
                 self.config_dict = json.load(config)
                 self.setWindowState(QtCore.Qt.WindowActive)
