@@ -3,15 +3,17 @@ from setuptools.command.install import install
 import glob
 import os
 
+VERSION = "0.5.0"
+
 data_files = [
         ('/usr/share/applications/', ['resources/qomui.desktop']),
         ('/etc/systemd/system/', ['resources/qomui.service']),
         ('/etc/dbus-1/system.d/', ['resources/org.qomui.service.conf']),
-        ('/usr/share/icons/hicolor/scalable/apps/', ['resources/qomui.svg']),
+        ('/usr/share/icons/hicolor/scalable/apps/', ['resources/qomui.svg',
+                                                     'resources/qomui_off.svg']),
         ('/usr/share/qomui/', ['resources/Airvpn_config',
                           'resources/PIA_config',    
                           'resources/default_config.json',
-                          'resources/firewall.json',
                           'resources/firewall_default.json',
                           'resources/Mullvad_config',
                           'resources/ssl_config',
@@ -29,7 +31,11 @@ def post_install(i):
                 os.chmod(fmod, 0o774)
             else:
                 os.chmod(fmod, 0o664)
-            
+                
+    with open("/usr/share/qomui/VERSION", "w") as vtext:
+        vtext.write(VERSION)
+        vtext.close()
+    
 
 class CustomInstall(install):
     def run(self):
@@ -38,7 +44,7 @@ class CustomInstall(install):
 
 
 setup(name="qomui",
-      version="0.4.1",
+      version=VERSION,
       packages=['qomui'],
       include_package_data=True,
       install_requires=[
@@ -70,10 +76,6 @@ setup(name="qomui",
       cmdclass={'install': CustomInstall}
       )
 
-
-    
-    
-    
     
     
     

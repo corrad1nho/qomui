@@ -9,6 +9,7 @@ import logging
 
 class LatencyCheck(QtCore.QThread):
     lat_signal = QtCore.pyqtSignal(tuple)
+    finished = QtCore.pyqtSignal()
 
     def __init__(self, server_dict, interface):
         QtCore.QThread.__init__(self)
@@ -44,4 +45,6 @@ class LatencyCheck(QtCore.QThread):
                 
         except RuntimeError:
             logging.debug("RuntimeError: Latency check is already running")
+            
+        self.finished.emit()
                 

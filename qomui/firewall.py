@@ -8,7 +8,7 @@ rootdir = "/usr/share/qomui"
 saved_rules = []
 saved_rules_6 = []
 ip_cmd = ["iptables", "--wait",]
-ip6_cmd = ["ip6tables", "-w",]
+ip6_cmd = ["ip6tables", "--wait",]
 
 def add_rule(rule):
     a = 1
@@ -43,14 +43,7 @@ def add_rule_6(rule):
         logging.warning("ip6tables: failed to apply %s" %rule)
 
 def apply_rules(opt):
-    firewall_rules = {}
-    try:
-        with open ("%s/firewall.json" %(rootdir), "r") as f:
-            firewall_rules = json.load(f)
-    except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
-        logging.debug("Could not read firewall configuration file")
-        return "error"
-
+    firewall_rules = get_config()
     save_existing_rules(firewall_rules)
     save_existing_rules_6(firewall_rules)
         
@@ -113,7 +106,6 @@ def save_existing_rules_6(firewall_rules):
         rpl = line.replace("/32", "")
         rule = shlex.split(rpl)
         if len(rule) != 0:
-            #rule.insert(0, "iptables")
             match = 0
             omit = firewall_rules["ipv6rules"] + firewall_rules["flushv6"]
             for x in omit:
@@ -123,18 +115,26 @@ def save_existing_rules_6(firewall_rules):
                 saved_rules_6.append(rule)
             match = 0
 
-
 def allow_ping(opt):
-    logging.info("pingeling")
     if opt == 1:
+        firewall_rules = get_config()
+        for rule in firewall_rules["allowping"]:
+                add_rule(rule)
+        logging.info("iptables: Ping allowed")
+            
+def get_config():
+    try:
+        with open ("%s/firewall.json" %(rootdir), "r") as f:
+                return json.load(f)
+    except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
+        logging.debug("Loading default firewall configuration")
         try:
-            with open ("%s/firewall.json" %(rootdir), "r") as f:
-                firewall_rules = json.load(f)
-            for rule in firewall_rules["allowping"]:
-                    add_rule(rule)
-            logging.info("iptables: Ping allowed")
+            with open ("%s/firewall_default.json" %(rootdir), "r") as f:
+                    return json.load(f)
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
-            logging.debug("Could not read firewall configuration file")
+                logging.debug("Failed to load firewall configuration")
+                return None
+        
         
 
     

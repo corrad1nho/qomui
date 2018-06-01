@@ -5,6 +5,7 @@ from PyQt5 import QtCore, QtGui, Qt, QtWidgets
 import requests
 import os
 from bs4 import BeautifulSoup
+import json
 import zipfile
 import gzip
 import tarfile
@@ -69,22 +70,26 @@ class AirVPNDownload(QtCore.QThread):
         self.url = "https://airvpn.org"
 
     def run(self):
-        with requests.Session() as self.session:
-            auth_parse = BeautifulSoup(self.session.get(self.url).content, "lxml")
-            auth = auth_parse.find("input", {"type": "hidden"}).get("value")
-            payload = {'auth_key' : auth,
-                       'referer' : self.url,
-                       'ips_username' : self.username,
-                       'ips_password' : self.password
-                        }
-            post = self.session.post("https://airvpn.org/index.php?app=core&module=global&section=login&do=process",
-                                     data=payload)
-            cook = self.session.cookies.get_dict()
-            
-            if "coppa" in cook:
-                self.parse()
-            else:
-                self.importFail.emit("Airvpn")
+        try:
+            with requests.Session() as self.session:
+                auth_parse = BeautifulSoup(self.session.get(self.url).content, "lxml")
+                auth = auth_parse.find("input", {"type": "hidden"}).get("value")
+                payload = {'auth_key' : auth,
+                        'referer' : self.url,
+                        'ips_username' : self.username,
+                        'ips_password' : self.password
+                            }
+                url = "https://airvpn.org/index.php?app=core&module=global&section=login&do=process"
+                post = self.session.post(url, data=payload)
+                cook = self.session.cookies.get_dict()
+                
+                if "coppa" in cook:
+                    self.parse()
+                else:
+                    self.importFail.emit("Airvpn")
+                    
+        except requests.exceptions.RequestException as e:
+            self.importFail.emit("Network error: no internet connection")
            
     def parse(self):
         csrf_parse = BeautifulSoup(self.session.get('%s/generator' % (self.url)).content, "lxml")
@@ -128,42 +133,54 @@ class AirVPNDownload(QtCore.QThread):
             server_chosen = "server_" + key.lower() 
             self.download_form[server_chosen] = "on"
             
-        download = self.session.post("https://airvpn.org/generator/", data=self.download_form)
-        filepath = "%s/temp" %(DIRECTORY)
-        z = zipfile.ZipFile(io.BytesIO(download.content))
-        z.extractall(filepath)
+        try:     
+            download = self.session.post("https://airvpn.org/generator/", 
+                                         data=self.download_form
+                                         )
+            filepath = "%s/temp" %(DIRECTORY)
+            z = zipfile.ZipFile(io.BytesIO(download.content))
+            z.extractall(filepath)
+            temp = "%s/temp" %DIRECTORY
+            vpnfiles = sorted([f for f in os.listdir(temp) if f.endswith('.ovpn')])
+            for ovpn in vpnfiles:
+                file = "%s/temp/%s" % (DIRECTORY, ovpn)
+                filedata = open(file, "r").read()
+                server = ovpn.split("_")[2]
+                if ovpn.endswith('_SSL-443.ovpn') == True:
+                    ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
+                    result = ipsearch.findall(filedata)
+                    alt_ip = "0.0.0.0"
+                    for i in result:
+                        if i != "127.0.0.1" and i != "255.255.255.255":
+                            alt_ip = i
+                            
+                    self.Airvpn_server_dict[server]["alt_ip"] = alt_ip
 
-        vpnfiles = sorted([file for file in os.listdir("%s/temp" % (DIRECTORY)) if file.endswith('.ovpn')])
-        for ovpn in vpnfiles:
-            file = "%s/temp/%s" % (DIRECTORY, ovpn)
-            filedata = open(file, "r").read()
-            server = ovpn.split("_")[2]
-            if ovpn.endswith('_SSL-443.ovpn') == True:
-                ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-                result = ipsearch.findall(filedata)
-                alt_ip = "0.0.0.0"
-                for i in result:
-                    if i != "127.0.0.1" and i != "255.255.255.255":
-                     alt_ip = i
+                else:
+                    ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
+                    result = ipsearch.findall(filedata)
+                    ip = "0.0.0.0"
+                    for j in result:
+                        if j != "127.0.0.1" and j != "255.255.255.255":
+                            ip = j
 
-                self.Airvpn_server_dict[server]["alt_ip"] = alt_ip
+                    self.Airvpn_server_dict[server]["prim_ip"] = ip
 
-            else:
-                ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-                result = ipsearch.findall(filedata)
-                ip = "0.0.0.0"
-                for j in result:
-                    if j != "127.0.0.1" and j != "255.255.255.255":
-                        ip = j
-
-                self.Airvpn_server_dict[server]["prim_ip"] = ip
-
-        Airvpn_dict = {"server" : self.Airvpn_server_dict, "protocol" : self.Airvpn_protocol_dict, "provider" : "Airvpn", "path" : filepath}
-        self.down_finished.emit(Airvpn_dict)   
+            Airvpn_dict = {"server" : self.Airvpn_server_dict,
+                        "protocol" : self.Airvpn_protocol_dict,
+                        "provider" : "Airvpn", 
+                        "path" : filepath
+                        }
+            
+            self.down_finished.emit(Airvpn_dict)
+            
+        except requests.exceptions.RequestException as e:
+            self.importFail.emit("Network error: no internet connection")
 
 class MullvadDownload(QtCore.QThread):
      down_finished = QtCore.pyqtSignal(object)
      importFail = QtCore.pyqtSignal(str)
+     omit = ["brigde", "wireguard"]
     
      def __init__(self, accountnumber):
         QtCore.QThread.__init__(self)
@@ -173,53 +190,59 @@ class MullvadDownload(QtCore.QThread):
 
      def run(self):
         with requests.Session() as self.session:
-            self.session.headers.update({"User-Agent" :	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36",
-                                         "Accept" : "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                                         "Accept-Language" : "en-US,en;q=0.5",
-                                         "Accept-Encoding" : "gzip, deflate, br"
-                                         })
-            
-            url = "https://mullvad.net/download/latest/source/"
-            src = self.session.get(url)
-            with open("%s/temp/tar" %(DIRECTORY), 'wb') as temp_file:
-                temp_file.write(gzip.decompress(src.content))
-                tar = tarfile.open("%s/temp/tar" %(DIRECTORY))
-                tar.extractall(path="%s/temp/" %(DIRECTORY))
+            try:
+                url = "https://mullvad.net/download/latest/source/"
+                src = self.session.get(url)
+                with open("%s/temp/tar" %(DIRECTORY), 'wb') as temp_file:
+                    temp_file.write(gzip.decompress(src.content))
+                    tar = tarfile.open("%s/temp/tar" %(DIRECTORY))
+                    tar.extractall(path="%s/temp/" %(DIRECTORY))
 
-            certpath = "%s/temp/%s/src/mullvad/ssl/" %(DIRECTORY, tar.getnames()[0])
-            with open("%s/mullvad_userpass.txt" %(certpath), "w") as passfile:
-                passfile.write("%s\nm" %(self.accountnumber))
+                certpath = "%s/temp/%s/src/mullvad/ssl/" %(DIRECTORY, tar.getnames()[0])
+                with open("%s/mullvad_userpass.txt" %(certpath), "w") as passfile:
+                    passfile.write("%s\nm" %(self.accountnumber))
 
-            page = self.session.get('https://www.mullvad.net/en/servers/')
-            server_page = BeautifulSoup(page.content, "lxml")
-            server_parse = server_page.find("div", {"class":"section-content server-table"}).findAll('tr')
-            for entry in server_parse:
-                info = entry.findAll('td')
-                if info[1].string != "Country":
-                    server = "%s.mullvad.net" %info[0].string
-                    country_raw = info[1].string
-                    city = info[2].string
-                    ip = info[3].string
-                    if country_raw == "UK":
-                        country = "United Kingdom"
-                    elif country_raw == "USA":
-                        country = "United States"
-                    elif country_raw == "Czech Rep.":
-                        country = "Czechia"
-                    else:
-                        country = country_raw
-                    self.Mullvad_server_dict[server] = {"name" : server,
-                                                        "provider" :"Mullvad",
-                                                        "city" : city,
-                                                        "country" : country,
-                                                        "ip" : ip}
-                    
-            self.Mullvad_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"}, "protocol_2" : {"protocol": "UDP", "port": "53"},
-                                        "protocol_3" : {"protocol": "TCP", "port": "80"}, "protocol_4" : {"protocol": "TCP", "port": "443"}}
+                page = self.session.get('https://www.mullvad.net/en/servers/')
+                server_page = BeautifulSoup(page.content, "lxml")
+                server_parse = server_page.find_all("div", {"class":"section-content server-table"})
+                for entry in server_parse[0].find_all('tr'):
+                    info = entry.find_all('td')
+                    name = info[0].string
+                    if info[1].string != "Country":
+                        server = "%s.mullvad.net" %info[0].string
+                        print(server)
+                        country_raw = info[1].string
+                        city = info[2].string
+                        ip = info[3].string
+                        if country_raw == "UK":
+                            country = "United Kingdom"
+                        elif country_raw == "USA":
+                            country = "United States"
+                        elif country_raw == "Czech Rep.":
+                            country = "Czechia"
+                        else:
+                            country = country_raw
+                        self.Mullvad_server_dict[server] = {"name" : server,
+                                                            "provider" :"Mullvad",
+                                                            "city" : city,
+                                                            "country" : country,
+                                                            "ip" : ip}
+                        
+                self.Mullvad_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"}, 
+                                            "protocol_2" : {"protocol": "UDP", "port": "53"},
+                                            "protocol_3" : {"protocol": "TCP", "port": "80"},
+                                            "protocol_4" : {"protocol": "TCP", "port": "443"}
+                                            }
 
-            Mullvad_dict = {"server" : self.Mullvad_server_dict, "protocol" : self.Mullvad_protocol_dict, "provider" : "Mullvad", "path" : certpath}
-            self.down_finished.emit(Mullvad_dict)
-            
+                Mullvad_dict = {"server" : self.Mullvad_server_dict, 
+                                "protocol" : self.Mullvad_protocol_dict, 
+                                "provider" : "Mullvad", 
+                                "path" : certpath
+                                }
+                self.down_finished.emit(Mullvad_dict)
+                
+            except requests.exceptions.RequestException as e:
+                self.importFail.emit("Network error: no internet connection")
 
 class PiaDownload(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(object)
@@ -235,58 +258,67 @@ class PiaDownload(QtCore.QThread):
     def run(self):
         url_ip = "https://www.privateinternetaccess.com/openvpn/openvpn-ip.zip"
         url_strong =  "https://www.privateinternetaccess.com/openvpn/openvpn-strong.zip"
-        with requests.Session() as self.session:
-            download_ip = self.session.get(url_ip)
-            filepath = "%s/temp/ip" %(DIRECTORY)
-            z = zipfile.ZipFile(io.BytesIO(download_ip.content))
-            z.extractall(filepath)
-            
-        vpnfiles = sorted([file for file in os.listdir(filepath) if file.endswith('.ovpn')])
-        for ovpn in vpnfiles:
-            f = "%s/temp/ip/%s" % (DIRECTORY, ovpn)
-            filedata = open(f, "r").read()
-            ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-            result = ipsearch.findall(filedata)
-            for i in result:
-                ip = i
-            raw_name = os.path.splitext(ovpn)[0]
-            name = "PIA-%s" %raw_name
-            
-            try:
-                parse_country = raw_name.split(" ")
-                if parse_country[0] == "US":
-                    country = "United States"
-                elif parse_country[0] == "UK":
-                    country = "United Kingdom"
-                elif parse_country[0] == "CA":
-                    country = "Canada"
-                elif parse_country[0] == "AU":
-                    country = "Australia"
-                else:
-                    country = raw_name
-            except AttributeError:
-                country = raw_name
-          
-            self.pia_server_dict[name] = {"name" : name, "country" : country, "ip" : ip, "city" : "", "provider" : "PIA"}
-        
-        with requests.Session() as self.session:
-            download_ip = self.session.get(url_strong)
-            filepath = "%s/temp/strong" %(DIRECTORY)
-            z = zipfile.ZipFile(io.BytesIO(download_ip.content))
-            z.extractall(filepath)
-            
-        with open("%s/pia_userpass.txt" %(filepath), "w") as passfile:
-                passfile.write("%s\n%s" %(self.username, self.password))
+        try:
+            with requests.Session() as self.session:
+                download_ip = self.session.get(url_ip)
+                filepath = "%s/temp/ip" %(DIRECTORY)
+                z = zipfile.ZipFile(io.BytesIO(download_ip.content))
+                z.extractall(filepath)
                 
-        self.pia_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1197"}, 
-                                       "protocol_2" : {"protocol": "TCP", "port": "502"}}
+            vpnfiles = sorted([f for f in os.listdir(filepath) if f.endswith('.ovpn')])
+            for ovpn in vpnfiles:
+                f = "%s/temp/ip/%s" % (DIRECTORY, ovpn)
+                filedata = open(f, "r").read()
+                ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
+                result = ipsearch.findall(filedata)
+                for i in result:
+                    ip = i
+                raw_name = os.path.splitext(ovpn)[0]
+                name = "PIA-%s" %raw_name
+                
+                try:
+                    parse_country = raw_name.split(" ")
+                    if parse_country[0] == "US":
+                        country = "United States"
+                    elif parse_country[0] == "UK":
+                        country = "United Kingdom"
+                    elif parse_country[0] == "CA":
+                        country = "Canada"
+                    elif parse_country[0] == "AU":
+                        country = "Australia"
+                    else:
+                        country = raw_name
+                except AttributeError:
+                    country = raw_name
             
-        pia_dict = {"server" : self.pia_server_dict, "protocol" : self.pia_protocol_dict, "provider" : "PIA", "path" : filepath}
-        
-        self.down_finished.emit(pia_dict)   
+                self.pia_server_dict[name] = {"name" : name, "country" : country, 
+                                              "ip" : ip, "city" : "", "provider" : "PIA"
+                                                  }
+            
+            with requests.Session() as self.session:
+                download_ip = self.session.get(url_strong)
+                filepath = "%s/temp/strong" %(DIRECTORY)
+                z = zipfile.ZipFile(io.BytesIO(download_ip.content))
+                z.extractall(filepath)
+                
+            with open("%s/pia_userpass.txt" %(filepath), "w") as passfile:
+                    passfile.write("%s\n%s" %(self.username, self.password))
+                    
+            self.pia_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1197"}, 
+                                        "protocol_2" : {"protocol": "TCP", "port": "502"}}
+                
+            pia_dict = {"server" : self.pia_server_dict, 
+                        "protocol" : self.pia_protocol_dict, 
+                        "provider" : "PIA", 
+                        "path" : filepath
+                        }
+            
+            self.down_finished.emit(pia_dict)   
+            
+        except requests.exceptions.RequestException as e:
+            self.importFail.emit("Network error: no internet connection")
 
-
-class AddThread(QtCore.QThread):
+class AddFolder(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(dict)
     importFail = QtCore.pyqtSignal(str)
     extensions = ['.ovpn', '.conf', '.key', '.cert', '.pem']
@@ -301,10 +333,10 @@ class AddThread(QtCore.QThread):
     def run(self):
         self.configs = [f for f in os.listdir(self.folderpath) if f.endswith('.ovpn') or f.endswith('.conf')]
         if len(self.configs) == 0:
-            self.importFail.emit(self.provider)
+            self.importFail.emit("nothing")
             
         elif self.sanity_check(self.folderpath) >= 10:
-                self.importFail.emit(self.provider)
+                self.importFail.emit("nothing")
         
         else:
             if os.path.exists("%s/temp/%s" % (DIRECTORY, self.provider)):
@@ -319,11 +351,20 @@ class AddThread(QtCore.QThread):
             name = os.path.splitext(f)[0]
             copied_file = "%s/%s" % (temp_path, f)
             ip_found = 0
+            proto_line = 0
             with open(copied_file, "r") as config:
                 modify = config.readlines()
                 for index, line in enumerate(modify):
                     if line.startswith("remote "):
+                        
                         if ip_found == 0:
+                            
+                            try: 
+                                protocol = line.split(" ")[3]
+                            except IndexError:
+                                protocol = "udp\n"
+                                
+                            port = line.split(" ")[2]
                             ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
                             result = ipsearch.search(line)
                             if result is not None:
@@ -331,15 +372,16 @@ class AddThread(QtCore.QThread):
                                 ip_found = 1
                             else:
                                 server = line.split(" ")[1]
-                                port = line.split(" ")[2]
                                 try:
-                                    dig_cmd = ["dig", "%s" %(server), "+short"]
+                                    dig_cmd = ["dig", "+time=2", "+tries=2", "%s" %(server), "+short"]
                                     ip = check_output(dig_cmd).decode("utf-8")
                                     ip = ip.split("\n")[0]
                                     modify[index] = "remote %s %s\n" %(ip, port)
                                     ip_found = 1
                                 except CalledProcessError:
-                                    ip = line.split(" ")[1]
+                                    ip = server
+                                    modify[index] = "remote %s %s\n" %(ip, port)
+                                    ip_found = 1
                                     logging.warning("dig: resolving servername failed")
                         else:
                             modify[index] = "#%s" %line
@@ -350,8 +392,15 @@ class AddThread(QtCore.QThread):
                         modify[index] = 'verb 3\n'
                     elif line.startswith("up ") or line.startswith("down "):
                         modify[index] = "#%s" %line
+                    elif line.startswith("proto "):
+                        protocol = line.split(" ")[1]
+                        proto_line = 1
+                        
+                if proto_line == 0:
+                    modify.insert(0, "proto %s" %protocol.lower())
+    
                 config.close()
-                            
+                        
                 with open (copied_file, "w") as file_edit:
                     file_edit.writelines(modify)
                     file_edit.close()
@@ -361,8 +410,15 @@ class AddThread(QtCore.QThread):
                     cc = country_check.split(" ")[3].split(",")[0]
                     country = country_translate(cc)
                     
-                    custom_server_dict[name] = {"name": name, "provider" : self.provider, "city" : "",
-                                                "path" : "%s/%s" %(self.provider, f), "ip" : ip, "country" : country}
+                    custom_server_dict[name] = {"name": name, 
+                                                "provider" : self.provider, 
+                                                "city" : "",
+                                                "path" : "%s/%s" %(self.provider, f), 
+                                                "ip" : ip, 
+                                                "country" : country,
+                                                "port": port.upper().split("\n")[0], 
+                                                "protocol": protocol.upper().split("\n")[0]
+                                                }
                     
                 else:
                     pass
@@ -386,4 +442,20 @@ class AddThread(QtCore.QThread):
                 except IndexError:
                     unrelated_files += 1
         return unrelated_files
+    
+    
+class UpdateCheck(QtCore.QThread):
+    release_found = QtCore.pyqtSignal(str)
+    
+    def __init__(self):
+        QtCore.QThread.__init__(self)
+    
+    def run(self):
+        url = "https://api.github.com/repos/corrad1nho/qomui/releases/latest"
+        try:
+            check_version = requests.get(url)
+            latest_release = check_version.json()["tag_name"]
+            self.release_found.emit(latest_release)
+        except:
+            logging.info("ConnectionError: Checking for update failed")
     

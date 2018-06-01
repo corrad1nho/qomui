@@ -15,6 +15,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
 - allow applications to bypass the OpenVPN tunnel - to watch Netflix for example
+- automatic reconnects
 
 ### Dependencies/Requirements
 - Qomui should work on any GNU/Linux distribution 
@@ -45,7 +46,7 @@ sudo pacman -S python python-setuptools python-pip python-pyqt5 python-dbus open
 yaourt -S libcgroup
 ```
 
-The equivalent for Debian/Ubuntu-based distributions is:
+The equivalent for Ubuntu-based distributions is:
 
 ```
 sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils net-tools dnsmasq cgroup-lite cgroup-tools geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
@@ -65,7 +66,7 @@ Arch:
 sudo pip install ./
 ```
 
-Debian/Ubuntu:
+Ubuntu:
 
 ```
 sudo pip3 install ./
@@ -97,38 +98,26 @@ The idea is taken from [this post on severfault.com](https://serverfault.com/que
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.5.0:
+- [new] Reconnect when OpenVPN unexpectedly dies
+- [new] Update Qomui via new "About" tab - EXPERIMENTAL
+- [new] Option to use simplified tray icon to avoid glitches
+- [new] Protocol/port of active connection displayed
+- [new] Tray icon shows connection status 
+- [new] Automatic reconnects when OpenVPN tunnel breaks
+- [change] Disconnect button always visible
+- [bugfix] Config file / firewall configuration overwritten after update
+- [bugfix] Crashes due to missing entry in config file
+- [bugfix] Crashes when modifying server during latency check
+- [bugfix] Changing country in modify dialog fails
+- [bugfix] Connection attempt fails when protocol/port not set
+- [bugfix] Wireguard servers downloaded from Mullvad even though not supported
+
 version 0.4.1:
 - [bugfix] Crashes if no port/protocol selected
 - [bugfix] Crashes while performing latency checks if not connected to a network
-- [bugfix] Config file overwritten after updating Qomui
 - [bugfix] Tray icon not displayed on Linux Mint Cinnamon 18.3
 - [bugfix] Cannot toggle "autoconnect" option
 - [bugfix] Crashes if checking latencies while new servers are added
 
-version 0.4:
-- [new] Check and sort servers by latency
-- [new] Additional info for active connection displayed 
-- [bugfix] Disable ipv6 option status not displayed correctly
-- [bugfix] List of applications is empty if not all default application directories exist
-- [bugfix] Minimizing/maximizing window does not work on Mint Cinnamon 18.3
-
-version 0.3.1
-- [new] Modify imported servers and config files
-- [change] Improved performance of server list
-- [change] Mullvad: Updated link to parse server info
-- [bugfix] Crashes when deleting server/provider fixed
-- [bugfix] Memory leak in server tab fixed
-
-version 0.3
-- [new] Mark servers as favourites
-- [new] Randomly connect to a favourite server
-- [new] Support for PIA (PrivateInternetAccess)
-- [new] Override Port/Protocol in imported configs
-- [change] Config file import improved
-- [change] All servers displayed in one tab
-- [bugfix] Crashes after hibernate
-
-version 0.2
-- [new] OpenVPN bypass
-- [change] DNS management
 
