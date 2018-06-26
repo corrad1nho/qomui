@@ -108,6 +108,7 @@ class QomuiGui(QtWidgets.QWidget):
     hop_server_dict = None
     bypass_dict = {}
     config_dict = {}
+    packetmanager = None
     config_list = [
                    "firewall",
                    "autoconnect",
@@ -867,16 +868,26 @@ class QomuiGui(QtWidgets.QWidget):
             self.show_failmsg("Upgrade failed", "See log for further details")
         
     def check_update(self):
-        self.check_thread = update.UpdateCheck()
-        self.check_thread.release_found.connect(self.release_compare)
-        self.check_thread.start()
+        if self.packetmanager is None:
+            self.check_thread = update.UpdateCheck()
+            self.check_thread.release_found.connect(self.release_compare)
+            self.check_thread.start()
 
     def release_compare(self, release):
         self.release = release
-        if self.installed != self.release:
-            self.updateQomuiBt.setText("Upgrade to %s" %self.release)
-            self.updateQomuiBt.setVisible(True)
-            self.newVersionLabel.setVisible(True)
+        try:
+            split = self.release[1:].split(".")
+            latest = int("".join(split))
+            split = self.installed[1:].split(".")
+            installed = int("".join(split))
+
+            if (latest > installed) is True:
+                self.updateQomuiBt.setText("Upgrade to %s" %self.release)
+                self.updateQomuiBt.setVisible(True)
+                self.newVersionLabel.setVisible(True)
+                
+        except ValueError:
+            pass
             
     def update_qomui(self):
         self.qomui_service.update_qomui(self.release)
@@ -995,8 +1006,16 @@ class QomuiGui(QtWidgets.QWidget):
     def load_saved_files(self):
         try:
             with open("%s/VERSION" %ROOTDIR, "r") as v:
-                self.installed = v.read().split("\n")[0]
+                version = v.read().split("\n")
+                self.installed = version[0]
                 self.versionInfo.setText(self.installed)
+                try:
+                    pm_check = version[1]
+                    if pm_check != "":
+                        self.packetmanager = pm_check
+                except IndexError:
+                    pass
+                
         except FileNotFoundError:
             self.logger.warning("/usr/share/qomui/VERSION does not exist")
             self.versionInfo.setText("N.A.")
@@ -1493,7 +1512,8 @@ class QomuiGui(QtWidgets.QWidget):
             for k,v in sorted(self.protocol_dict[provider].items()):
                 if k != "selected":
                     try:
-                        mode = v["protocol"] + " " + v["port"] + ", " + v["ip"]
+                        ipv6 = ", connect with %s" %v["ipv6"]
+                        mode = v["protocol"] + " " + v["port"] + ", " + v["ip"] + ipv6
                     except KeyError:
                         mode = v["protocol"] + " " + v["port"]
                         
@@ -1644,12 +1664,29 @@ class QomuiGui(QtWidgets.QWidget):
             protocol = self.protocol_dict[provider][mode]["protocol"]
             
             if provider == "Airvpn":
-                if self.protocol_dict["Airvpn"][mode]["ip"] == "Primary":
-                    ip = current_dict["prim_ip"]
+                if self.protocol_dict["Airvpn"][mode]["ipv6"] == "ipv6":
+                    ipv6 = "on"
+                else: 
+                    ipv6 = "off"
+                    
+                try:
+                    ip_chosen = self.protocol_dict["Airvpn"][mode]["ip"]
+                    
+                    if ip_chosen == "ip3" or ip_chosen == "ip4":
+                        tlscrypt = "on"
+                    else:
+                        tlscrypt = "off"
+                    
+                    if ipv6 == "on":
+                        ip = current_dict["%s_6" %ip_chosen]
+                    else:
+                        ip = current_dict[ip_chosen]
                 
-                elif self.protocol_dict["Airvpn"][mode]["ip"] == "Alternative":
-                    ip = current_dict["alt_ip"]
-                current_dict.update({"ip" : ip, "port": port, "protocol": protocol, "prot_index": mode})
+                except KeyError:
+                    ip = current_dict[prim_ip]
+                    
+                current_dict.update({"ip" : ip, "port": port, "protocol": protocol, 
+                                     "prot_index": mode, "ipv6" : ipv6, "tlscrypt" : tlscrypt})
             
             else:
                 current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
@@ -1706,7 +1743,7 @@ class QomuiGui(QtWidgets.QWidget):
         elif reply == "fail2":
             self.kill()
             self.show_failmsg("Connection attempt failed",
-                              "Authentication errorMsgor while trying to connect\nMaybe your account is expired or connection limit is exceeded")
+                              "Authentication error while trying to connect\nMaybe your account is expired or connection limit is exceeded")
             QtWidgets.QApplication.restoreOverrideCursor()
             
         elif reply == "kill":
@@ -1998,11 +2035,12 @@ class ServerWidget(QtWidgets.QWidget):
         
     def hide_button(self, choice=None):
         self.choice = choice
-        #self.hop_bt = None
         self.horizontalLayout.removeWidget(self.hop_bt)
+        self.hop_bt = None
         if choice == 1:
             self.connect_bt.setVisible(False)
             self.horizontalLayout.removeWidget(self.connect_bt)
+            self.connect_bt = None
             
     def enterEvent(self, event):
         if self.show == None:
@@ -2317,7 +2355,7 @@ class NetMon(QtCore.QThread):
         accum = (0, 0)
         start_time = time.time()
  
-        while connected is True and psutil.net_if_stats()[self.tun].isup is True:
+        while connected is True:
             last_stat = stat
             time.sleep(1)
             time_measure = time.time()
@@ -2333,7 +2371,7 @@ class NetMon(QtCore.QThread):
                 DLacc, ULacc = [(now + last) / (1024*1024) for now, last in zip(stat, last_stat)]
                 t0 = time.time()
                 self.stat.emit([DLrate, DLacc, ULrate, ULacc])                     
-            except KeyError:
+            except (KeyError, OSError):
                 break
             
         connected = False
@@ -2358,8 +2396,13 @@ class FirewallEditor(QtWidgets.QDialog):
     
     def __init__ (self, parent=None):
         super(FirewallEditor, self).__init__(parent)
-        with open('%s/firewall.json' %ROOTDIR, 'r') as fload:
-            self.firewall_dict = json.load(fload)
+        try:
+            with open('%s/firewall.json' %ROOTDIR, 'r') as fload:
+                self.firewall_dict = json.load(fload)
+        except FileNotFoundError:
+            with open('%s/firewall_default.json' %ROOTDIR, 'r') as fload:
+                self.firewall_dict = json.load(fload)
+            
         self.setupUi(self)
         self.display_rules()
         
@@ -2464,7 +2507,7 @@ class FirewallEditor(QtWidgets.QDialog):
 
         self.firewall_dict["ipv4rules"] = new_ipv4_rules
         self.firewall_dict["ipv6rules"] = new_ipv6_rules
-
+        
         with open ("%s/firewall_temp.json" % HOMEDIR, "w") as firedump:
                 json.dump(self.firewall_dict, firedump)
 

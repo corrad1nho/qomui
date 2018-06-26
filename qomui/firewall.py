@@ -1,5 +1,6 @@
 import json
 import shlex
+import os
 import logging
 from subprocess import check_call, check_output, CalledProcessError
 from collections import Counter
@@ -9,6 +10,7 @@ saved_rules = []
 saved_rules_6 = []
 ip_cmd = ["iptables", "--wait",]
 ip6_cmd = ["ip6tables", "--wait",]
+devnull = open(os.devnull, 'w') 
 
 def add_rule(rule):
     a = 1
@@ -21,7 +23,7 @@ def add_rule(rule):
             check.pop(2)
         elif check[2] == "-A":
             check[2] = "-C"
-        apply_rule = check_call(ip_cmd + check)
+        apply_rule = check_call(ip_cmd + check, stdout=devnull, stderr=devnull)
         logging.debug("iptables: %s already exists" %rule)
         a = 0
     except (IndexError, CalledProcessError):
@@ -29,16 +31,34 @@ def add_rule(rule):
             
     try:
         if a == 1:
-            apply_rule = check_call(ip_cmd + rule)
+            apply_rule = check_call(ip_cmd + rule, stdout=devnull, stderr=devnull)
             logging.debug("iptables: applied %s" %rule)
         
     except CalledProcessError:
         logging.warning("iptables: failed to apply %s" %rule)
     
 def add_rule_6(rule):
+    a = 1
     try:
-        apply_rule = check_call(ip6_cmd + rule)
-        logging.debug("ip6tables: applied %s" %rule)
+        check = rule[:]
+        if check[0] == "-A":
+            check[0] = "-C"
+        elif check[0] == "-I":
+            check[0] = "-C"
+            check.pop(2)
+        elif check[2] == "-A":
+            check[2] = "-C"
+        apply_rule = check_call(ip6_cmd + check, stdout=devnull, stderr=devnull)
+        logging.debug("ipt6ables: %s already exists" %rule)
+        a = 0
+    except (IndexError, CalledProcessError):
+        pass
+            
+    try:
+        if a == 1:
+            apply_rule = check_call(ip6_cmd + rule, stdout=devnull, stderr=devnull)
+            logging.debug("ip6tables: applied %s" %rule)
+        
     except CalledProcessError:
         logging.warning("ip6tables: failed to apply %s" %rule)
 
@@ -114,13 +134,6 @@ def save_existing_rules_6(firewall_rules):
             if match == 0 and rule not in saved_rules_6:
                 saved_rules_6.append(rule)
             match = 0
-
-def allow_ping(opt):
-    if opt == 1:
-        firewall_rules = get_config()
-        for rule in firewall_rules["allowping"]:
-                add_rule(rule)
-        logging.info("iptables: Ping allowed")
             
 def get_config():
     try:

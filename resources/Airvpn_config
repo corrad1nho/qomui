@@ -6,6 +6,7 @@ resolv-retry infinite
 nobind
 persist-key
 persist-tun
+push-peer-info
 remote-cert-tls server
 cipher AES-256-CBC
 comp-lzo no
@@ -14,5 +15,4 @@ verb 3
 ca /usr/share/qomui/certs/ca.crt
 cert /usr/share/qomui/certs/user.crt
 key /usr/share/qomui/certs/user.key
-key-direction 1
-tls-auth /usr/share/qomui/certs/ta.key
+

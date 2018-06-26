@@ -51,8 +51,6 @@ class AirVPNDownload(QtCore.QThread):
                      "download_mode" : "zip",
                      "fileprefix" : "",
                      "noembedkeys" : "on",
-                     "protocol_14" : "on",
-                     "protocol_18" : "on",
                      "proxy_mode" : "none",
                      "resolve" : "on",
                      "system" : "linux",
@@ -102,16 +100,18 @@ class AirVPNDownload(QtCore.QThread):
                 number = protocols[0].find('input').get('id')
                 mode = protocols[1].string
                 port = protocols[2].string
-                if protocols[3].string == "1":
-                    ip = "Primary"
-                    self.Airvpn_protocol_dict[number] = {"protocol" : mode,
+                self.Airvpn_protocol_dict[number] = {"protocol" : mode,
                                                      "port" : port,
-                                                     "ip" : ip}
-                elif protocols[3].string == "2":
-                    ip = "Alternative"
-                    self.Airvpn_protocol_dict[number] = {"protocol" : mode,
-                                                     "port" : port,
-                                                     "ip" : ip}
+                                                     "ip" : "ip%s" %protocols[3].string,
+                                                     "ipv6" : "ipv4"
+                                                     }
+                
+                self.Airvpn_protocol_dict["%s-v6" %number] = {"protocol" : mode,
+                                                            "port" : port,
+                                                            "ip" : "ip%s" %protocols[3].string,
+                                                            "ipv6" : "ipv6",
+                                                            }
+                
                            
         get_list = requests.get('%s/status' % (self.url))
         get_list_parse = BeautifulSoup(get_list.content, "lxml")
@@ -133,7 +133,11 @@ class AirVPNDownload(QtCore.QThread):
             server_chosen = "server_" + key.lower() 
             self.download_form[server_chosen] = "on"
             
-        try:     
+        try:
+            self.download_form["protocol_14"] = "on"
+            self.download_form["protocol_18"] = "on"
+            self.download_form["iplayer"] = "ipv4"
+            
             download = self.session.post("https://airvpn.org/generator/", 
                                          data=self.download_form
                                          )
@@ -141,30 +145,78 @@ class AirVPNDownload(QtCore.QThread):
             z = zipfile.ZipFile(io.BytesIO(download.content))
             z.extractall(filepath)
             temp = "%s/temp" %DIRECTORY
+            
+            self.download_form["protocol_31"] = "on"
+            self.download_form["protocol_39"] = "on"
+            
+            download = self.session.post("https://airvpn.org/generator/", 
+                                         data=self.download_form
+                                         )
+            z = zipfile.ZipFile(io.BytesIO(download.content))
+            z.extractall(filepath)
+            temp = "%s/temp" %DIRECTORY
+            
+            self.download_form["iplayer"] = "ipv6_ipv4"
+            download = self.session.post("https://airvpn.org/generator/", 
+                                         data=self.download_form
+                                         )
+            
+            filepath_6 = "%s/temp/ipv6" %(DIRECTORY)
+            if not os.path.exists(filepath_6):
+                os.makedirs(filepath_6)
+
+            z = zipfile.ZipFile(io.BytesIO(download.content))
+            z.extractall(filepath_6)
+            temp = "%s/temp" %DIRECTORY
             vpnfiles = sorted([f for f in os.listdir(temp) if f.endswith('.ovpn')])
+            vpn6files = sorted([f for f in os.listdir(filepath_6) if f.endswith('.ovpn')])
+            
             for ovpn in vpnfiles:
-                file = "%s/temp/%s" % (DIRECTORY, ovpn)
-                filedata = open(file, "r").read()
                 server = ovpn.split("_")[2]
-                if ovpn.endswith('_SSL-443.ovpn') == True:
-                    ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-                    result = ipsearch.findall(filedata)
-                    alt_ip = "0.0.0.0"
-                    for i in result:
-                        if i != "127.0.0.1" and i != "255.255.255.255":
-                            alt_ip = i
+                fullpath = "%s/temp/%s" % (DIRECTORY, ovpn)
+                with open(fullpath, "r") as o:
+                    lines = o.readlines()
+                    for line in lines:
+                        
+                        if ovpn.endswith('SSL-443.ovpn'):
+                            if line.startswith("route "):
+                                self.Airvpn_server_dict[server]["ip2"] = line.split(" ")[1]
+                                
+                        elif ovpn.endswith('SSH-22.ovpn'):
+                            if line.startswith("route "):
+                                self.Airvpn_server_dict[server]["ip1"] = line.split(" ")[1]
+                        
+                        elif ovpn.endswith('Entry3.ovpn'):
+                            if line.startswith("remote "):
+                                self.Airvpn_server_dict[server]["ip3"] = line.split(" ")[1]
+                                
+                        elif ovpn.endswith('Entry4.ovpn'):
+                            if line.startswith("remote "):
+                                self.Airvpn_server_dict[server]["ip4"] = line.split(" ")[1]
                             
-                    self.Airvpn_server_dict[server]["alt_ip"] = alt_ip
+            for ovpn in vpn6files:
+                server = ovpn.split("_")[2]
+                fullpath = "%s/temp/ipv6/%s" % (DIRECTORY, ovpn)
+                with open(fullpath, "r") as o:
+                    lines = o.readlines()
+                    for line in lines:
+                        
+                        if ovpn.endswith('SSL-443.ovpn'):
+                            if line.startswith("route "):
+                                self.Airvpn_server_dict[server]["ip2_6"] = line.split(" ")[1]
 
-                else:
-                    ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-                    result = ipsearch.findall(filedata)
-                    ip = "0.0.0.0"
-                    for j in result:
-                        if j != "127.0.0.1" and j != "255.255.255.255":
-                            ip = j
-
-                    self.Airvpn_server_dict[server]["prim_ip"] = ip
+                        elif ovpn.endswith('SSH-22.ovpn'):
+                            if line.startswith("route "):
+                                self.Airvpn_server_dict[server]["ip1_6"] = line.split(" ")[1]
+                        
+                        elif ovpn.endswith('Entry3.ovpn'):
+                            if line.startswith("remote "):
+                                self.Airvpn_server_dict[server]["ip3_6"] = line.split(" ")[1]
+                                
+                        elif ovpn.endswith('Entry4.ovpn'):
+                            if line.startswith("remote "):
+                                self.Airvpn_server_dict[server]["ip4_6"] = line.split(" ")[1]
+                            
 
             Airvpn_dict = {"server" : self.Airvpn_server_dict,
                         "protocol" : self.Airvpn_protocol_dict,
@@ -210,7 +262,6 @@ class MullvadDownload(QtCore.QThread):
                     name = info[0].string
                     if info[1].string != "Country":
                         server = "%s.mullvad.net" %info[0].string
-                        print(server)
                         country_raw = info[1].string
                         city = info[2].string
                         ip = info[3].string

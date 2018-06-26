@@ -104,7 +104,6 @@ class QomuiDbus(dbus.service.Object):
         try: 
             firewall.apply_rules(self.config["firewall"])
             self.disable_ipv6(self.config["ipv6_disable"])
-            firewall.allow_ping(self.config["ping"])
             
         except KeyError:
             self.logger.warning('Could not read all values from config file')
@@ -206,6 +205,7 @@ class QomuiDbus(dbus.service.Object):
             shutil.copyfile("%s/ta.key" % (certpath), "%s/certs/ta.key" % (ROOTDIR))
             shutil.copyfile("%s/user.key" % (certpath), "%s/certs/user.key" % (ROOTDIR))
             shutil.copyfile("%s/user.crt" % (certpath), "%s/certs/user.crt" % (ROOTDIR))
+            shutil.copyfile("%s/tls-crypt.key" % (certpath), "%s/certs/tls-crypt.key" % (ROOTDIR))
             
         elif provider == "Mullvad":
             shutil.copyfile("%s/ca.crt" % (certpath), "%s/certs/mullvad_ca.crt" % (ROOTDIR))
@@ -307,6 +307,7 @@ class QomuiDbus(dbus.service.Object):
                                                self.default_interface, default_gateway
                                                )
                     self.dnsmasq_pid = (pid, "dnsmasq")
+                    self.logger.debug("dnsmasq-PID = %s" %pid)
                 elif self.config["bypass"] == 0:
                     try:
                         bypass.delete_cgroup(self.default_interface)
@@ -354,7 +355,7 @@ class QomuiDbus(dbus.service.Object):
         try:
             install = check_output(upgrade_cmd)
             with open ("%s/VERSION" %ROOTDIR, "w") as vfile:
-                vfile.write(self.version)
+                vfile.write(self.version[1:])
             self.updated(self.version) 
         except CalledProcessError as e:
             self.logger.error("%s: Upgrade failed" %e)
@@ -368,7 +369,10 @@ class QomuiDbus(dbus.service.Object):
         self.connect_status = 0
         provider = self.ovpn_dict["provider"]
         ip = self.ovpn_dict["ip"]
-        firewall.add_rule(['-I', 'OUTPUT', '1', '-d', '%s' %ip, '-j', 'ACCEPT'])
+        
+        rule = (['-I', 'OUTPUT', '1', '-d', '%s' %ip), '-j', 'ACCEPT'])
+        self.allow_ip(ip, rule)
+        
         self.logger.info("iptables: created rule for %s" %ip)
         path = "%s/temp.ovpn" %ROOTDIR
         cwd_ovpn = None
@@ -389,30 +393,30 @@ class QomuiDbus(dbus.service.Object):
                         ssl_dump.writelines(ssl_config)
                         ssl_dump.close()
                     ssl_edit.close()
-                self.write_config(provider, ip, port, protocol)
+                self.write_config(self.ovpn_dict)
                 self.ssl_thread = threading.Thread(target=self.ssl, args=(ip,))
                 self.ssl_thread.start()
                 logging.info("Started Stunnel process in new thread")
             elif protocol == "SSH":
-                self.write_config(provider, ip, port, protocol)
+                self.write_config(self.ovpn_dict)
                 self.ssh_thread = threading.Thread(target=self.ssh, args=(ip,port,))
                 self.ssh_thread.start()
                 logging.info("Started SSH process in new thread")
                 time.sleep(2)
             else:
-                self.write_config(provider, ip, port, protocol)
+                self.write_config(self.ovpn_dict)
 
         elif provider == "Mullvad":
-            self.write_config(provider, ip, port, protocol)
+            self.write_config(self.ovpn_dict)
             
         elif provider == "PIA":
-            self.write_config(provider, ip, port, protocol)
+            self.write_config(self.ovpn_dict)
             
         else:
             config_file = "%s/%s" %(ROOTDIR, self.ovpn_dict["path"])
             try:
                 edit = "%s/temp" %(provider)
-                self.write_config(provider, ip, port, protocol, 
+                self.write_config(self.ovpn_dict, 
                                   edit=edit, path=config_file)
                 
                 path = "%s/%s/temp.ovpn" %(ROOTDIR, provider)
@@ -421,22 +425,17 @@ class QomuiDbus(dbus.service.Object):
             cwd_ovpn=os.path.dirname(config_file) 
             
         if self.hop == "2":
-            firewall_hop_add = firewall.add_rule(['-I', 'OUTPUT', '1', '-d', 
-                                                  '%s' % (self.hop_dict["ip"]), '-j', 'ACCEPT']
-                                                )
+            rule = (['-I', 'OUTPUT', '1', '-d', '%s' % (self.hop_dict["ip"]), '-j', 'ACCEPT'])
+            self.allow_ip(self.hop_dict["ip"], rule)
             
             if self.hop_dict["provider"] in SUPPORTED_PROVIDERS:
                 hop_path = "%s/hop.ovpn" %ROOTDIR
-                self.write_config(self.hop_dict["provider"], self.hop_dict["ip"], 
-                                self.hop_dict["port"], self.hop_dict["protocol"],
-                                edit="hop")
+                self.write_config(self.hop_dict, edit="hop")
             else:
                 config_file = "%s/%s" %(ROOTDIR, self.hop_dict["path"])
                 try:
                     edit = "%s/hop" %self.hop_dict["provider"]
-                    self.write_config(self.hop_dict["provider"], self.hop_dict["ip"], 
-                                self.hop_dict["port"], self.hop_dict["protocol"],
-                                edit=edit, path=config_file)
+                    self.write_config(self.hop_dict, edit=edit, path=config_file)
                     hop_path = "%s/%s/temp.ovpn" %(ROOTDIR, self.hop_dict["provider"])
                     
                 except (UnboundLocalError, KeyError):
@@ -451,7 +450,13 @@ class QomuiDbus(dbus.service.Object):
             
         self.ovpn(path, self.hop, cwd_ovpn)
             
-    def write_config(self, provider, ip, port, protocol, edit="temp", path=None):
+    def write_config(self, ovpn_dict, edit="temp", path=None):
+        provider = ovpn_dict["provider"]
+        ip = ovpn_dict["ip"]
+        port = ovpn_dict["port"]
+        protocol = ovpn_dict["protocol"]
+        
+        
         if path is None:
             ovpn_file = "%s/%s_config" %(ROOTDIR, provider)
         else:
@@ -473,9 +478,27 @@ class QomuiDbus(dbus.service.Object):
 
             for line, value in enumerate(config):
                 if value.startswith("proto ") is True:
-                    config[line] = "proto %s \n" % (protocol.lower()) 
+                    try:
+                        if ovpn_dict["ipv6"] == "on":
+                            config.append("setenv UV_IPV6 yes \n")
+                            config[line] = "proto %s6 \n" % (protocol.lower()) 
+                        else:
+                            config[line] = "proto %s \n" % (protocol.lower()) 
+                    except KeyError:
+                        config[line] = "proto %s \n" % (protocol.lower()) 
                 elif value.startswith("remote ") is True:
                     config[line] = "remote %s %s \n" % (ip.replace("\n", ""), port)
+                    
+            if provider == "Airvpn":
+                try: 
+                    if ovpn_dict["tlscrypt"] == "on":
+                        config.append("tls-crypt %s/certs/tls-crypt.key \n" %ROOTDIR)
+                        config.append("auth sha512")
+                    else:
+                        config.append("tls-auth %s/certs/ta.key 1 \n" %ROOTDIR)
+                        
+                except KeyError:
+                    config.append("tls-auth %s/certs/ta.key 1 \n" %ROOTDIR)
             
             with open("%s/%s.ovpn" %(ROOTDIR, edit), "w") as ovpn_dump:
                     ovpn_dump.writelines(config)
@@ -559,8 +582,8 @@ class QomuiDbus(dbus.service.Object):
         ovpn_exe.stdout.close()
         self.reply("kill")
         self.logger.info("OpenVPN - process killed")
-        firewall_del = firewall.add_rule(['-D', 'OUTPUT',
-                                  '-d', '%s' % (last_ip), '-j', 'ACCEPT'])
+        rule = (['-D', 'OUTPUT', '-d', '%s' %last_ip, '-j', 'ACCEPT'])
+        self.allow_ip(last_ip, rule)
 
     def ssl(self, ip):
         cmd_ssl = ['stunnel','%s' % ("%s/temp.ssl" % (ROOTDIR))]
@@ -597,6 +620,17 @@ class QomuiDbus(dbus.service.Object):
         logging.info("SSH: Successfully opened SSH tunnel to %s" %(ip)) 
         ssh_exe.wait()
 
+    def allow_ip(self, ip, rule):
+        
+        try:
+            if len(ip.split(".")) == 4:
+                firewall.add_rule(rule)
+                
+            elif len(ip.split(":")) >= 4:
+                firewall.add_rule_6(rule)
+        except:
+            pass
+        
 def main():
     DBusQtMainLoop(set_as_default=True)
     app = QtCore.QCoreApplication([])

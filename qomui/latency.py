@@ -22,7 +22,10 @@ class LatencyCheck(QtCore.QThread):
                 try:
                     ip = v["ip"]
                 except KeyError:
-                    ip = v["prim_ip"]
+                    try:
+                        ip = v["ip1"]
+                    except KeyError:
+                        ip = v["prim_ip"]
                 
                 try:
                     pinger = check_output(["ping", "-c", "1", "-W", "1", "-I", "%s" %self.interface, "%s" %ip]).decode("utf-8")

@@ -61,8 +61,8 @@ def create_cgroup(user, group, default_interface, default_gateway):
     logging.info("Succesfully create cgroup to bypass OpenVPN tunnel")
     
     try:
-        dnsmasq = Popen(["dnsmasq", "--port=5354", "--bind-interfaces"])
-        return dnsmasq.pid
+        dnsmasq = Popen(["dnsmasq", "--port=5354", "--interface=%s" %default_interface])
+        return dnsmasq.pid + 2
     except CalledProcessError:
         logging.error("Failed to start dnsmasq for cgroup qomui_bypass")
         return None

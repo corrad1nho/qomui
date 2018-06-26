@@ -98,6 +98,12 @@ The idea is taken from [this post on severfault.com](https://serverfault.com/que
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.5.1:
+- [new] support for ipv6/tls-crypt configs from AirVPN - EXPERIMENTAL
+- [bugfix] firewall dialog not opening on new installations
+- [bugfix] random crashes when tunnel interface not available
+- [bugfix] update offered even though latest version installed
+
 version 0.5.0:
 - [new] Reconnect when OpenVPN unexpectedly dies
 - [new] Update Qomui via new "About" tab - EXPERIMENTAL
@@ -112,12 +118,4 @@ version 0.5.0:
 - [bugfix] Changing country in modify dialog fails
 - [bugfix] Connection attempt fails when protocol/port not set
 - [bugfix] Wireguard servers downloaded from Mullvad even though not supported
-
-version 0.4.1:
-- [bugfix] Crashes if no port/protocol selected
-- [bugfix] Crashes while performing latency checks if not connected to a network
-- [bugfix] Tray icon not displayed on Linux Mint Cinnamon 18.3
-- [bugfix] Cannot toggle "autoconnect" option
-- [bugfix] Crashes if checking latencies while new servers are added
-
 

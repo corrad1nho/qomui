@@ -3,7 +3,7 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 
 data_files = [
         ('/usr/share/applications/', ['resources/qomui.desktop']),
@@ -24,17 +24,21 @@ data_files = [
         ]
 
 def post_install(i):
-    for f in data_files:
-        for o in f[1]:
-            fmod = os.path.join(f[0], os.path.basename(o))
-            if os.path.splitext(fmod)[1] == ".sh":
-                os.chmod(fmod, 0o774)
-            else:
-                os.chmod(fmod, 0o664)
-                
-    with open("/usr/share/qomui/VERSION", "w") as vtext:
-        vtext.write(VERSION)
-        vtext.close()
+    try:
+        for f in data_files:
+            for o in f[1]:
+                fmod = os.path.join(f[0], os.path.basename(o))
+                if os.path.splitext(fmod)[1] == ".sh":
+                    os.chmod(fmod, 0o774)
+                else:
+                    os.chmod(fmod, 0o664)
+                    
+        with open("/usr/share/qomui/VERSION", "w") as vtext:
+            vtext.write(VERSION)
+            vtext.close()
+    
+    except FileNotFoundError:
+        pass
     
 
 class CustomInstall(install):

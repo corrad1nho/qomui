@@ -1,5 +1,11 @@
 ##Changelog
 
+version 0.5.1:
+- [new] support for ipv6/tls-crypt configs from AirVPN - EXPERIMENTAL
+- [bugfix] firewall dialog not opening on new installations
+- [bugfix] random crashes when tunnel interface not available
+- [bugfix] update offered even though latest version installed
+
 version 0.5.0:
 - [new] Reconnect when OpenVPN unexpectedly dies
 - [new] Update Qomui via new "About" tab - EXPERIMENTAL
