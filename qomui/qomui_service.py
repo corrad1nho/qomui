@@ -370,7 +370,7 @@ class QomuiDbus(dbus.service.Object):
         provider = self.ovpn_dict["provider"]
         ip = self.ovpn_dict["ip"]
         
-        rule = (['-I', 'OUTPUT', '1', '-d', '%s' %ip), '-j', 'ACCEPT'])
+        rule = (['-I', 'OUTPUT', '1', '-d', '%s' %ip, '-j', 'ACCEPT'])
         self.allow_ip(ip, rule)
         
         self.logger.info("iptables: created rule for %s" %ip)
