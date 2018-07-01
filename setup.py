@@ -11,15 +11,18 @@ data_files = [
         ('/etc/dbus-1/system.d/', ['resources/org.qomui.service.conf']),
         ('/usr/share/icons/hicolor/scalable/apps/', ['resources/qomui.svg',
                                                      'resources/qomui_off.svg']),
-        ('/usr/share/qomui/', ['resources/Airvpn_config',
-                          'resources/PIA_config',    
-                          'resources/default_config.json',
-                          'resources/firewall_default.json',
-                          'resources/Mullvad_config',
-                          'resources/ssl_config',
-                          'resources/qomui.png',
-                          'resources/hop.sh',
-                          'resources/hop_down.sh']),
+        ('/usr/share/qomui/', [
+                                'resources/Airvpn_config',
+                                'resources/PIA_config',    
+                                'resources/default_config.json',
+                                'resources/firewall_default.json',
+                                'resources/Mullvad_config',
+                                'resources/ssl_config',
+                                'resources/qomui.png',
+                                'resources/hop.sh',
+                                'resources/hop_down.sh',
+                                'resources/VERSION']
+                            ),
         ('/usr/share/qomui/flags/', glob.glob('resources/flags/*'))
         ]
 
@@ -32,10 +35,6 @@ def post_install(i):
                     os.chmod(fmod, 0o774)
                 else:
                     os.chmod(fmod, 0o664)
-                    
-        with open("/usr/share/qomui/VERSION", "w") as vtext:
-            vtext.write(VERSION)
-            vtext.close()
     
     except FileNotFoundError:
         pass
