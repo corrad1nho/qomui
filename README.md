@@ -76,10 +76,15 @@ This should also work with CentOS and other distibution on the RHEL branch.
 ```
 sudo dnf install python3-psutil python3-dbus stunnel python3-qt5-base
 ```
-
 ```
 sudo pip3 install pycountry requests beautifulsoup4 pexpect lxml PyQt5
 ```
+
+```
+sudo pip3 install --no-deps ./
+```
+
+Note: you may need to copy the file VERSON from `/qomui/` to `/qomui/resources/`. Also bypass is broken for Fedora at the moment.
 
 #### Alternatively:
 
