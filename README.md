@@ -15,6 +15,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
 - allow applications to bypass the OpenVPN tunnel - to watch Netflix for example
+- latency checker
 - automatic reconnects
 
 ### Dependencies/Requirements
@@ -36,7 +37,15 @@ Additionally, the following python modules are required:
 
 In case the latter are not present on your system these will be automatically installed when running setup.py. I would recommend installing them with your distribution's package manager, though.
 
-### Installation
+## Installation
+
+```
+git clone https://github.com/corrad1nho/qomui.git
+cd ./qomui
+```
+Follow the instrutions below that correlates to your linux distribution.
+
+### Arch:
 To install all dependencies in (almost) one go on Arch-based distributions run the following command:
 
 ```
@@ -46,39 +55,45 @@ sudo pacman -S python python-setuptools python-pip python-pyqt5 python-dbus open
 yaourt -S libcgroup
 ```
 
-The equivalent for Ubuntu-based distributions is:
+```
+sudo pip install ./
+```
+
+### Ubuntu:
+
+To install dependencies for Debian-based distributions:
 
 ```
 sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils net-tools dnsmasq cgroup-lite cgroup-tools geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
 ```
 
-
-To install Qomui, simply issue the following commands:
-
-```
-git clone https://github.com/corrad1nho/qomui.git
-cd ./qomui
-```
-
-Arch:
-
-```
-sudo pip install ./
-```
-
-Ubuntu:
-
 ```
 sudo pip3 install ./
 ```
 
-Alternatively:
+### Fedora:
+
+This should also work with CentOS and other distibution on the RHEL branch.
+```
+sudo dnf install python3-psutil python3-dbus stunnel python3-qt5-base
+```
+```
+sudo pip3 install pycountry requests beautifulsoup4 pexpect lxml PyQt5
+```
+
+```
+sudo pip3 install --no-deps ./
+```
+
+Note: you may need to copy the file VERSON from `/qomui/` to `/qomui/resources/`. Also bypass is broken for Fedora at the moment.
+
+#### Alternatively:
 
 ```
 sudo python setup.py install
 ```
 
-### Usage
+## Usage
 Qomui contains two components: qomui-gui and qomui-service. The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service"). Be aware that if you choose to activate the firewall and enable qomui-service all internet connectivity will be blocked as long as no OpenVPN connection has been established whether or not the gui is running. 
 
 Current configurations for AirVPN and Mullvad can be automatically downloaded via provider tab. For all other providers you can conveniently add a config file folder. Qomui will automatically resolve host names, determine the location of servers (using geoip-database) and save your username and password (in a file readable only by root). Modified config files will be saved as "QOMUI-NameOfConfigFile" in the same directory as the original files. 
