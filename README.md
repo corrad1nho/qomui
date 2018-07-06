@@ -15,6 +15,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
 - allow applications to bypass the OpenVPN tunnel - to watch Netflix for example
+- latency checker
 - automatic reconnects
 
 ### Dependencies/Requirements
