@@ -15,7 +15,6 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
 - allow applications to bypass the OpenVPN tunnel - to watch Netflix for example
-- automatic reconnects
 
 ### Dependencies/Requirements
 - Qomui should work on any GNU/Linux distribution 
@@ -24,7 +23,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - python-pyqt5, python-dbus, and python-dbus.mainloop.pyqt5 
 - openvpn, dnsutils and stunnel
 - geoip and geoip-database (optional: to identify server locations)
-- dnsmasq, libcgroup, iptables >= 1.6 (optional: required for bypassing OpenVPN)
+- dnsmasq, libcgroup, libcgroup-tools, iptables >= 1.6 (optional: required for bypassing OpenVPN)
 
 Additionally, the following python modules are required:
 - psutil
@@ -37,46 +36,33 @@ Additionally, the following python modules are required:
 In case the latter are not present on your system these will be automatically installed when running setup.py. I would recommend installing them with your distribution's package manager, though.
 
 ### Installation
-To install all dependencies in (almost) one go on Arch-based distributions run the following command:
+
+# Ubuntu
+
+Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.5.1/qomui-0.5.1-amd64.deb)
+
+# Fedora
+
+Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.5.1/qomui-0.5.1-1.x86_64.rpm)
+
+# Arch
+
+Qomui is available on the AUR:
 
 ```
-sudo pacman -S python python-setuptools python-pip python-pyqt5 python-dbus openvpn stunnel dnsutils dnsmasq geoip geoip-database python-psutil python-requests python-lxml python-beautifulsoup4 python-pycountry python-pexpect
-```
-```
-yaourt -S libcgroup
+yaourt -S qomui
 ```
 
-The equivalent for Ubuntu-based distributions is:
+# Source
 
-```
-sudo apt install python3 python3-setuptools python3-pip python3-pyqt5 python3-dbus python3-dbus.mainloop.pyqt5 openvpn stunnel dnsutils net-tools dnsmasq cgroup-lite cgroup-tools geoip-bin geoip-database python3-psutil python3-requests python3-lxml python3-bs4 python3-pycountry python3-pexpect
-```
-
-
-To install Qomui, simply issue the following commands:
+Make sure all dependencies are installed - be aware that depending on your distribution package names may vary!
 
 ```
 git clone https://github.com/corrad1nho/qomui.git
 cd ./qomui
+sudo python3 setup.py install
 ```
 
-Arch:
-
-```
-sudo pip install ./
-```
-
-Ubuntu:
-
-```
-sudo pip3 install ./
-```
-
-Alternatively:
-
-```
-sudo python setup.py install
-```
 
 ### Usage
 Qomui contains two components: qomui-gui and qomui-service. The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service"). Be aware that if you choose to activate the firewall and enable qomui-service all internet connectivity will be blocked as long as no OpenVPN connection has been established whether or not the gui is running. 
@@ -98,24 +84,21 @@ The idea is taken from [this post on severfault.com](https://serverfault.com/que
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
-version 0.5.1:
-- [new] support for ipv6/tls-crypt configs from AirVPN - EXPERIMENTAL
-- [bugfix] firewall dialog not opening on new installations
-- [bugfix] random crashes when tunnel interface not available
-- [bugfix] update offered even though latest version installed
-
 version 0.5.0:
-- [new] Reconnect when OpenVPN unexpectedly dies
-- [new] Update Qomui via new "About" tab - EXPERIMENTAL
+- [new] Update Qomui via "About" tab
 - [new] Option to use simplified tray icon to avoid glitches
 - [new] Protocol/port of active connection displayed
 - [new] Tray icon shows connection status 
-- [new] Automatic reconnects when OpenVPN tunnel breaks
 - [change] Disconnect button always visible
 - [bugfix] Config file / firewall configuration overwritten after update
 - [bugfix] Crashes due to missing entry in config file
 - [bugfix] Crashes when modifying server during latency check
-- [bugfix] Changing country in modify dialog fails
-- [bugfix] Connection attempt fails when protocol/port not set
-- [bugfix] Wireguard servers downloaded from Mullvad even though not supported
+
+version 0.4.1:
+- [bugfix] Crashes if no port/protocol selected
+- [bugfix] Crashes while performing latency checks if not connected to a network
+- [bugfix] Tray icon not displayed on Linux Mint Cinnamon 18.3
+- [bugfix] Cannot toggle "autoconnect" option
+- [bugfix] Crashes if checking latencies while new servers are added
+
 
