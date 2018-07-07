@@ -37,15 +37,15 @@ In case the latter are not present on your system these will be automatically in
 
 ### Installation
 
-# Ubuntu
+#### Ubuntu
 
 Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.5.1/qomui-0.5.1-amd64.deb)
 
-# Fedora
+#### Fedora
 
 Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.5.1/qomui-0.5.1-1.x86_64.rpm)
 
-# Arch
+#### Arch
 
 Qomui is available on the AUR:
 
@@ -53,7 +53,7 @@ Qomui is available on the AUR:
 yaourt -S qomui
 ```
 
-# Source
+#### Source
 
 Make sure all dependencies are installed - be aware that depending on your distribution package names may vary!
 
