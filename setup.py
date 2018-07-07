@@ -21,7 +21,7 @@ data_files = [
                                 'resources/qomui.png',
                                 'resources/hop.sh',
                                 'resources/hop_down.sh',
-                                'resources/VERSION']
+                                'VERSION']
                             ),
         ('/usr/share/qomui/flags/', glob.glob('resources/flags/*'))
         ]
