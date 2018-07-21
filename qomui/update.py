@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from PyQt5 import QtCore, QtGui, Qt, QtWidgets
+from PyQt5 import QtCore
 import requests
 import os
 from bs4 import BeautifulSoup
@@ -9,7 +9,7 @@ import json
 import zipfile
 import gzip
 import tarfile
-from subprocess import Popen, PIPE, check_output, CalledProcessError, check_call
+from subprocess import Popen, PIPE, check_output, CalledProcessError, check_call, run
 import re
 import sys
 import io
@@ -22,15 +22,6 @@ try:
 except AttributeError:
     def _fromUtf8(s):
         return s
-    
-try:
-    _encoding = QtWidgets.QApplication.UnicodeUTF8
-    def _translate(context, text, disambig):
-        return QtWidgets.QApplication.translate(context, text, disambig, _encoding)
-except AttributeError:
-    def _translate(context, text, disambig):
-        return QtWidgets.QApplication.translate(context, text, disambig)
-            
 
 DIRECTORY = "%s/.qomui" % (os.path.expanduser("~"))
 ROOTDIR = "/usr/share/qomui"
@@ -77,6 +68,7 @@ class AirVPNDownload(QtCore.QThread):
                         'ips_username' : self.username,
                         'ips_password' : self.password
                             }
+                
                 url = "https://airvpn.org/index.php?app=core&module=global&section=login&do=process"
                 post = self.session.post(url, data=payload)
                 cook = self.session.cookies.get_dict()
@@ -241,11 +233,13 @@ class MullvadDownload(QtCore.QThread):
         self.Mullvad_protocol_dict = {}
 
      def run(self):
+        auth = 0
         with requests.Session() as self.session:
+            
             try:
                 url = "https://mullvad.net/download/latest/source/"
                 src = self.session.get(url)
-                with open("%s/temp/tar" %(DIRECTORY), 'wb') as temp_file:
+                with open("%s/temp/tar" %DIRECTORY, 'wb') as temp_file:
                     temp_file.write(gzip.decompress(src.content))
                     tar = tarfile.open("%s/temp/tar" %(DIRECTORY))
                     tar.extractall(path="%s/temp/" %(DIRECTORY))
@@ -265,36 +259,104 @@ class MullvadDownload(QtCore.QThread):
                         country_raw = info[1].string
                         city = info[2].string
                         ip = info[3].string
-                        if country_raw == "UK":
-                            country = "United Kingdom"
-                        elif country_raw == "USA":
-                            country = "United States"
-                        elif country_raw == "Czech Rep.":
-                            country = "Czechia"
-                        else:
-                            country = country_raw
+                        country = self.cc_translate(country_raw)
                         self.Mullvad_server_dict[server] = {"name" : server,
-                                                            "provider" :"Mullvad",
+                                                            "provider" : "Mullvad",
                                                             "city" : city,
                                                             "country" : country,
-                                                            "ip" : ip}
+                                                            "ip" : ip,
+                                                            }
                         
                 self.Mullvad_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"}, 
                                             "protocol_2" : {"protocol": "UDP", "port": "53"},
                                             "protocol_3" : {"protocol": "TCP", "port": "80"},
                                             "protocol_4" : {"protocol": "TCP", "port": "443"}
                                             }
-
-                Mullvad_dict = {"server" : self.Mullvad_server_dict, 
-                                "protocol" : self.Mullvad_protocol_dict, 
-                                "provider" : "Mullvad", 
-                                "path" : certpath
-                                }
-                self.down_finished.emit(Mullvad_dict)
+                try:
+                    wg_list = []
+                    wg_api = "https://api.mullvad.net/public/relays/wireguard/v1/"
+                    wg_get = self.session.get(wg_api)
+                    wg_dict = wg_get.json()
+                    for c in wg_dict["countries"]:
+                        for k,v in c.items():
+                            country_raw = c["name"]
+                            country = self.cc_translate(country_raw)
+                            for cc in c["cities"]:
+                                city = cc["name"].split(",")[0]
+                                for relay in cc["relays"]:
+                                    server = relay["hostname"] + "-mullvad"
+                                    wg_list.append(server)
+                                    ip = relay["ipv4_addr_in"]
+                                    public_key = relay["public_key"]
+                                    port = "51820"
+                                    self.Mullvad_server_dict[server] = {"name" : server,
+                                                                "provider" : "Mullvad",
+                                                                "city" : city,
+                                                                "country" : country,
+                                                                "ip" : ip,
+                                                                "port" : port,
+                                                                "public_key" : public_key,
+                                                                "tunnel" : "Wireguard"}
+                                    
+                    
+                    private_key = check_output(["wg", "genkey"]).decode("utf-8").split("\n")[0]
+                    pubgen = run(["wg", "pubkey"], stdout=PIPE, input=private_key, encoding='ascii')
+                    pubkey = pubgen.stdout.split("\n")[0]
+                    data = [('account', self.accountnumber),
+                            ('pubkey', pubkey)
+                            ]
+                    
+                    pub_up = self.session.post("https://api.mullvad.net/wg/", data=data)
+                    if pub_up.status_code < 400:
+                        wg_address = pub_up.content.decode("utf-8").split("\n")[0]
+                        
+                        wg_conf = ["[Interface]\n",
+                                    "DNS = 193.138.219.228\n",
+                                    "\n",
+                                    "[Peer]\n",
+                                    "AllowedIPs = 0.0.0.0/0, ::/0\n"
+                                    ]
+                    
+                        with open("%s/mullvad_wg.conf" %certpath, "w") as wg:
+                            wg_conf.insert(1, "PrivateKey = %s\n" %private_key)
+                            wg_conf.insert(2, "Address = %s\n" %wg_address)
+                            wg.writelines(wg_conf)
+                    
+                    else:
+                        self.importFail.emit("Airvpn")
+                        auth = 1
+                        
+                    
+                except (CalledProcessError, FileNotFoundError) as e:
+                    for s in wg_list:
+                        self.Mullvad_server_dict.pop(s, None)
+                    
                 
+                if auth == 0:
+                    Mullvad_dict = {"server" : self.Mullvad_server_dict, 
+                                            "protocol" : self.Mullvad_protocol_dict, 
+                                            "provider" : "Mullvad", 
+                                            "path" : certpath
+                                            }
+
+                    self.down_finished.emit(Mullvad_dict)
+        
             except requests.exceptions.RequestException as e:
                 self.importFail.emit("Network error: no internet connection")
-
+                
+            
+     def cc_translate(self, country_raw):
+        if country_raw == "UK":
+            country = "United Kingdom"
+        elif country_raw == "USA":
+            country = "United States"
+        elif country_raw == "Czech Rep.":
+            country = "Czechia"
+        else:
+            country = country_raw
+        
+        return country
+                
 class PiaDownload(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(object)
     importFail = QtCore.pyqtSignal(str)
@@ -399,6 +461,7 @@ class AddFolder(QtCore.QThread):
         custom_server_dict = {}
         temp_path = "%s/temp/%s" % (DIRECTORY, self.provider)
         for f in self.configs:
+            tunnel = "OpenVPN"
             name = os.path.splitext(f)[0]
             copied_file = "%s/%s" % (temp_path, f)
             ip_found = 0
@@ -407,7 +470,6 @@ class AddFolder(QtCore.QThread):
                 modify = config.readlines()
                 for index, line in enumerate(modify):
                     if line.startswith("remote "):
-                        
                         if ip_found == 0:
                             
                             try: 
@@ -423,17 +485,10 @@ class AddFolder(QtCore.QThread):
                                 ip_found = 1
                             else:
                                 server = line.split(" ")[1]
-                                try:
-                                    dig_cmd = ["dig", "+time=2", "+tries=2", "%s" %(server), "+short"]
-                                    ip = check_output(dig_cmd).decode("utf-8")
-                                    ip = ip.split("\n")[0]
-                                    modify[index] = "remote %s %s\n" %(ip, port)
-                                    ip_found = 1
-                                except CalledProcessError:
-                                    ip = server
-                                    modify[index] = "remote %s %s\n" %(ip, port)
-                                    ip_found = 1
-                                    logging.warning("dig: resolving servername failed")
+                                ip = self.resolve(server)
+                                modify[index] = "remote %s %s\n" %(ip, port)
+                                ip_found = 1
+
                         else:
                             modify[index] = "#%s" %line
                     elif line.startswith("auth-user-pass"):
@@ -445,6 +500,23 @@ class AddFolder(QtCore.QThread):
                         modify[index] = "#%s" %line
                     elif line.startswith("proto "):
                         protocol = line.split(" ")[1]
+                        proto_line = 1
+                    
+                    #Wireguard
+                    elif line.startswith("Endpoint ="):
+                        tunnel = "Wireguard"
+                        ip_port = line.split(" = ")[1]
+                        ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
+                        result = ipsearch.search(line)
+                        port = ip_port.split(":")[1]
+                        server = ip_port.split(":")[0]
+                        protocol = "UDP"
+                        if result is not None:
+                            ip = result.group()
+                        else:
+                            ip = self.resolve(server)
+                            modify[index] = "Endpoint = %s:%s\n" %(ip, port)
+                        ip_found = 1
                         proto_line = 1
                         
                 if proto_line == 0:
@@ -460,13 +532,13 @@ class AddFolder(QtCore.QThread):
                     country_check = check_output(["geoiplookup", "%s" %ip]).decode("utf-8")
                     cc = country_check.split(" ")[3].split(",")[0]
                     country = country_translate(cc)
-                    
                     custom_server_dict[name] = {"name": name, 
                                                 "provider" : self.provider, 
                                                 "city" : "",
                                                 "path" : "%s/%s" %(self.provider, f), 
                                                 "ip" : ip, 
                                                 "country" : country,
+                                                "tunnel" : tunnel,
                                                 "port": port.upper().split("\n")[0], 
                                                 "protocol": protocol.upper().split("\n")[0]
                                                 }
@@ -479,9 +551,19 @@ class AddFolder(QtCore.QThread):
             passfile.write('%s\n%s' % (self.username, self.password))
             
         custom_dict = {"server" : custom_server_dict, "provider" : self.provider, "path" : temp_path}
-        
         self.down_finished.emit(custom_dict) 
-                    
+ 
+    def resolve(self, host):
+        try:
+            dig_cmd = ["dig", "+time=2", "+tries=2", "%s" %host, "+short"]
+            ip = check_output(dig_cmd).decode("utf-8")
+            ip = ip.split("\n")[0]
+        except CalledProcessError:
+            ip = server
+            logging.warning("dig: resolving servername failed")
+            
+        return ip
+    
     def sanity_check(self, path):
         unrelated_files = 0
         for dirpath, dirnames, filenames in os.walk(path):
@@ -510,3 +592,4 @@ class UpdateCheck(QtCore.QThread):
         except:
             logging.info("ConnectionError: Checking for update failed")
     
+

@@ -3,7 +3,7 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.5.1"
+VERSION = "0.6.0"
 
 data_files = [
         ('/usr/share/applications/', ['resources/qomui.desktop']),
@@ -36,7 +36,7 @@ def post_install(i):
                 else:
                     os.chmod(fmod, 0o664)
     
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError) as e:
         pass
     
 
@@ -74,7 +74,8 @@ setup(name="qomui",
             'qomui-gui=qomui.qomui_gui:main' 
             ],
         'console_scripts': [
-            'qomui-service=qomui.qomui_service:main'
+            'qomui-service=qomui.qomui_service:main',
+            'qomui-cli=qomui.qomui_cli:main'
             ]},
       cmdclass={'install': CustomInstall}
       )

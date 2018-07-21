@@ -1,5 +1,14 @@
 ##Changelog
 
+version 0.6.0:
+- [new] support for Wireguard
+- [new] cli-interface
+- [change] additional parameters parsed from .desktop-files
+- [change] update routine now uses dpkg/rpm if installed as DEB/RPM package - reinstall required!
+- [bugfix] crashes at start when system tray not available
+- [bugfix] Info for active connection sometimes not updated correctly 
+- [bugfix] Doublehop fails on Fedora
+
 version 0.5.1:
 - [new] support for ipv6/tls-crypt configs from AirVPN - EXPERIMENTAL
 - [bugfix] firewall dialog not opening on new installations

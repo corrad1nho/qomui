@@ -6,7 +6,7 @@ Written in Python 3.6
 Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux with some unique features such as provider-independent support for double-hop connections. Qomui supports multiple providers with added convenience when using AirVPN, PIA or Mullvad. 
 
 ### Features
-- should work with all VPN providers that offer OpenVPN config files 
+- should work with all VPN providers that offer OpenVPN config files
 - automatic download function for Mullvad, Private Internet Access and AirVPN 
 - support for OpenVPN over SSL and SSH for AirVPN
 - allows double-hop VPN connections (VPN chains) between different providers (currently tested with AirVPN, Mullvad and ProtonVPN). 
@@ -14,7 +14,9 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
 - protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
-- allow applications to bypass the OpenVPN tunnel - to watch Netflix for example
+- allow applications to bypass the VPN tunnel - to watch Netflix for example
+- experimental support for Wireguard
+- command-line interface
 
 ### Dependencies/Requirements
 - Qomui should work on any GNU/Linux distribution 
@@ -24,16 +26,17 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - openvpn, dnsutils and stunnel
 - geoip and geoip-database (optional: to identify server locations)
 - dnsmasq, libcgroup, libcgroup-tools, iptables >= 1.6 (optional: required for bypassing OpenVPN)
+- wireguard-tools, openresolv (optional: wireguard)
 
 ### Installation
 
 #### Ubuntu
 
-Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.5.1/qomui-0.5.1-amd64.deb)
+Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.0/qomui-0.6.0-amd64.deb)
 
 #### Fedora
 
-Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.5.1/qomui-0.5.1-1.x86_64.rpm)
+Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.0/qomui-0.6.0-1.x86_64.rpm)
 
 #### Arch
 
@@ -70,29 +73,50 @@ cgexec -g net_cls:bypass_qomui $yourcommand
 ```
 The idea is taken from [this post on severfault.com](https://serverfault.com/questions/669430/how-to-bypass-openvpn-per-application/761780#761780). Essentially, running an application outside the OpenVPN tunnel works by putting it in a network control group. This allows classifying and identifying network packets from processes in this cgroup in order to route them differently. Be aware that the implementation of this feature is still experimental. 
 
+### Wireguard
+You can add wireguard config files from any provider as easily as OpenVPN files. Wireguard configs for Mullvad are now downloaded automatically alongside their OpenVPN configs as long as Wireguard is installed. As of now, Wireguard will not be installed automatically with DEB and RPM packages. You can find the official installation guidelines for different distributions [here](https://www.wireguard.com/install/).
+
+### Cli
+The cli interface is still experimental and missing some features, e.g. automatic reconnects. Avoid using the cli and the Gui concurrently. Example usage:
+
+Add config files:
+```
+qomui-cli -a $provider
+```
+Connect to a server:
+```
+qomui-cli -c $server
+```
+Activate options (e.g. firewall):
+```
+qomui-cli -e firewall
+```
+List and filter available servers:
+```
+qomui-cli -l Airvpn "United States"
+```
+To see all other available options:
+```
+qomui-cli --help
+```
+
 ### About this project
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.6.0:
+- [new] support for Wireguard
+- [new] cli-interface
+- [change] additional parameters parsed from .desktop-files
+- [change] update routine now uses dpkg/rpm if installed as DEB/RPM package - reinstall required!
+- [bugfix] crashes at start when system tray not available
+- [bugfix] Info for active connection sometimes not updated correctly 
+- [bugfix] Doublehop fails on Fedora 
+
 version 0.5.1:
 - [new] support for ipv6/tls-crypt configs from AirVPN - EXPERIMENTAL
 - [bugfix] firewall dialog not opening on new installations
 - [bugfix] random crashes when tunnel interface not available
 - [bugfix] update offered even though latest version installed
-
-version 0.5.0:
-- [new] Reconnect when OpenVPN unexpectedly dies
-- [new] Update Qomui via new "About" tab - EXPERIMENTAL
-- [new] Option to use simplified tray icon to avoid glitches
-- [new] Protocol/port of active connection displayed
-- [new] Tray icon shows connection status 
-- [new] Automatic reconnects when OpenVPN tunnel breaks
-- [change] Disconnect button always visible
-- [bugfix] Config file / firewall configuration overwritten after update
-- [bugfix] Crashes due to missing entry in config file
-- [bugfix] Crashes when modifying server during latency check
-- [bugfix] Changing country in modify dialog fails
-- [bugfix] Connection attempt fails when protocol/port not set
-- [bugfix] Wireguard servers downloaded from Mullvad even though not supported
 
 

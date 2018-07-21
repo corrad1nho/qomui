@@ -1,6 +1,6 @@
 #!/bin/bash
 
-route del -net $1 netmask 255.255.255.255 gw _gateway
+/sbin/route del -net $1 netmask 255.255.255.255 gw _gateway
 
 
 #OLD VERSION

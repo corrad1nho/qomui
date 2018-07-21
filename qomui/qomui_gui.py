@@ -20,8 +20,9 @@ import glob
 import configparser
 import requests
 import bisect
+import signal
 
-from qomui import update, latency
+from qomui import update, latency, utils
 
 
 try:
@@ -109,6 +110,7 @@ class QomuiGui(QtWidgets.QWidget):
     bypass_dict = {}
     config_dict = {}
     packetmanager = None
+    tunnel_list = ["OpenVPN", "Wireguard"]
     config_list = [
                    "firewall",
                    "autoconnect",
@@ -271,6 +273,10 @@ class QomuiGui(QtWidgets.QWidget):
         self.providerBox = QtWidgets.QComboBox(self.serverTab)
         self.providerBox.setObjectName(_fromUtf8("providerBox"))
         self.horizontalLayout_3.addWidget(self.providerBox)
+        self.tunnelBox = QtWidgets.QComboBox(self.serverTab)
+        self.tunnelBox.setObjectName(_fromUtf8("tunnelBox"))
+        self.tunnelBox.setVisible(False)
+        self.horizontalLayout_3.addWidget(self.tunnelBox)
         self.favouriteButton = favouriteButton(self.serverTab)
         self.favouriteButton.setCheckable(True)
         self.favouriteButton.setMinimumSize(QtCore.QSize(25, 25))
@@ -696,6 +702,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.delServerBt.clicked.connect(self.del_single_server)
         self.countryBox.activated[str].connect(self.filter_servers)
         self.providerBox.activated[str].connect(self.filter_servers)
+        self.tunnelBox.activated[str].connect(self.filter_servers)
         self.serverTabBt.clicked.connect(self.tab_switch)
         self.bypassTabBt.clicked.connect(self.tab_switch)
         self.aboutTabBt.clicked.connect(self.tab_switch)
@@ -836,9 +843,13 @@ class QomuiGui(QtWidgets.QWidget):
         box.addButton(QtWidgets.QPushButton(buttons[0]), 
                                             QtWidgets.QMessageBox.NoRole
                                             )
-        box.addButton(QtWidgets.QPushButton(buttons[1]), 
+        try:
+            box.addButton(QtWidgets.QPushButton(buttons[1]), 
                                             QtWidgets.QMessageBox.YesRole
                                             )
+        except:
+            pass
+        
         try:                                    
             box.addButton(QtWidgets.QPushButton(buttons[2]), 
                                             QtWidgets.QMessageBox.RejectRole
@@ -868,7 +879,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.show_failmsg("Upgrade failed", "See log for further details")
         
     def check_update(self):
-        if self.packetmanager is None:
+        if self.packetmanager in ["None", "DEB", "RPM"]:
             self.check_thread = update.UpdateCheck()
             self.check_thread.release_found.connect(self.release_compare)
             self.check_thread.start()
@@ -890,7 +901,7 @@ class QomuiGui(QtWidgets.QWidget):
             pass
             
     def update_qomui(self):
-        self.qomui_service.update_qomui(self.release)
+        self.qomui_service.update_qomui(self.release, self.packetmanager)
         self.update_bar("upgrade", "Qomui")
 
     def tab_switch(self):
@@ -997,11 +1008,6 @@ class QomuiGui(QtWidgets.QWidget):
                 
         except KeyError:
             pass
-                
-    def get_user_group(self):
-        user = check_output(['id', '-u', '-n']).decode("utf-8").split("\n")[0]
-        group = check_output(['id', '-g', '-n']).decode("utf-8").split("\n")[0]
-        return {"user" : user, "group" : group}
     
     def load_saved_files(self):
         try:
@@ -1013,6 +1019,8 @@ class QomuiGui(QtWidgets.QWidget):
                     pm_check = version[1]
                     if pm_check != "":
                         self.packetmanager = pm_check
+                    else:
+                        self.packetmanager = "None"
                 except IndexError:
                     pass
                 
@@ -1035,7 +1043,7 @@ class QomuiGui(QtWidgets.QWidget):
         
         try:
             if self.config_dict["bypass"] == 1:
-                self.qomui_service.bypass(self.get_user_group())
+                self.qomui_service.bypass(utils.get_user_group())
                 self.bypassTabBt.setVisible(True) 
         except KeyError:
             pass
@@ -1092,7 +1100,7 @@ class QomuiGui(QtWidgets.QWidget):
             update = check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
             self.qomui_service.load_firewall()
-            self.qomui_service.bypass(self.get_user_group())
+            self.qomui_service.bypass(utils.get_user_group())
             QtWidgets.QMessageBox.information(self,
                                             "Updated",
                                             "Configuration updated successfully",
@@ -1122,7 +1130,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.get_latencies()
             if self.ovpn_dict is not None:
                 self.establish_connection(self.ovpn_dict)
-                self.qomui_service.bypass(self.get_user_group())
+                self.qomui_service.bypass(utils.get_user_group())
         elif networkstate != 70 and networkstate != 60:
             self.logger.info("Lost network connection - VPN tunnel terminated")
             self.kill()
@@ -1282,13 +1290,6 @@ class QomuiGui(QtWidgets.QWidget):
             self.WaitBar.setText("Updating %s" %provider)
 
     def downloaded(self, content):
-        self.update_bar("stop", None)
-        QtWidgets.QApplication.restoreOverrideCursor()
-        down_msg = QtWidgets.QMessageBox.information(self,
-                                                "Import successful",
-                                                "List of available servers updated",
-                                                QtWidgets.QMessageBox.Ok)
-        
         provider = content["provider"]
         if provider not in self.provider_list:
             self.provider_list.append(provider)
@@ -1300,6 +1301,15 @@ class QomuiGui(QtWidgets.QWidget):
                     content["server"][k]["favourite"] = "on"
             except KeyError:
                 pass
+            
+        if provider in SUPPORTED_PROVIDERS:
+            del_list = []
+            for k, v in self.server_dict.items():
+                if v["provider"] == provider:
+                    del_list.append(k)
+            for k in del_list:
+                self.server_dict.pop(k)
+                
         self.server_dict.update(content["server"])
         
         try:
@@ -1321,6 +1331,13 @@ class QomuiGui(QtWidgets.QWidget):
         with open ("%s/protocol.json" % HOMEDIR, "w") as p:
             json.dump(self.protocol_dict, p) 
         self.pop_boxes()
+        
+        self.update_bar("stop", None)
+        QtWidgets.QApplication.restoreOverrideCursor()
+        down_msg = QtWidgets.QMessageBox.information(self,
+                                                "Import successful",
+                                                "List of available servers updated",
+                                                QtWidgets.QMessageBox.Ok)
     
     def del_single_server(self):
         for item in self.serverListWidget.selectedItems():
@@ -1353,12 +1370,25 @@ class QomuiGui(QtWidgets.QWidget):
     def pop_boxes(self, country=None):
         self.country_list = ["All countries"]
         self.provider_list = ["All providers"]
+        self.tunnel_list = ["OpenVPN"]
+        self.tunnelBox.clear()
         for k,v in (self.server_dict.items()):
             if v["country"] not in self.country_list:
                 self.country_list.append(v["country"])
                 self.set_flag(v["country"])
             elif v["provider"] not in self.provider_list:
                 self.provider_list.append(v["provider"])
+            try:
+                if v["tunnel"] == "Wireguard" and "Wireguard" not in self.tunnel_list:
+                    self.tunnel_list.append("Wireguard")
+                    for t in self.tunnel_list:
+                        self.tunnelBox.addItem(t)
+                    self.tunnelBox.setVisible(True)
+                else:
+                    self.tunnelBox.setVisible(True)
+            except KeyError:
+                pass
+            
         self.pop_providerProtocolBox()
         self.pop_delProviderBox()
         self.countryBox.clear()
@@ -1432,6 +1462,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.randomSeverBt.setVisible(False)
         country = self.countryBox.currentText()
         provider = self.providerBox.currentText()
+        tunnel = self.tunnelBox.currentText()
         if self.favouriteButton.isChecked() == True:
             self.favouriteButton.setChecked(False)
         if display == "all":
@@ -1449,8 +1480,20 @@ class QomuiGui(QtWidgets.QWidget):
                 index = self.index_list.index(key)
                 if val["provider"] == provider or provider == "All providers":
                     if val["country"] == country or country == "All countries":
-                        self.serverListWidget.setRowHidden(index, False)
-                        getattr(self, key).setHidden(False)
+                        try:
+                            if val["tunnel"] == tunnel:
+                                self.serverListWidget.setRowHidden(index, False)
+                                getattr(self, key).setHidden(False)
+                            else:
+                                self.serverListWidget.setRowHidden(index, True)
+                                getattr(self, key).setHidden(True)
+                        except KeyError:
+                            if tunnel == "OpenVPN":
+                                self.serverListWidget.setRowHidden(index, False)
+                                getattr(self, key).setHidden(False)
+                            elif tunnel == "Wireguard":
+                                self.serverListWidget.setRowHidden(index, True)
+                                getattr(self, key).setHidden(True)
                     else:
                         self.serverListWidget.setRowHidden(index, True)
                         getattr(self, key).setHidden(True)
@@ -1483,6 +1526,11 @@ class QomuiGui(QtWidgets.QWidget):
                             getattr(self, "%s_pixmap" %val["country"]), 
                             val["city"], fav=fav)
             
+        try:
+            if val["tunnel"] == "Wireguard":
+                getattr(self, key).hide_button(0)
+        except KeyError:
+            pass
             
         getattr(self, key).item_chosen_signal.connect(self.item_chosen_signal)
         getattr(self, key).set_hop_signal.connect(self.set_hop)
@@ -1598,7 +1646,7 @@ class QomuiGui(QtWidgets.QWidget):
     def set_hop(self, server):
         try:
             current_dict = self.server_dict[server].copy()
-            self.create_server_dict(current_dict, 1)
+            self.hop_server_dict = utils.create_server_dict(current_dict, self.protocol_dict)
             self.show_hop_widget()
         except KeyError:
             self.show_failmsg("Server not found",
@@ -1627,82 +1675,37 @@ class QomuiGui(QtWidgets.QWidget):
                     random_list.append(key)
             except KeyError:
                 pass
+            
         if len(random_list) != 0:
             self.item_chosen_signal(random.choice(random_list), random="on")
         
     def item_chosen_signal(self, server, random=None):
         try:
             current_dict = self.server_dict[server].copy()
+            self.ovpn_dict = utils.create_server_dict(current_dict, self.protocol_dict)
+            
+            try:
+                if self.ovpn_dict["tunnel"] == "Wireguard":
+                    self.delete_hop()
+            except KeyError:
+                pass
+            
+            self.kill()
+            if self.hop_active == 2 and self.hop_server_dict is not None:
+                self.ovpn_dict.update({"hop":"2"})
+            else:
+                self.ovpn_dict.update({"hop":"0"})
+                
+            if random is not None:
+                self.ovpn_dict.update({"random" : "on"})
+            
+            self.establish_connection(self.ovpn_dict)
+            
         except KeyError:
             self.show_failmsg("Server not found",
                               "Server does not exist (anymore)\nHave you deleted the server?")
             
-        QtWidgets.QApplication.restoreOverrideCursor()
-        self.kill()
-        self.create_server_dict(current_dict, 0)
-        
-        if self.hop_active == 2 and self.hop_server_dict is not None:
-            self.ovpn_dict.update({"hop":"2"})
-        else:
-            self.ovpn_dict.update({"hop":"0"})
-            
-        if random is not None:
-            self.ovpn_dict.update({"random" : "on"})
-        
-        self.establish_connection(self.ovpn_dict)
-        
-    def create_server_dict(self, current_dict, h):
-        provider = current_dict["provider"]
-        if provider in SUPPORTED_PROVIDERS:
-            
-            try:
-                mode = self.protocol_dict[provider]["selected"]
-            except KeyError:
-                mode = "protocol_1"
-                
-            port = self.protocol_dict[provider][mode]["port"]
-            protocol = self.protocol_dict[provider][mode]["protocol"]
-            
-            if provider == "Airvpn":
-                if self.protocol_dict["Airvpn"][mode]["ipv6"] == "ipv6":
-                    ipv6 = "on"
-                else: 
-                    ipv6 = "off"
-                    
-                try:
-                    ip_chosen = self.protocol_dict["Airvpn"][mode]["ip"]
-                    
-                    if ip_chosen == "ip3" or ip_chosen == "ip4":
-                        tlscrypt = "on"
-                    else:
-                        tlscrypt = "off"
-                    
-                    if ipv6 == "on":
-                        ip = current_dict["%s_6" %ip_chosen]
-                    else:
-                        ip = current_dict[ip_chosen]
-                
-                except KeyError:
-                    ip = current_dict[prim_ip]
-                    
-                current_dict.update({"ip" : ip, "port": port, "protocol": protocol, 
-                                     "prot_index": mode, "ipv6" : ipv6, "tlscrypt" : tlscrypt})
-            
-            else:
-                current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
-
-        else:
-            try: 
-                port = self.protocol_dict[provider]["port"]
-                protocol = self.protocol_dict[provider]["protocol"]
-                current_dict.update({"port": port, "protocol": protocol})
-            except KeyError:
-                pass
-            
-        if h == 1:
-            self.hop_server_dict = current_dict
-        else:
-            self.ovpn_dict = current_dict
+            QtWidgets.QApplication.restoreOverrideCursor()
           
     def openvpn_log_monitor(self, reply):
         if reply == "success":
@@ -1747,7 +1750,6 @@ class QomuiGui(QtWidgets.QWidget):
             QtWidgets.QApplication.restoreOverrideCursor()
             
         elif reply == "kill":
-            self.tray.setIcon(QtGui.QIcon("%s/qomui.png" % (ROOTDIR)))
             try:
                 if self.config_dict["simpletray"] == 0:
                     self.trayIcon = QtGui.QIcon.fromTheme("qomui")
@@ -1772,10 +1774,10 @@ class QomuiGui(QtWidgets.QWidget):
         QtWidgets.QApplication.restoreOverrideCursor()
         tun = self.qomui_service.return_tun_device()
         self.ActiveWidget.setVisible(True)
-        self.ActiveWidget.setText(current_server, hop_dict, tun)
+        self.ActiveWidget.setText(self.ovpn_dict, self.hop_server_dict, tun)
         self.ActiveWidget.disconnect.connect(self.kill)
         self.ActiveWidget.reconnect.connect(self.reconnect)
-        #self.gridLayout.addWidget(self.ActiveWidget, 0, 0, 1, 3)
+        self.gridLayout.addWidget(self.ActiveWidget, 0, 0, 1, 3)
         
     def reconnect(self):
         if self.status == "active":
@@ -1785,17 +1787,19 @@ class QomuiGui(QtWidgets.QWidget):
 
     def kill(self):
         self.status = "inactive"
+        self.hop_log_monitor = 0
+        self.qomui_service.disconnect()
         self.WaitBar.setVisible(False)
         self.ActiveWidget.setVisible(False)
         try:
             if self.config_dict["simpletray"] == 0:
-                    self.trayIcon = QtGui.QIcon.fromTheme("qomui")
+                self.trayIcon = QtGui.QIcon.fromTheme("qomui")
             else:
                 self.trayIcon = QtGui.QIcon.fromTheme("qomui_off")
+            self.tray.setIcon(self.trayIcon)
             self.tray.setToolTip("Status: disconnected")
-        except KeyError:
+        except (KeyError, AttributeError):
             pass
-        self.qomui_service.disconnect()
 
     def establish_connection(self, server_dict):
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
@@ -1860,7 +1864,9 @@ class QomuiGui(QtWidgets.QWidget):
             found = 0
             for line in search:
                 if line.startswith("Exec") and found !=1:
-                    cmd = line.split("=")[1].split(" ")[0].replace("\n", "")
+                    #cmd = line.split("=")[1].split(" ")[0].replace("\n", "")
+                    cmd = line.replace("Exec=", "").replace("\n", "")
+                    cmd = re.sub(r"%[\w]", "", cmd)
                     found = 1
         
         temp_bash = "%s/bypass_temp.sh" %HOMEDIR
@@ -2035,7 +2041,7 @@ class ServerWidget(QtWidgets.QWidget):
         
     def hide_button(self, choice=None):
         self.choice = choice
-        self.horizontalLayout.removeWidget(self.hop_bt)
+        #self.horizontalLayout.removeWidget(self.hop_bt)
         self.hop_bt = None
         if choice == 1:
             self.connect_bt.setVisible(False)
@@ -2259,6 +2265,11 @@ class ActiveWidget(QtWidgets.QWidget):
 
     def setText(self, server_dict, hop_dict, tun):
         self.tun = tun
+        self.statusLabel.setText("Active Connection")
+        city = self.city_port_label(server_dict)
+        self.ServerWidget.setText(server_dict["name"], server_dict["provider"],
+                               server_dict["country"], city, button="disconnect")
+        
         if hop_dict is not None:
             self.activeHopWidget.setVisible(True)
             self.hopActiveLabel.setVisible(True)
@@ -2271,10 +2282,6 @@ class ActiveWidget(QtWidgets.QWidget):
             self.activeHopWidget.setVisible(False)
             self.hopActiveLabel.setVisible(False)
         
-        city = self.city_port_label(server_dict)
-        self.ServerWidget.setText(server_dict["name"], server_dict["provider"],
-                               server_dict["country"], city, button="disconnect")
-
         self.ServerWidget.hide_button(0)
         self.calcThread = NetMon(self.tun)
         self.calcThread.stat.connect(self.show_stats)
@@ -2349,12 +2356,17 @@ class NetMon(QtCore.QThread):
             self.ip.emit(ip)
         except:
             logging.debug("Could not determine external ip address")
+            
         t0 = time.time()
-        counter = psutil.net_io_counters(pernic=True)['tun0']
-        stat = (counter.bytes_recv, counter.bytes_sent)
         accum = (0, 0)
         start_time = time.time()
- 
+        
+        try:
+            counter = psutil.net_io_counters(pernic=True)[self.tun]
+            stat = (counter.bytes_recv, counter.bytes_sent)
+        except KeyError:
+            stat = (0,0)
+
         while connected is True:
             last_stat = stat
             time.sleep(1)
@@ -2362,9 +2374,9 @@ class NetMon(QtCore.QThread):
             elapsed = time_measure - start_time
             return_time = self.time_format(int(elapsed))
             self.time.emit(return_time)
-            
+
             try:
-                counter = psutil.net_io_counters(pernic=True)['tun0']
+                counter = psutil.net_io_counters(pernic=True)[self.tun]
                 t1 = time.time()
                 stat = (counter.bytes_recv, counter.bytes_sent)
                 DLrate, ULrate = [(now - last) / (t1 - t0) / 1024.0 for now, last in zip(stat, last_stat)]
@@ -2373,7 +2385,7 @@ class NetMon(QtCore.QThread):
                 self.stat.emit([DLrate, DLacc, ULrate, ULacc])                     
             except (KeyError, OSError):
                 break
-            
+        
         connected = False
         self.lost.emit()
 
@@ -2682,6 +2694,19 @@ class ModifyServer(QtWidgets.QDialog):
             self.changeAllBox.setChecked(True)
     
     def load_config_file(self):
+        try:
+            if self.server_info["tunnel"] == "Wireguard":
+                self.configBrowser.setVisible(False)
+                self.configLabel.setVisible(False)
+                self.changeAllBox.setVisible(False)
+                self.resize(419, 150)
+            else:
+                self.display_config()
+        
+        except KeyError:
+            self.display_config()
+        
+    def display_config(self):
         if self.provider in SUPPORTED_PROVIDERS:
             config = "%s/%s_config" %(ROOTDIR, self.provider)
         else:
@@ -2728,8 +2753,9 @@ class ModifyServer(QtWidgets.QDialog):
                     os.makedirs(temp_folder)
                 with open("%s/%s" %(temp_folder, temp_file), "w") as update_config:
                     update_config.writelines(new_config)
-            else:
-                new_config = []
+        else:
+            remote_index = 0
+            new_config = []
                 
         if self.changeAllBox.isChecked() == True:
             change_all = 1
@@ -2745,6 +2771,7 @@ class ModifyServer(QtWidgets.QDialog):
 def main():
     if not os.path.exists("%s/.qomui" % (os.path.expanduser("~"))):
         os.makedirs("%s/.qomui" % (os.path.expanduser("~")))
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QtWidgets.QApplication(sys.argv)
     DBusQtMainLoop(set_as_default=True)
     ex = QomuiGui()

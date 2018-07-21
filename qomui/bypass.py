@@ -9,6 +9,7 @@ from qomui import firewall
 cgroup_path = "/sys/fs/cgroup/net_cls/bypass_qomui"
 cls_id = "0x00110011"
 default_interface = None
+ROOTDIR = "/usr/share/qomui/"
 
 def create_cgroup(user, group, default_interface, default_gateway):
     
@@ -62,6 +63,7 @@ def create_cgroup(user, group, default_interface, default_gateway):
     
     try:
         dnsmasq = Popen(["dnsmasq", "--port=5354", "--interface=%s" %default_interface])
+        
         return dnsmasq.pid + 2
     except CalledProcessError:
         logging.error("Failed to start dnsmasq for cgroup qomui_bypass")
