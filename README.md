@@ -77,7 +77,9 @@ The idea is taken from [this post on severfault.com](https://serverfault.com/que
 You can add wireguard config files from any provider as easily as OpenVPN files. Wireguard configs for Mullvad are now downloaded automatically alongside their OpenVPN configs as long as Wireguard is installed. As of now, Wireguard will not be installed automatically with DEB and RPM packages. You can find the official installation guidelines for different distributions [here](https://www.wireguard.com/install/).
 
 ### Cli
-The cli interface is still experimental and missing some features, e.g. automatic reconnects. Avoid using the cli and the Gui concurrently. Example usage:
+The cli interface is still experimental and missing some features, e.g. automatic reconnects. Avoid using the cli and the Gui concurrently. 
+
+#### Example usage
 
 Add config files:
 ```
