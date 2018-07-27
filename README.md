@@ -38,11 +38,11 @@ Taken on Arch/Plasma Arc Dark Theme - Qomui will adapt to your theme<br/>
 
 #### Ubuntu
 
-Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.0/qomui-0.6.0-amd64.deb)
+Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.1/qomui-0.6.1-amd64.deb)
 
 #### Fedora
 
-Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.0/qomui-0.6.0-1.x86_64.rpm)
+Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.1/qomui-0.6.1-1.x86_64.rpm)
 
 #### Arch
 
