@@ -4,8 +4,8 @@ client = yes
 debug = 6
 
 [openvpn]
-accept = 127.0.0.1:1413
+accept = 
 connect 
 TIMEOUTclose = 0
-verify = 3
-CAfile = /usr/share/qomui/certs/stunnel.crt
+
+

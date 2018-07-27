@@ -17,6 +17,8 @@ import io
 import logging
 import shutil
 import pycountry
+import uuid
+
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -458,20 +460,15 @@ class WsDownload(QtCore.QThread):
         self.password = password
         self.ws_server_dict = {}
         self.ws_protocol_dict = {}
-        #self.timer = QtCore.QTimer()
     
     def run(self):
-        #self.timer.start()
-        self.username = "corrad1nho"
-        self.password = "***REMOVED***"
         init_url = "https://res.windscribe.com/res/init"
         login_url = "https://windscribe.com/login"
         
         try:
-            with requests.Session() as self.session:
+            with requests.Session() as self.session:            
                 self.session.headers.update(self.header)
-                failed_list = []
-                temp = "%s/temp" %DIRECTORY
+                self.temp = "%s/temp" %DIRECTORY
                 self.session.get(login_url)
                 self.session.headers.update({"Host" : "res.windscribe.com",
                                             "Origin" : "https://windscribe.com"})
@@ -493,86 +490,69 @@ class WsDownload(QtCore.QThread):
                 get_cred = self.session.get(cred_url)
                 credentials = json.loads(get_cred.content.decode("utf-8"))
                 
-                with open("%s/windscribe_userpass.txt" %temp, "w") as cd:
-                    cd.write("%s\n%s" %(credentials["username"], credentials["password"]))
-                            
-                cert_url = "https://assets.windscribe.com/desktop/other/openvpn_cert.zip"
-                get_certs = self.session.get(cert_url)
-                z = zipfile.ZipFile(io.BytesIO(get_certs.content))
-                z.extractall(temp)
-                
-                download_url = "https://windscribe.com/getconfig/openvpn"
-                
-                parse = BeautifulSoup(self.session.get(download_url).content, "lxml")
-                        
-                for s in parse.find("select", {"id":"location"}).findAll('option'):
-                    s_id = s.get("value")
-                    download_data = {"location": s_id,
-                                "port" : "443",
-                                "protocol" : "udp"
-                                }
-                
-                    post = self.session.post(download_url, data=download_data)
-                    with open("%s/%s.ovpn" %(temp, s_id), "w") as o:
-                        o.write(post.content.decode("utf-8"))
+                try:
+                    with open("%s/windscribe_userpass.txt" %self.temp, "w") as cd:
+                        cd.write("%s\n%s" %(credentials["username"], credentials["password"]))
+                        self.get_servers()
+                except KeyError:
+                    self.importFail.emit("Airvpn")
                     
-                    with open("%s/%s.ovpn" %(temp, s_id), "r") as v:
-                        lines = v.readlines()
-                        for line in lines:
-                            if line.startswith("remote "):
-                                server = line.split(" ")[1]
-                                ip = resolve(server)
-                                if ip == "Failed to resolve":
-                                    failed_list.append(server)
-                                countrycode = server.split(".")[0]
-                                split = countrycode.split("-")
-                                if len(split) >= 2:
-                                    if split[0] == "wf":
-                                        countrycode = split[1]
-                                    else:
-                                        countrycode = split[0]
-                                        
-                                if countrycode == "uk":
-                                    countrycode = "gb"
-                                    
-                                country = country_translate(countrycode.upper())
-                                
-                                self.ws_server_dict[server] = {"name" : server, "country" : country, 
-                                                "ip" : ip, "city" : "", "provider" : "Windscribe"
-                                                    }
-                    
-                    time.sleep(0.5)
-                    
-                    
-                self.ws_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "443"},
-                                            "protocol_2" : {"protocol": "UDP", "port": "80"},
-                                            "protocol_3" : {"protocol": "UDP", "port": "53"},
-                                            "protocol_4" : {"protocol": "UDP", "port": "1194"},
-                                            "protocol_5" : {"protocol": "UDP", "port": "54783"},
-                                            "protocol_6" : {"protocol": "TCP", "port": "443"},
-                                            "protocol_7" : {"protocol": "TCP", "port": "587"},
-                                            "protocol_8" : {"protocol": "TCP", "port": "21"},
-                                            "protocol_9" : {"protocol": "TCP", "port": "22"},
-                                            "protocol_10" : {"protocol": "TCP", "port": "80"},
-                                            "protocol_11" : {"protocol": "TCP", "port": "143"},
-                                            "protocol_12" : {"protocol": "TCP", "port": "3306"},
-                                            "protocol_13" : {"protocol": "TCP", "port": "8080"},
-                                            "protocol_14" : {"protocol": "TCP", "port": "54783"},
-                                            "protocol_15" : {"protocol": "TCP", "port": "1194"}
-                                        }
-                
-                ws_dict = {"server" : self.ws_server_dict, 
-                            "protocol" : self.ws_protocol_dict, 
-                            "provider" : "Windscribe", 
-                            "path" : temp,
-                            "failed" : failed_list
-                            }
-                
-                self.down_finished.emit(ws_dict) 
-            
         except requests.exceptions.RequestException as e:
             self.importFail.emit("Network error: no internet connection")
-                        
+                    
+    def get_servers(self):            
+        cert_url = "https://assets.windscribe.com/desktop/other/openvpn_cert.zip"
+        get_certs = self.session.get(cert_url)
+        z = zipfile.ZipFile(io.BytesIO(get_certs.content))
+        z.extractall(self.temp)
+        
+        uid = uuid.uuid4()
+        random = uid.hex
+        api_url = "https://assets.windscribe.com/serverlist/openvpn/1/%s" %random
+
+        data = json.loads(self.session.get(api_url).content.decode("utf-8"))
+        
+        for s in data["data"]:
+            try:
+                countrycode = s["country_code"]
+                for n in s["nodes"]:
+                    city = n["group"].split("-")[0]
+                    ip = n["ip2"]
+                    ip2 = n["ip3"]
+                    name = n["hostname"].replace("staticnetcontent", "windscribe")
+                    country = country_translate(countrycode)
+                    self.ws_server_dict[name] = {"name" : name, "country" : country, 
+                                        "ip" : ip, "ip2" : ip2, "city" : city, "provider" : "Windscribe", "tunnel" : "OpenVPN"
+                                            }
+            except KeyError:
+                pass
+                
+        self.ws_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "443"},
+                                    "protocol_2" : {"protocol": "UDP", "port": "80"},
+                                    "protocol_3" : {"protocol": "UDP", "port": "53"},
+                                    "protocol_4" : {"protocol": "UDP", "port": "1194"},
+                                    "protocol_5" : {"protocol": "UDP", "port": "54783"},
+                                    "protocol_6" : {"protocol": "TCP", "port": "443"},
+                                    "protocol_7" : {"protocol": "TCP", "port": "587"},
+                                    "protocol_8" : {"protocol": "TCP", "port": "21"},
+                                    "protocol_9" : {"protocol": "TCP", "port": "22"},
+                                    "protocol_10" : {"protocol": "TCP", "port": "80"},
+                                    "protocol_11" : {"protocol": "TCP", "port": "143"},
+                                    "protocol_12" : {"protocol": "TCP", "port": "3306"},
+                                    "protocol_13" : {"protocol": "TCP", "port": "8080"},
+                                    "protocol_14" : {"protocol": "TCP", "port": "54783"},
+                                    "protocol_15" : {"protocol": "TCP", "port": "1194"},
+                                    "protocol_16" : {"protocol": "SSL", "port": "443"}
+                                }
+        
+        ws_dict = {"server" : self.ws_server_dict, 
+                    "protocol" : self.ws_protocol_dict, 
+                    "provider" : "Windscribe", 
+                    "path" : self.temp
+                    }
+        
+        self.down_finished.emit(ws_dict) 
+                    
 class ProtonDownload(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(object)
     importFail = QtCore.pyqtSignal(str)

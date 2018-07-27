@@ -56,7 +56,14 @@ def create_server_dict(current_dict, protocol_dict):
             
             except KeyError:
                 current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
-        
+                
+        elif provider == "Windscribe":
+            if protocol == "SSL":
+                ip = current_dict["ip2"]
+                current_dict.update({"port": port, "protocol": protocol, "prot_index": mode, "ip" : ip})
+            
+            else:
+                current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
         else:
             current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
 
@@ -67,5 +74,5 @@ def create_server_dict(current_dict, protocol_dict):
             current_dict.update({"port": port, "protocol": protocol})
         except KeyError:
             pass
-        
+    
     return current_dict

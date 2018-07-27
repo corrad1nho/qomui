@@ -474,6 +474,8 @@ class QomuiDbus(dbus.service.Object):
         self.wg(path)
     
     def openvpn(self):
+        self.air_ssl_port = "1413"
+        self.ws_ssl_port = "1194"
         path = "%s/temp.ovpn" %ROOTDIR
         cwd_ovpn = None
         provider = self.ovpn_dict["provider"]
@@ -493,6 +495,10 @@ class QomuiDbus(dbus.service.Object):
                     for line, value in enumerate(ssl_config):
                         if value.startswith("connect") is True:
                             ssl_config[line] = "connect = %s:%s\n" % (ip, port) 
+                        elif value.startswith("accept") is True:
+                            ssl_config[line] = "accept = 127.0.0.1:%s\n" %self.air_ssl_port
+                    ssl_config.append("verify = 3\n")        
+                    ssl_config.append("CAfile = /usr/share/qomui/certs/stunnel.crt")
                     with open("%s/temp.ssl" % ROOTDIR, "w") as ssl_dump:
                         ssl_dump.writelines(ssl_config)
                         ssl_dump.close()
@@ -517,6 +523,23 @@ class QomuiDbus(dbus.service.Object):
             self.write_config(self.ovpn_dict)
             
         elif provider == "Windscribe":
+            if protocol == "SSL":
+                with open("%s/ssl_config" %ROOTDIR, "r") as ssl_edit:
+                    ssl_config = ssl_edit.readlines()
+                    for line, value in enumerate(ssl_config):
+                        if value.startswith("connect") is True:
+                            ssl_config[line] = "connect = %s:%s\n" % (ip, port) 
+                        elif value.startswith("accept") is True:
+                            ssl_config[line] = "accept = 127.0.0.1:%s\n" %self.ws_ssl_port
+                    with open("%s/temp.ssl" % ROOTDIR, "w") as ssl_dump:
+                        ssl_dump.writelines(ssl_config)
+                        ssl_dump.close()
+                    ssl_edit.close()
+                self.write_config(self.ovpn_dict)
+                self.ssl_thread = threading.Thread(target=self.ssl, args=(ip,))
+                self.ssl_thread.start()
+                logging.info("Started Stunnel process in new thread")
+                
             self.write_config(self.ovpn_dict)
             
         elif provider == "ProtonVPN":
@@ -576,7 +599,10 @@ class QomuiDbus(dbus.service.Object):
             if protocol == "SSL":
                config.insert(13, "route %s 255.255.255.255 net_gateway\n" % (ip))
                ip = "127.0.0.1"
-               port = "1413"
+               if provider == "Airvpn":
+                    port = self.air_ssl_port
+               elif provider == "Windscribe":
+                   port = self.ws_ssl_port
                protocol = "tcp"
                
             elif protocol == "SSH":
