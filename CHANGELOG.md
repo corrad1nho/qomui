@@ -1,5 +1,16 @@
 ##Changelog
 
+version 0.6.1:
+- [new] support for Windscribe
+- [new] support for ProtonVPN
+- [change] missing flags for Windscribe added
+- [change] autocompletion for "c" and "v" options in cli
+- [change] most cli commands are not case-sensitive anymore
+- [bugfix] alternative dns servers not parsed correctly
+- [bugfix] crashes when loading default configuration
+- [bugfix] configs are not imported if url cannot be resolved
+- [bugfix] old connection not killed after network change detected (in rare cases)
+
 version 0.6.0:
 - [new] support for Wireguard
 - [new] cli-interface

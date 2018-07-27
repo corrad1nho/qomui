@@ -6,6 +6,7 @@ import requests
 import os
 from bs4 import BeautifulSoup
 import json
+import time
 import zipfile
 import gzip
 import tarfile
@@ -25,12 +26,25 @@ except AttributeError:
 
 DIRECTORY = "%s/.qomui" % (os.path.expanduser("~"))
 ROOTDIR = "/usr/share/qomui"
-supported_providers = ["Airvpn", "Mullvad", "PIA", "Manually add config files"]
+supported_providers = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe", "Manually add config files"]
 
 def country_translate(cc):
     try:
         country = pycountry.countries.get(alpha_2=cc).name
+        
+        if country == "Czechia":
+            country = "Czech Republic"
+        elif country == "Russian Federation":
+            country = "Russia"
+        elif country == "Taiwan, Province of China":
+            country = "Taiwan"
+        elif country == "Moldova, Republic of":
+            country = "Moldova"
+        elif country == "Korea, Republic of":
+            country = "South Korea"
+        
         return country
+    
     except KeyError:
         return "Unknown"
 
@@ -115,7 +129,8 @@ class AirVPNDownload(QtCore.QThread):
             self.Airvpn_server_dict[name] = {"name" : name,
                                              "provider": "Airvpn",
                                              "city": city,
-                                             "country" : country}
+                                             "country" : country,
+                                             "tunnel" : "OpenVPN"}
    
         self.Download()
 
@@ -265,6 +280,7 @@ class MullvadDownload(QtCore.QThread):
                                                             "city" : city,
                                                             "country" : country,
                                                             "ip" : ip,
+                                                            "tunnel" : "OpenVPN"
                                                             }
                         
                 self.Mullvad_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"}, 
@@ -350,8 +366,6 @@ class MullvadDownload(QtCore.QThread):
             country = "United Kingdom"
         elif country_raw == "USA":
             country = "United States"
-        elif country_raw == "Czech Rep.":
-            country = "Czechia"
         else:
             country = country_raw
         
@@ -390,22 +404,18 @@ class PiaDownload(QtCore.QThread):
                 name = "PIA-%s" %raw_name
                 
                 try:
-                    parse_country = raw_name.split(" ")
-                    if parse_country[0] == "US":
-                        country = "United States"
-                    elif parse_country[0] == "UK":
-                        country = "United Kingdom"
-                    elif parse_country[0] == "CA":
-                        country = "Canada"
-                    elif parse_country[0] == "AU":
-                        country = "Australia"
+                    parse_country = raw_name.split(" ")[0]
+                    if len(parse_country) == 2:
+                        if parse_country == "UK":
+                            parse_country = "GB"
+                        country = country_translate(parse_country)
                     else:
                         country = raw_name
                 except AttributeError:
                     country = raw_name
             
                 self.pia_server_dict[name] = {"name" : name, "country" : country, 
-                                              "ip" : ip, "city" : "", "provider" : "PIA"
+                                              "ip" : ip, "city" : "", "provider" : "PIA", "tunnel" : "OpenVPN"
                                                   }
             
             with requests.Session() as self.session:
@@ -423,14 +433,200 @@ class PiaDownload(QtCore.QThread):
             pia_dict = {"server" : self.pia_server_dict, 
                         "protocol" : self.pia_protocol_dict, 
                         "provider" : "PIA", 
-                        "path" : filepath
+                        "path" : filepath,
+                        "tunnel" : "OpenVPN"
                         }
             
             self.down_finished.emit(pia_dict)   
             
         except requests.exceptions.RequestException as e:
             self.importFail.emit("Network error: no internet connection")
+            
+class WsDownload(QtCore.QThread):
+    down_finished = QtCore.pyqtSignal(object)
+    importFail = QtCore.pyqtSignal(str)
+    header = {"User-Agent" : "Mozilla/5.0 (X11; Linux x86_64; rv:61.0) Gecko/20100101 Firefox/61.0",
+            "Accept" : "*/*",
+            "Accept-Language" : "en-US,en;q=0.5",
+            "Accept-Encoding" : "gzip, deflate, br",
+            "Connection" : "keep-alive"
+            }
+    
+    def __init__(self, username, password):
+        QtCore.QThread.__init__(self)
+        self.username = username
+        self.password = password
+        self.ws_server_dict = {}
+        self.ws_protocol_dict = {}
+        #self.timer = QtCore.QTimer()
+    
+    def run(self):
+        #self.timer.start()
+        self.username = "corrad1nho"
+        self.password = "***REMOVED***"
+        init_url = "https://res.windscribe.com/res/init"
+        login_url = "https://windscribe.com/login"
+        
+        try:
+            with requests.Session() as self.session:
+                self.session.headers.update(self.header)
+                failed_list = []
+                temp = "%s/temp" %DIRECTORY
+                self.session.get(login_url)
+                self.session.headers.update({"Host" : "res.windscribe.com",
+                                            "Origin" : "https://windscribe.com"})
+                post = self.session.post("https://res.windscribe.com/res/logintoken")
+                csrf = json.loads(post.content.decode("utf-8"))
+                self.session.headers.pop("Host", None)
+                self.session.headers.pop("Origin", None)
+                
+                payload = {'login' : '1',
+                            'upgrade' : '0',
+                            'username' : self.username,
+                            'password' : self.password,
+                            'csrf_token' : csrf["csrf_token"],
+                            'csrf_time' : csrf["csrf_time"]
+                            }
+                
+                post = self.session.post(login_url, data=payload)
+                cred_url = "https://windscribe.com/getconfig/credentials"
+                get_cred = self.session.get(cred_url)
+                credentials = json.loads(get_cred.content.decode("utf-8"))
+                
+                with open("%s/windscribe_userpass.txt" %temp, "w") as cd:
+                    cd.write("%s\n%s" %(credentials["username"], credentials["password"]))
+                            
+                cert_url = "https://assets.windscribe.com/desktop/other/openvpn_cert.zip"
+                get_certs = self.session.get(cert_url)
+                z = zipfile.ZipFile(io.BytesIO(get_certs.content))
+                z.extractall(temp)
+                
+                download_url = "https://windscribe.com/getconfig/openvpn"
+                
+                parse = BeautifulSoup(self.session.get(download_url).content, "lxml")
+                        
+                for s in parse.find("select", {"id":"location"}).findAll('option'):
+                    s_id = s.get("value")
+                    download_data = {"location": s_id,
+                                "port" : "443",
+                                "protocol" : "udp"
+                                }
+                
+                    post = self.session.post(download_url, data=download_data)
+                    with open("%s/%s.ovpn" %(temp, s_id), "w") as o:
+                        o.write(post.content.decode("utf-8"))
+                    
+                    with open("%s/%s.ovpn" %(temp, s_id), "r") as v:
+                        lines = v.readlines()
+                        for line in lines:
+                            if line.startswith("remote "):
+                                server = line.split(" ")[1]
+                                ip = resolve(server)
+                                if ip == "Failed to resolve":
+                                    failed_list.append(server)
+                                countrycode = server.split(".")[0]
+                                split = countrycode.split("-")
+                                if len(split) >= 2:
+                                    if split[0] == "wf":
+                                        countrycode = split[1]
+                                    else:
+                                        countrycode = split[0]
+                                        
+                                if countrycode == "uk":
+                                    countrycode = "gb"
+                                    
+                                country = country_translate(countrycode.upper())
+                                
+                                self.ws_server_dict[server] = {"name" : server, "country" : country, 
+                                                "ip" : ip, "city" : "", "provider" : "Windscribe"
+                                                    }
+                    
+                    time.sleep(0.5)
+                    
+                    
+                self.ws_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "443"},
+                                            "protocol_2" : {"protocol": "UDP", "port": "80"},
+                                            "protocol_3" : {"protocol": "UDP", "port": "53"},
+                                            "protocol_4" : {"protocol": "UDP", "port": "1194"},
+                                            "protocol_5" : {"protocol": "UDP", "port": "54783"},
+                                            "protocol_6" : {"protocol": "TCP", "port": "443"},
+                                            "protocol_7" : {"protocol": "TCP", "port": "587"},
+                                            "protocol_8" : {"protocol": "TCP", "port": "21"},
+                                            "protocol_9" : {"protocol": "TCP", "port": "22"},
+                                            "protocol_10" : {"protocol": "TCP", "port": "80"},
+                                            "protocol_11" : {"protocol": "TCP", "port": "143"},
+                                            "protocol_12" : {"protocol": "TCP", "port": "3306"},
+                                            "protocol_13" : {"protocol": "TCP", "port": "8080"},
+                                            "protocol_14" : {"protocol": "TCP", "port": "54783"},
+                                            "protocol_15" : {"protocol": "TCP", "port": "1194"}
+                                        }
+                
+                ws_dict = {"server" : self.ws_server_dict, 
+                            "protocol" : self.ws_protocol_dict, 
+                            "provider" : "Windscribe", 
+                            "path" : temp,
+                            "failed" : failed_list
+                            }
+                
+                self.down_finished.emit(ws_dict) 
+            
+        except requests.exceptions.RequestException as e:
+            self.importFail.emit("Network error: no internet connection")
+                        
+class ProtonDownload(QtCore.QThread):
+    down_finished = QtCore.pyqtSignal(object)
+    importFail = QtCore.pyqtSignal(str)
 
+    def __init__(self, username, password):
+        QtCore.QThread.__init__(self)
+        self.username = username
+        self.password = password
+        self.proton_server_dict = {}
+        
+    def run(self):
+        try:
+            path = "%s/temp" %DIRECTORY
+            server_url = "https://account.protonvpn.com/api/vpn/servers"
+            get_servers = json.loads(requests.get(server_url).content.decode("utf-8"))
+            
+            for s in get_servers["Servers"]:
+                name = s["Domain"]
+                country = country_translate(s["Country"])
+                ip = s["IPs"][0]["EntryIP"]
+                self.proton_server_dict[name] = {"name" : name, "country" : country, "city": "", "ip" : ip, "provider" : "ProtonVPN", "tunnel": "OpenVPN"}
+                
+            cert_url = "https://account.protonvpn.com/api/vpn/config?ID=34&Platform=Linux"
+            ovpn = requests.get(cert_url).content.decode("utf-8")
+
+            ca_cert = BeautifulSoup(ovpn, "lxml").find("ca")
+            with open("%s/proton_ca.crt" %path, "w") as ca:
+                ca.write(str(ca_cert))
+            
+            ta_key = "<tls-auth>\n%s" %ovpn.split("<tls-auth>")[1]
+            with open("%s/proton_ta.key" %path, "w") as ta:
+                ta.write(str(ta_key))
+                
+            with open("%s/proton_userpass.txt" %path, "w") as up:
+                up.write('%s\n%s' % (self.username, self.password))
+                
+            self.proton_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"},
+                                            "protocol_2" : {"protocol": "TCP", "port": "443"}
+                                            }
+            
+            proton_dict = {"server" : self.proton_server_dict, 
+                            "protocol" : self.proton_protocol_dict, 
+                            "provider" : "ProtonVPN", 
+                            "path" : path
+                            }
+                
+            self.down_finished.emit(proton_dict) 
+        
+        except requests.exceptions.RequestException as e:
+            self.importFail.emit("Network error: no internet connection")
+            
+            
+            
+            
 class AddFolder(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(dict)
     importFail = QtCore.pyqtSignal(str)
@@ -459,6 +655,7 @@ class AddFolder(QtCore.QThread):
     
     def import_configs(self):
         custom_server_dict = {}
+        failed_list = []
         temp_path = "%s/temp/%s" % (DIRECTORY, self.provider)
         for f in self.configs:
             tunnel = "OpenVPN"
@@ -485,9 +682,12 @@ class AddFolder(QtCore.QThread):
                                 ip_found = 1
                             else:
                                 server = line.split(" ")[1]
-                                ip = self.resolve(server)
-                                modify[index] = "remote %s %s\n" %(ip, port)
-                                ip_found = 1
+                                ip = resolve(server)
+                                if ip != "Failed to resolve":
+                                    modify[index] = "remote %s %s\n" %(ip, port)
+                                    ip_found = 1
+                                else:
+                                    failed_list.append(server)
 
                         else:
                             modify[index] = "#%s" %line
@@ -514,9 +714,12 @@ class AddFolder(QtCore.QThread):
                         if result is not None:
                             ip = result.group()
                         else:
-                            ip = self.resolve(server)
-                            modify[index] = "Endpoint = %s:%s\n" %(ip, port)
-                        ip_found = 1
+                            ip = resolve(server)
+                            if ip != "Failed to resolve":
+                                modify[index] = "Endpoint = %s:%s\n" %(ip, port)
+                                ip_found = 1
+                            else:
+                                failed_list.append(server)
                         proto_line = 1
                         
                 if proto_line == 0:
@@ -550,20 +753,9 @@ class AddFolder(QtCore.QThread):
         with open("%s/%s-auth.txt" % (temp_path, self.provider) , "w") as passfile:
             passfile.write('%s\n%s' % (self.username, self.password))
             
-        custom_dict = {"server" : custom_server_dict, "provider" : self.provider, "path" : temp_path}
+        custom_dict = {"server" : custom_server_dict, "provider" : self.provider, "path" : temp_path, "failed" : failed_list}
         self.down_finished.emit(custom_dict) 
  
-    def resolve(self, host):
-        try:
-            dig_cmd = ["dig", "+time=2", "+tries=2", "%s" %host, "+short"]
-            ip = check_output(dig_cmd).decode("utf-8")
-            ip = ip.split("\n")[0]
-        except CalledProcessError:
-            ip = server
-            logging.warning("dig: resolving servername failed")
-            
-        return ip
-    
     def sanity_check(self, path):
         unrelated_files = 0
         for dirpath, dirnames, filenames in os.walk(path):
@@ -575,6 +767,18 @@ class AddFolder(QtCore.QThread):
                 except IndexError:
                     unrelated_files += 1
         return unrelated_files
+    
+    
+def resolve(host):
+    try:
+        dig_cmd = ["dig", "+time=2", "+tries=2", "%s" %host, "+short"]
+        ip = check_output(dig_cmd).decode("utf-8")
+        ip = ip.split("\n")[0]
+    except CalledProcessError:
+        ip = "Failed to resolve"
+        logging.warning("dig: resolving servername failed")
+        
+    return ip
     
     
 class UpdateCheck(QtCore.QThread):

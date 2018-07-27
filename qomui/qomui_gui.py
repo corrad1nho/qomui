@@ -54,7 +54,7 @@ class DbusLogHandler(logging.Handler):
 
 HOMEDIR = "%s/.qomui" % (os.path.expanduser("~"))
 ROOTDIR = "/usr/share/qomui"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA"]
+SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 JSON_FILE_LIST = [("config_dict", "%s/config.json" %ROOTDIR),
                   ("server_dict", "%s/server.json" %HOMEDIR), 
                   ("protocol_dict", "%s/protocol.json" %HOMEDIR), 
@@ -990,6 +990,7 @@ class QomuiGui(QtWidgets.QWidget):
     def connect_last_server(self):
         try:
             if self.config_dict["autoconnect"] == 1:
+                self.kill()
                 last_server_dict = self.load_json("%s/last_server.json" %HOMEDIR)
                 self.ovpn_dict = last_server_dict["last"]
                 self.hop_server_dict = last_server_dict["hop"]
@@ -1070,7 +1071,7 @@ class QomuiGui(QtWidgets.QWidget):
                 pass
 
     def restoreDefaults(self):
-        default_config_dict = load.json('%s/default_config.json' % (ROOTDIR))
+        default_config_dict = self.load_json('%s/default_config.json' % (ROOTDIR))
         self.setOptiontab(default_config_dict)
     
     def cancelOptions(self):
@@ -1078,8 +1079,8 @@ class QomuiGui(QtWidgets.QWidget):
             
     def applyoptions(self):
         temp_config_dict = {}
-        temp_config_dict["alt_dns1"] = self.altDnsEdit1.text()
-        temp_config_dict["alt_dns2"] = self.altDnsEdit2.text()
+        temp_config_dict["alt_dns1"] = self.altDnsEdit1.text().replace("\n", "")
+        temp_config_dict["alt_dns2"] = self.altDnsEdit2.text().replace("\n", "")
         
         for option in self.config_list:
             if getattr(self, "%sOptCheck" %option).checkState() == 2:
@@ -1129,6 +1130,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.qomui_service.save_default_dns()
             self.get_latencies()
             if self.ovpn_dict is not None:
+                self.kill()
                 self.establish_connection(self.ovpn_dict)
                 self.qomui_service.bypass(utils.get_user_group())
         elif networkstate != 70 and networkstate != 60:
@@ -1137,7 +1139,7 @@ class QomuiGui(QtWidgets.QWidget):
         
     def providerChosen(self):
         provider = self.addProviderBox.currentText()
-        if provider == "Airvpn" or provider == "PIA":
+        if provider == "Airvpn" or provider == "PIA" or provider == "Windscribe" or provider == "ProtonVPN":
             self.addProviderEdit.setVisible(False)
             self.addProviderUserEdit.setPlaceholderText(_translate("Form", "Username", None))
             self.addProviderPassEdit.setPlaceholderText(_translate("Form", "Password", None))
@@ -1190,6 +1192,15 @@ class QomuiGui(QtWidgets.QWidget):
             self.down_thread.down_finished.connect(self.downloaded)
             self.down_thread.start()
             self.update_bar("start", provider)
+        elif provider == "ProtonVPN":
+            username = self.addProviderUserEdit.text()
+            password = self.addProviderPassEdit.text()
+            self.down_thread = update.ProtonDownload(username, password)
+            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+            self.down_thread.importFail.connect(self.import_fail)
+            self.down_thread.down_finished.connect(self.downloaded)
+            self.down_thread.start()
+            self.update_bar("start", provider)
         elif provider == "PIA":
             username = self.addProviderUserEdit.text()
             password = self.addProviderPassEdit.text()
@@ -1199,6 +1210,16 @@ class QomuiGui(QtWidgets.QWidget):
             self.down_thread.down_finished.connect(self.downloaded)
             self.down_thread.start()
             self.update_bar("start", provider)
+        elif provider == "Windscribe":
+            username = self.addProviderUserEdit.text()
+            password = self.addProviderPassEdit.text()
+            self.down_thread = update.WsDownload(username, password)
+            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+            self.down_thread.importFail.connect(self.import_fail)
+            self.down_thread.down_finished.connect(self.downloaded)
+            self.down_thread.start()
+            self.update_bar("start", provider)
+            
         else:
             provider = self.addProviderEdit.text()
             if provider == "":
@@ -1334,9 +1355,16 @@ class QomuiGui(QtWidgets.QWidget):
         
         self.update_bar("stop", None)
         QtWidgets.QApplication.restoreOverrideCursor()
+        txt = "List of available servers updated"
+        try:
+            for s in content["failed"]:
+                txt = txt + "\nFailed to resolve %s - server not added" %s
+        except KeyError:
+            pass
+        
         down_msg = QtWidgets.QMessageBox.information(self,
                                                 "Import successful",
-                                                "List of available servers updated",
+                                                txt,
                                                 QtWidgets.QMessageBox.Ok)
     
     def del_single_server(self):
@@ -1372,6 +1400,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.provider_list = ["All providers"]
         self.tunnel_list = ["OpenVPN"]
         self.tunnelBox.clear()
+
         for k,v in (self.server_dict.items()):
             if v["country"] not in self.country_list:
                 self.country_list.append(v["country"])
@@ -1385,7 +1414,10 @@ class QomuiGui(QtWidgets.QWidget):
                         self.tunnelBox.addItem(t)
                     self.tunnelBox.setVisible(True)
                 else:
-                    self.tunnelBox.setVisible(True)
+                    if len(self.tunnel_list) == 2:
+                        self.tunnelBox.setVisible(True)
+                    else:
+                        self.tunnelBox.setVisible(False)
             except KeyError:
                 pass
             

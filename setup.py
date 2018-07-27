@@ -3,7 +3,7 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 
 data_files = [
         ('/usr/share/applications/', ['resources/qomui.desktop']),
@@ -13,7 +13,9 @@ data_files = [
                                                      'resources/qomui_off.svg']),
         ('/usr/share/qomui/', [
                                 'resources/Airvpn_config',
-                                'resources/PIA_config',    
+                                'resources/PIA_config',
+                                'resources/ProtonVPN_config',
+                                'resources/Windscribe_config',
                                 'resources/default_config.json',
                                 'resources/firewall_default.json',
                                 'resources/Mullvad_config',

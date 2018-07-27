@@ -24,7 +24,7 @@ OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
 BUS_NAME = "org.qomui.service"
 ROOTDIR = "/usr/share/qomui"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA"]
+SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 
 class GuiLogHandler(logging.Handler):
     def __init__(self, send_log, parent = None):
@@ -133,7 +133,9 @@ class QomuiDbus(dbus.service.Object):
             
         if self.wg_connect == 1:
             try:
-                wg_down = Popen(["wg-quick", "down", "%s/wg_qomui.conf" %ROOTDIR])
+                wg_down = Popen(["wg-quick", "down", "%s/wg_qomui.conf" %ROOTDIR], stdout=PIPE, stderr=STDOUT)
+                for line in wg_down.stdout:
+                    logging.info(line)
             except CalledProcessError:
                 pass
             
@@ -165,12 +167,16 @@ class QomuiDbus(dbus.service.Object):
             server.append("api.mullvad.net")
         elif provider == "PIA":
             server.append("www.privateinternetaccess.com")
+        elif provider == "Windscribe":
+            server.append("www.windscribe.com")
+        elif provider == "ProtonVPN":
+            server.append("account.protonvpn.com")
         self.allow_dns()
         if len(server) > 0:
             for s in server:
                 self.logger.info("iptables: Temporarily creating rule to allow access to %s" %s)
                 try:
-                    dig_cmd = ["dig", "+time=2", "+tries=1", "%s" %(server), "+short"]
+                    dig_cmd = ["dig", "+time=2", "+tries=1", "%s" %s, "+short"]
                     answer = check_output(dig_cmd).decode("utf-8")
                     parse = answer.split("\n")
                     ip = parse[len(parse)-2]
@@ -242,6 +248,16 @@ class QomuiDbus(dbus.service.Object):
             shutil.copyfile("%s/crl.rsa.4096.pem" % (certpath), "%s/certs/pia_crl.rsa.4096.pem" % (ROOTDIR))
             shutil.copyfile("%s/ca.rsa.4096.crt" % (certpath), "%s/certs/pia_ca.rsa.4096.crt" % (ROOTDIR))
             shutil.copyfile("%s/pia_userpass.txt" % (certpath), "%s/certs/pia_userpass.txt" % (ROOTDIR))
+            
+        elif provider == "Windscribe":
+            shutil.copyfile("%s/ca.crt" % (certpath), "%s/certs/ca_ws.crt" % (ROOTDIR))
+            shutil.copyfile("%s/ta.key" % (certpath), "%s/certs/ta_ws.key" % (ROOTDIR))
+            shutil.copyfile("%s/windscribe_userpass.txt" % (certpath), "%s/certs/windscribe_userpass.txt" % (ROOTDIR))
+            
+        elif provider == "ProtonVPN":
+            shutil.copyfile("%s/proton_ca.crt" % (certpath), "%s/certs/proton_ca.crt" % (ROOTDIR))
+            shutil.copyfile("%s/proton_ta.key" % (certpath), "%s/certs/proton_ta.key" % (ROOTDIR))
+            shutil.copyfile("%s/proton_userpass.txt" % (certpath), "%s/certs/proton_userpass.txt" % (ROOTDIR))
             
         elif provider.find("CHANGE") != -1:
             provider = provider.split("_")[1]
@@ -476,7 +492,7 @@ class QomuiDbus(dbus.service.Object):
                     ssl_config = ssl_edit.readlines()
                     for line, value in enumerate(ssl_config):
                         if value.startswith("connect") is True:
-                            ssl_config[line] = "connect = %s:443\n" % (ip) 
+                            ssl_config[line] = "connect = %s:%s\n" % (ip, port) 
                     with open("%s/temp.ssl" % ROOTDIR, "w") as ssl_dump:
                         ssl_dump.writelines(ssl_config)
                         ssl_dump.close()
@@ -498,6 +514,12 @@ class QomuiDbus(dbus.service.Object):
             self.write_config(self.ovpn_dict)
             
         elif provider == "PIA":
+            self.write_config(self.ovpn_dict)
+            
+        elif provider == "Windscribe":
+            self.write_config(self.ovpn_dict)
+            
+        elif provider == "ProtonVPN":
             self.write_config(self.ovpn_dict)
             
         else:
@@ -544,7 +566,6 @@ class QomuiDbus(dbus.service.Object):
         port = ovpn_dict["port"]
         protocol = ovpn_dict["protocol"]
         
-        
         if path is None:
             ovpn_file = "%s/%s_config" %(ROOTDIR, provider)
         else:
@@ -574,6 +595,7 @@ class QomuiDbus(dbus.service.Object):
                             config[line] = "proto %s \n" % (protocol.lower()) 
                     except KeyError:
                         config[line] = "proto %s \n" % (protocol.lower()) 
+                        
                 elif value.startswith("remote ") is True:
                     config[line] = "remote %s %s \n" % (ip.replace("\n", ""), port)
                     

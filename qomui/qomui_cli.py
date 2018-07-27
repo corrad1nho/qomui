@@ -5,6 +5,7 @@ import sys
 import os
 import dbus
 import argparse
+import readline
 import json
 import time
 import shutil
@@ -17,7 +18,7 @@ from qomui import utils, update
 
 HOMEDIR = "%s/.qomui" % (os.path.expanduser("~"))
 ROOTDIR = "/usr/share/qomui"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA"]
+SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 app = QtCore.QCoreApplication(sys.argv)
 
 try:
@@ -28,6 +29,7 @@ except AttributeError:
 
 class QomuiCli(QtCore.QObject):
     hop_server_dict = None
+    hop_active = 0
     
     def __init__(self, args=None):
         QtCore.QObject.__init__(self)
@@ -85,48 +87,33 @@ class QomuiCli(QtCore.QObject):
         if args["connect"] is not None:
             self.server_dict = self.load_json("%s/server.json" %HOMEDIR)
             self.protocol_dict = self.load_json("%s/protocol.json" %HOMEDIR)
+            keys = self.server_dict.keys()
             
             if args["via"] is not None:
+                self.hop_active = 1
                 hop_server = args["via"]
-                if hop_server in self.server_dict.keys():
-                    self.hop_server_dict = utils.create_server_dict(self.server_dict[hop_server], 
-                                                                    self.protocol_dict
-                                                                    )
-                    self.qomui_service.set_hop(self.hop_server_dict)
+                if hop_server in keys:
+                    self.set_hop(hop_server)
                     
                 else:
                     print("Sorry, %s does not exist" %hop_server)
-                    sys.exit(1)
+                    self.autocomplete(keys, action="set_hop")
                     
             server = args["connect"]
-            if server in self.server_dict.keys():
-                self.ovpn_dict = utils.create_server_dict(self.server_dict[server], 
-                                                                        self.protocol_dict
-                                                                        )
-                
-                if self.hop_server_dict is not None:
-                    self.ovpn_dict.update({"hop":"2"})
-                else:
-                    self.ovpn_dict.update({"hop":"0"})
-                    
-                self.kill()    
-                self.qomui_service.connect_to_server(self.ovpn_dict)
-                
-                config = self.get_config()
-                try:
-                    if config["bypass"] == 1:
-                        self.qomui_service.bypass(utils.get_user_group())
-                except KeyError:
-                    pass
+            
+            if server in keys:
+                self.establish_connection(server)
                 
             else:
                 print("Sorry, %s does not exist" %server)
-                sys.exit(1)
+                self.autocomplete(keys, action="establish_connection")
         
         if args["list"] is not None:
             server_dict = self.load_json("%s/server.json" %HOMEDIR)
             for k,v in server_dict.items():
-                check = all(i in v.values() for i in args["list"])
+                v_lower = [v.lower() for v in v.values()]
+                a_lower = [a.lower() for a in args["list"]]
+                check = all(i in v_lower for i in a_lower)
                 if check:
                     formatted = "%s - %s - %s" %(k, v["country"], v["provider"])
                     print(formatted)
@@ -190,10 +177,46 @@ class QomuiCli(QtCore.QObject):
             provider = args["add"]
             self.add_server(provider)
             
+    def autocomplete(self, keys, action=None):
+        readline.set_completer(AutoCompleter(keys).complete)
+        readline.parse_and_bind('tab: complete')
+        line = ""
+        while line not in keys:
+            line = input("Try again ('TAB' for autocompletion): ")
+    
+        do = getattr(self, action)
+        do(line)
+     
+    def establish_connection(self, server):
+        self.ovpn_dict = utils.create_server_dict(self.server_dict[server], 
+                                                                self.protocol_dict
+                                                                )
+        
+        if self.hop_server_dict is not None:
+            self.ovpn_dict.update({"hop":"2"})
+        else:
+            self.ovpn_dict.update({"hop":"0"})
+    
+        self.kill()    
+        self.qomui_service.connect_to_server(self.ovpn_dict)
+        
+        config = self.get_config()
+        try:
+            if config["bypass"] == 1:
+                self.qomui_service.bypass(utils.get_user_group())
+        except KeyError:
+            pass
             
+    def set_hop(self, server):
+        self.hop_server_dict = utils.create_server_dict(self.server_dict[server], 
+                                                                    self.protocol_dict
+                                                                    )
+        self.qomui_service.set_hop(self.hop_server_dict)
+        
+        
     def add_server(self, provider):
         path = "None"
-        print("Automatic download is available for the following providers: Airvpn, Mullvad, PIA")
+        print("Automatic download is available for the following providers: Airvpn, Mullvad, PIA, Windscribe and ProtonVPN")
         if provider not in SUPPORTED_PROVIDERS:
             path = input("Enter path of folder containing config files of %s:\n" %provider) 
             if not os.path.exists(path):
@@ -230,6 +253,20 @@ class QomuiCli(QtCore.QObject):
             username = username
             password = password
             self.down_thread = update.PiaDownload(username, password)
+            self.down_thread.importFail.connect(self.import_fail)
+            self.down_thread.down_finished.connect(self.downloaded)
+            self.down_thread.start()
+        elif provider == "Windscribe":
+            username = username
+            password = password
+            self.down_thread = update.WsDownload(username, password)
+            self.down_thread.importFail.connect(self.import_fail)
+            self.down_thread.down_finished.connect(self.downloaded)
+            self.down_thread.start()
+        elif provider == "ProtonVPN":
+            username = username
+            password = password
+            self.down_thread = update.ProtonDownload(username, password)
             self.down_thread.importFail.connect(self.import_fail)
             self.down_thread.down_finished.connect(self.downloaded)
             self.down_thread.start()
@@ -316,19 +353,24 @@ class QomuiCli(QtCore.QObject):
         
     def openvpn_log_monitor(self, reply):
         if reply == "success":
-            print("Connection to %s successful" %self.ovpn_dict["name"])
+            if self.hop_active == 1:
+                self.hop_active = 0
+            else:
+                print("Connection to %s successful" %self.ovpn_dict["name"])
+                app.quit()
         
         elif reply == "fail2":
             self.kill()
             print("Connection attempt failed")
             print("Authentication error while trying to connect\nMaybe your account is expired or connection limit is exceeded")
+            app.quit()
+        
             
         elif reply == "fail1":
             self.kill()
             print("Connection attempt failed")
             print("Application was unable to connect to server\nSee log for further information")
-
-        app.quit()
+            app.quit()
         
     def openvpn_log_print(self, reply):
         print(reply)
@@ -381,7 +423,28 @@ class QomuiCli(QtCore.QObject):
     def get_config(self):
         config_dict = self.load_json("%s/config.json" %ROOTDIR)
         return config_dict
+    
+    
+class AutoCompleter(object):
+    
+    def __init__(self, keys):
+        self.keys = sorted(keys)
+        return
+    
+    def complete(self, text, state):
+        response = None
+        if state == 0:
+            if text:
+                self.matches = [s for s in self.keys if s.lower() and s.lower().startswith(text.lower())]
+            else:
+                self.matches = self.options[:]
+        try:
+            response = self.matches[state]
+        except IndexError:
+            response = None
         
+        return response
+
     
 def main():    
     parser = argparse.ArgumentParser()

@@ -3,7 +3,7 @@
 
 from subprocess import check_output
 
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA"]
+SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 
 def get_user_group():
     user = check_output(['id', '-u', '-n']).decode("utf-8").split("\n")[0]
@@ -18,7 +18,7 @@ def create_server_dict(current_dict, protocol_dict):
             mode = protocol_dict[provider]["selected"]
         except KeyError:
             mode = "protocol_1"
-            
+        
         port = protocol_dict[provider][mode]["port"]
         protocol = protocol_dict[provider][mode]["protocol"]
         

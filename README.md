@@ -7,9 +7,9 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 
 ### Features
 - should work with all VPN providers that offer OpenVPN config files
-- automatic download function for Mullvad, Private Internet Access and AirVPN 
+- automatic download function for Mullvad, Private Internet Access, Windscribe, ProtonVPN and AirVPN 
 - support for OpenVPN over SSL and SSH for AirVPN
-- allows double-hop VPN connections (VPN chains) between different providers (currently tested with AirVPN, Mullvad and ProtonVPN). 
+- allows double-hop VPN connections (VPN chains) between different providers
 - Gui written in PyQt including option to minimize application to system tray 
 - security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
 - protection against DNS leaks/ipv6 leaks
@@ -62,11 +62,10 @@ cd ./qomui
 sudo python3 setup.py install
 ```
 
-
 ### Usage
 Qomui contains two components: qomui-gui and qomui-service. The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service"). Be aware that if you choose to activate the firewall and enable qomui-service all internet connectivity will be blocked as long as no OpenVPN connection has been established whether or not the gui is running. 
 
-Current configurations for AirVPN and Mullvad can be automatically downloaded via provider tab. For all other providers you can conveniently add a config file folder. Qomui will automatically resolve host names, determine the location of servers (using geoip-database) and save your username and password (in a file readable only by root). Modified config files will be saved as "QOMUI-NameOfConfigFile" in the same directory as the original files. 
+Current configurations for AirVPN, Mullvad, ProtonVPN, PIA and Windscribe can be automatically downloaded via provider tab. For all other providers you can conveniently add a config file folder. Qomui will automatically resolve host names, determine the location of servers (using geoip-database) and save your username and password (in a file readable only by root). Modified config files will be saved as "QOMUI-NameOfConfigFile" in the same directory as the original files.
 
 ### Double-Hop
 To create a "double-hop" simply choose a first server via the "hop"-button before connecting to the second one. You can mix connections to different providers. However, the double-hop feature does not support OpenVPN over SSL or SSH. Also be aware that depending on your choice of servers this feature may drastically reduce the speed of your internet connection and increase your ping. In any case, you will likely have to sacrifice some bandwith. In my opinion, the added benefits of increased privacy, being able to use different providers as entry and exit node and making it more difficult to be tracked are worth it, though. This feature was inspired by suggestions to simply run a second instance of OpenVPN in a virtual machine to create a double-hop. If that is possible, it should be possible to do the same by manipulating the routing table without the need to fire up a VM. Invaluable resources on the topic were [this discussion on the Openvpn forum](https://forums.openvpn.net/viewtopic.php?f=15&t=7483) and [this github repository](https://github.com/TomAshley303/VPN-Chain). 
@@ -112,6 +111,17 @@ qomui-cli --help
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.6.1:
+- [new] support for Windscribe
+- [new] support for ProtonVPN
+- [change] missing flags for Windscribe added
+- [change] autocompletion for "c" and "v" options in cli
+- [change] most cli commands are not case-sensitive anymore
+- [bugfix] alternative dns servers not parsed correctly
+- [bugfix] crashes when loading default configuration
+- [bugfix] configs are not imported if url cannot be resolved
+- [bugfix] old connection not killed after network change detected (in rare cases)
+
 version 0.6.0:
 - [new] support for Wireguard
 - [new] cli-interface
@@ -119,12 +129,6 @@ version 0.6.0:
 - [change] update routine now uses dpkg/rpm if installed as DEB/RPM package - reinstall required!
 - [bugfix] crashes at start when system tray not available
 - [bugfix] Info for active connection sometimes not updated correctly 
-- [bugfix] Doublehop fails on Fedora 
-
-version 0.5.1:
-- [new] support for ipv6/tls-crypt configs from AirVPN - EXPERIMENTAL
-- [bugfix] firewall dialog not opening on new installations
-- [bugfix] random crashes when tunnel interface not available
-- [bugfix] update offered even though latest version installed
+- [bugfix] Doublehop fails on Fedora
 
 
