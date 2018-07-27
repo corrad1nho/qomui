@@ -1,4 +1,4 @@
-<img align="left" src="resources/qomui.png" width=40> 
+<img align="right" src="resources/qomui.png" width=40> 
 
 
 # Qomui
