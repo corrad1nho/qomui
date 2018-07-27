@@ -1494,7 +1494,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.randomSeverBt.setVisible(False)
         country = self.countryBox.currentText()
         provider = self.providerBox.currentText()
-        if self.tunnelBox.isVisible is True:
+        if self.tunnelBox.isVisible() is True:
             tunnel = self.tunnelBox.currentText()
         else:
             tunnel = "OpenVPN"
