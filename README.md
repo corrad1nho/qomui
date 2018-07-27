@@ -1,8 +1,4 @@
-# Qomui
-
-<img align="right" src="resources/qomui.png" width=60> 
-
-
+# Qomui <img align="right" src="resources/qomui.png" width=60> 
 
 --------------------
 Written in Python 3.6
