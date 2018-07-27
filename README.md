@@ -21,7 +21,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 ### Screenshots
 Taken on Arch/Plasma Arc Dark Theme - Qomui will adapt to your theme<br/>
 
-<img src="screenshots/qomui_screenshot_main.png" width=250> <img src="screenshots/qomui_screenshot_options.png" width=250> <img src="screenshots/qomui_screenshot_bypass.png" width=250>
+<img src="screenshots/qomui_screenshot_main.png" width=250> <img src="screenshots/qomui_screenshot_option.png" width=250> <img src="screenshots/qomui_screenshot_bypass.png" width=250>
 
 
 ### Dependencies/Requirements
