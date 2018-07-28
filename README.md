@@ -8,7 +8,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 ### Features
 - should work with all VPN providers that offer OpenVPN config files
 - automatic download function for Mullvad, Private Internet Access, Windscribe, ProtonVPN and AirVPN 
-- support for OpenVPN over SSL and SSH for AirVPN
+- support for OpenVPN over SSL and SSH for AirVPN and OpenVPN over SSL for Windscribe (Stealth Mode)
 - allows double-hop VPN connections (VPN chains) between different providers
 - Gui written in PyQt including option to minimize application to system tray 
 - security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
