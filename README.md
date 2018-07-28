@@ -19,7 +19,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - command-line interface
 
 ### Screenshots
-Taken on Arch/Plasma Arc Dark Theme - Qomui will adapt to your theme<br/>
+Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to your theme.<br/>
 
 <img src="screenshots/qomui_screenshot_main.png" width=250> <img src="screenshots/qomui_screenshot_option.png" width=250> <img src="screenshots/qomui_screenshot_bypass.png" width=250>
 
@@ -38,11 +38,11 @@ Taken on Arch/Plasma Arc Dark Theme - Qomui will adapt to your theme<br/>
 
 #### Ubuntu
 
-Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.1/qomui-0.6.1-amd64.deb)
+Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.2/qomui-0.6.2-amd64.deb)
 
 #### Fedora
 
-Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.1/qomui-0.6.1-1.x86_64.rpm)
+Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.2/qomui-0.6.2-1.x86_64.rpm)
 
 #### Arch
 
@@ -111,6 +111,15 @@ qomui-cli --help
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.6.2:
+- [change] api-url for ProtonVPN updated - the one introduced in last update was out of date
+- [change] added support for Windscribe's stealth feature (OpenVPN over SSL)
+- [change] postrm functions added to deb/rpm/aur packages 
+- [change] automatic reconnections for double hop if first hop fails/disconnects
+- [change] adjusted OpenVPN configs of Mullvad and Windscribe to match official ones
+- [bugfix] tray icon not always updated after establishing double hop connection 
+- [bugfix] qomui crashes while performing latency checks when server(s) are deleted
+
 version 0.6.1:
 - [new] support for Windscribe
 - [new] support for ProtonVPN
@@ -121,14 +130,4 @@ version 0.6.1:
 - [bugfix] crashes when loading default configuration
 - [bugfix] configs are not imported if url cannot be resolved
 - [bugfix] old connection not killed after network change detected (in rare cases)
-
-version 0.6.0:
-- [new] support for Wireguard
-- [new] cli-interface
-- [change] additional parameters parsed from .desktop-files
-- [change] update routine now uses dpkg/rpm if installed as DEB/RPM package - reinstall required!
-- [bugfix] crashes at start when system tray not available
-- [bugfix] Info for active connection sometimes not updated correctly 
-- [bugfix] Doublehop fails on Fedora
-
 

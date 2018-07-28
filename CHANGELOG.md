@@ -1,5 +1,14 @@
 ##Changelog
 
+version 0.6.2:
+- [change] api-url for ProtonVPN updated - the one introduced in last update was out of date
+- [change] added support for Windscribe's stealth feature (OpenVPN over SSL)
+- [change] postrm functions added to deb/rpm/aur packages 
+- [change] automatic reconnections for double hop if first hop fails/disconnects
+- [change] adjusted OpenVPN configs of Mullvad and Windscribe to match official ones
+- [bugfix] tray icon not always updated after establishing double hop connection 
+- [bugfix] qomui crashes while performing latency checks when server(s) are deleted
+
 version 0.6.1:
 - [new] support for Windscribe
 - [new] support for ProtonVPN

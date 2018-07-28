@@ -40,6 +40,7 @@ class QomuiDbus(dbus.service.Object):
     firewall_opt = 1
     hop_dict = {"none" : "none"}
     tun = "tun0"
+    tun_hop = "tun0"
     connect_status = 0
     config = {}
     wg_connect = 0
@@ -121,9 +122,12 @@ class QomuiDbus(dbus.service.Object):
             disable_ipv6 = Popen(['sysctl', '-w', 'net.ipv6.conf.all.disable_ipv6=0'])
             self.logger.info('(Re-)enabled ipv6')
     
-    @dbus.service.method(BUS_NAME, in_signature='', out_signature='s')
-    def return_tun_device(self):
-        return self.tun
+    @dbus.service.method(BUS_NAME, in_signature='s', out_signature='s')
+    def return_tun_device(self, tun):
+        if tun == "tun":
+            return self.tun
+        elif tun == "hop":
+            return self.tun_hop
     
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
     def disconnect(self):
@@ -719,7 +723,12 @@ class QomuiDbus(dbus.service.Object):
                     if self.dns_found == 0:
                         self.update_dns()
                 elif line.find('TUN/TAP device') != -1:
-                    self.tun = line_format.split(" ")[3]
+                    if h == "2":
+                        self.tun = line_format.split(" ")[3]
+                    elif h == "1":
+                        self.tun_hop = line_format.split(" ")[3]
+                    else:
+                        self.tun = line_format.split(" ")[3]
                 elif line.find('PUSH: Received control message:') != -1:
                     dns_option_1 = line_format.find('dhcp-option')
                     if dns_option_1 != -1:
@@ -736,9 +745,26 @@ class QomuiDbus(dbus.service.Object):
                 elif line.find("Restart pause, 10 second(s)") != -1:
                     self.reply("fail1")
                     self.logger.info("Connection attempt failed") 
+                elif line.find("SIGTERM[soft,auth-failure]") != -1:
+                    self.reply("fail1")
+                    self.logger.info("Connection attempt failed") 
                 elif line.find('SIGTERM[soft,auth-failure]') != -1:
                     self.reply("fail2")
                     self.logger.info("Authentication error while trying to connect")
+                elif line.find('write UDP: Operation not permitted') != -1:
+                    ips = []
+                    try:
+                        hop_ip = self.hop_dict["ip"]
+                        ips.append(hop_ip)
+                    except:
+                        pass
+                    
+                    remote_ip = self.ovpn_dict["ip"]
+                    ips.append(remote_ip)
+                    
+                    for ip in ips:    
+                        rule = (['-I', 'OUTPUT', '1', '-d', '%s' %ip, '-j', 'ACCEPT'])
+                        self.allow_ip(ip, rule)
                 elif line == '':
                     break
                 line = ovpn_exe.stdout.readline()

@@ -106,6 +106,7 @@ class QomuiGui(QtWidgets.QWidget):
     firewall_rules_changed = False
     hop_active = 0
     hop_log_monitor = 0
+    tun_hop = None
     hop_server_dict = None
     bypass_dict = {}
     config_dict = {}
@@ -1139,23 +1140,23 @@ class QomuiGui(QtWidgets.QWidget):
         
     def providerChosen(self):
         provider = self.addProviderBox.currentText()
-        if provider == "Airvpn" or provider == "PIA" or provider == "Windscribe" or provider == "ProtonVPN":
+        
+        p_txt = {"Airvpn" : ("Username", "Password"),
+                "PIA" : ("Username", "Password"),
+                "Windscribe" : ("Username", "Password"),
+                "Mullvad" : ("Account Numner", "N.A. - Leave empty"),
+                "ProtonVPN" : ("OpenVPN username", "OpenVPN password")
+                }
+        
+        if provider in SUPPORTED_PROVIDERS:
             self.addProviderEdit.setVisible(False)
-            self.addProviderUserEdit.setPlaceholderText(_translate("Form", "Username", None))
-            self.addProviderPassEdit.setPlaceholderText(_translate("Form", "Password", None))
+            self.addProviderUserEdit.setPlaceholderText(_translate("Form", p_txt[provider][0], None))
+            self.addProviderPassEdit.setPlaceholderText(_translate("Form", p_txt[provider][1], None))
             if provider in self.provider_list:
                 self.addProviderDownloadBt.setText(_translate("Form", "Update", None))
             else:
                 self.addProviderDownloadBt.setText(_translate("Form", "Download", None))
                 
-        elif provider == "Mullvad":
-            self.addProviderEdit.setVisible(False)
-            self.addProviderUserEdit.setPlaceholderText(_translate("Form", "Account Number", None))
-            self.addProviderPassEdit.setPlaceholderText(_translate("Form", "N.A.", None))
-            if provider in self.provider_list:
-                self.addProviderDownloadBt.setText(_translate("Form", "Update", None))
-            else:
-                self.addProviderDownloadBt.setText(_translate("Form", "Download", None))
         else:
             self.addProviderEdit.setVisible(True)
             self.addProviderEdit.setPlaceholderText(_translate("Form", 
@@ -1458,18 +1459,21 @@ class QomuiGui(QtWidgets.QWidget):
         server = result[0]
         latency_string = result[1]
         latency_float = result[2]
-        old_index = self.index_list.index(server)
-        bisect.insort(self.latency_list, latency_float)
-        update_index = self.latency_list.index(latency_float)
-        rm = self.index_list.index(server)
-        self.index_list.pop(rm)
-        self.index_list.insert(update_index, server)
-        if getattr(self, server).isHidden() == True:
-            hidden = True
-        self.serverListWidget.takeItem(old_index)
-        self.add_server_widget(server, self.server_dict[server], insert=update_index)
-        self.serverListWidget.setRowHidden(update_index, hidden)
-        getattr(self, server).display_latency(latency_string)
+        try:
+            old_index = self.index_list.index(server)
+            bisect.insort(self.latency_list, latency_float)
+            update_index = self.latency_list.index(latency_float)
+            rm = self.index_list.index(server)
+            self.index_list.pop(rm)
+            self.index_list.insert(update_index, server)
+            if getattr(self, server).isHidden() == True:
+                hidden = True
+            self.serverListWidget.takeItem(old_index)
+            self.add_server_widget(server, self.server_dict[server], insert=update_index)
+            self.serverListWidget.setRowHidden(update_index, hidden)
+            getattr(self, server).display_latency(latency_string)
+        except ValueError:
+            pass
     
     def show_favourite_servers(self, state):
         self.randomSeverBt.setVisible(True)
@@ -1748,7 +1752,6 @@ class QomuiGui(QtWidgets.QWidget):
                 self.status = "active"
                 self.hop_log_monitor = 0
                 self.WaitBar.setVisible(False)
-                self.show_active_connection(self.ovpn_dict, self.hop_server_dict)
                 try:
                     if self.config_dict["simpletray"] == 0:
                         self.trayIcon = QtGui.QIcon('%s/flags/%s.png' % (ROOTDIR, 
@@ -1759,10 +1762,14 @@ class QomuiGui(QtWidgets.QWidget):
                 except KeyError:
                     self.trayIcon = QtGui.QIcon('%s/flags/%s.png' % (ROOTDIR,
                                                                      self.ovpn_dict["country"]
-                                                                     ))
-                self.tray.setIcon(QtGui.QIcon(self.trayIcon))
+                                                                    ))
+                finally:
+                    self.tray.setIcon(QtGui.QIcon(self.trayIcon))
+                    self.show_active_connection(self.ovpn_dict, self.hop_server_dict, tun_hop=self.tun_hop)
+                    self.tun_hop = None
             
             elif self.hop_active == 2 and self.hop_log_monitor != 1:
+                self.tun_hop = self.qomui_service.return_tun_device("hop")
                 self.hop_log_monitor = 1
             
             with open('%s/last_server.json' % (HOMEDIR), 'w') as lserver:
@@ -1804,12 +1811,12 @@ class QomuiGui(QtWidgets.QWidget):
         self.failmsg.setWindowModality(QtCore.Qt.WindowModal)
         self.failmsg.show()
         
-    def show_active_connection(self, current_server, hop_dict):
+    def show_active_connection(self, current_server, hop_dict, tun_hop=None):
         self.tray.setToolTip("Connected to %s" %self.ovpn_dict["name"])
         QtWidgets.QApplication.restoreOverrideCursor()
-        tun = self.qomui_service.return_tun_device()
+        tun = self.qomui_service.return_tun_device("tun")
         self.ActiveWidget.setVisible(True)
-        self.ActiveWidget.setText(self.ovpn_dict, self.hop_server_dict, tun)
+        self.ActiveWidget.setText(self.ovpn_dict, self.hop_server_dict, tun, tun_hop)
         self.ActiveWidget.disconnect.connect(self.kill)
         self.ActiveWidget.reconnect.connect(self.reconnect)
         self.gridLayout.addWidget(self.ActiveWidget, 0, 0, 1, 3)
@@ -1961,24 +1968,28 @@ class QomuiGui(QtWidgets.QWidget):
             json.dump(self.server_dict, s) 
         
         if len(new_config) != 0:
-            if provider in SUPPORTED_PROVIDERS:
-                temp_file = "%s/temp/%s_config" %(HOMEDIR, provider)
-                with open(temp_file, "w") as config_change:
-                    config_change.writelines(new_config)
-            else:
-                temp_file = "%s/temp/%s" %(HOMEDIR, val["path"].split("/")[1])
-                if modifications["apply_all"] == 1:
-                    for k, v in self.server_dict.items():
-                        if v["provider"] == provider:
-                            path = "%s/temp/%s" %(HOMEDIR, v["path"].split("/")[1])
-                            with open(path, "w") as config_change:
-                                index = modifications["index"]
-                                rpl = new_config[index].split(" ")
-                                ip_insert = "%s %s %s" %(rpl[0], v["ip"], rpl[2])
-                                new_config[index] = ip_insert
-                                config_change.writelines(new_config)
-                    
-            self.qomui_service.copy_rootdir("CHANGE_%s" %provider, "%s/temp" %(HOMEDIR))
+            try:
+                if provider in SUPPORTED_PROVIDERS:
+                    temp_file = "%s/temp/%s_config" %(HOMEDIR, provider)
+                    with open(temp_file, "w") as config_change:
+                        config_change.writelines(new_config)
+                else:
+                    temp_file = "%s/temp/%s" %(HOMEDIR, val["path"].split("/")[1])
+                    if modifications["apply_all"] == 1:
+                        for k, v in self.server_dict.items():
+                            if v["provider"] == provider:
+                                path = "%s/temp/%s" %(HOMEDIR, v["path"].split("/")[1])
+                                with open(path, "w") as config_change:
+                                    index = modifications["index"]
+                                    rpl = new_config[index].split(" ")
+                                    ip_insert = "%s %s %s" %(rpl[0], v["ip"], rpl[2])
+                                    new_config[index] = ip_insert
+                                    config_change.writelines(new_config)
+                        
+                self.qomui_service.copy_rootdir("CHANGE_%s" %provider, "%s/temp" %(HOMEDIR))
+            
+            except FileNotFoundError:
+                pass
                                 
     def search_listitem(self, key):
         for row in range(self.serverListWidget.count()):
@@ -2298,8 +2309,9 @@ class ActiveWidget(QtWidgets.QWidget):
         self.uploadLabel.setText(_translate("ConnectionWidget", "Upload:", None))
         self.timeLabel.setText(_translate("ConnectionWidget", "Time:", None))
 
-    def setText(self, server_dict, hop_dict, tun):
+    def setText(self, server_dict, hop_dict, tun, tun_hop=None):
         self.tun = tun
+        self.tun_hop = tun_hop
         self.statusLabel.setText("Active Connection")
         city = self.city_port_label(server_dict)
         self.ServerWidget.setText(server_dict["name"], server_dict["provider"],
@@ -2318,7 +2330,7 @@ class ActiveWidget(QtWidgets.QWidget):
             self.hopActiveLabel.setVisible(False)
         
         self.ServerWidget.hide_button(0)
-        self.calcThread = NetMon(self.tun)
+        self.calcThread = NetMon(self.tun, self.tun_hop)
         self.calcThread.stat.connect(self.show_stats)
         self.calcThread.ip.connect(self.show_ip)
         self.calcThread.time.connect(self.update_time)
@@ -2370,8 +2382,8 @@ class LineWidget(QtWidgets.QWidget):
     
     def setupUi(self, LineWidget):
         self.setAutoFillBackground(True)
-        self.setFixedHeight(2)
-        self.setBackgroundRole(self.palette().Highlight)
+        self.setFixedHeight(1)
+        #self.setBackgroundRole(self.palette().Highlight)
         
 class NetMon(QtCore.QThread):
     stat = QtCore.pyqtSignal(list)
@@ -2379,9 +2391,10 @@ class NetMon(QtCore.QThread):
     time = QtCore.pyqtSignal(str)
     lost = QtCore.pyqtSignal()
     
-    def __init__(self, tun):
+    def __init__(self, tun, tun_hop=None):
         QtCore.QThread.__init__(self)
         self.tun = tun
+        self.tun_hop = tun_hop
         
     def run(self):
         connected = True
@@ -2412,6 +2425,8 @@ class NetMon(QtCore.QThread):
 
             try:
                 counter = psutil.net_io_counters(pernic=True)[self.tun]
+                if self.tun_hop is not None:
+                    tun_hop_test = psutil.net_io_counters(pernic=True)[self.tun_hop]
                 t1 = time.time()
                 stat = (counter.bytes_recv, counter.bytes_sent)
                 DLrate, ULrate = [(now - last) / (t1 - t0) / 1024.0 for now, last in zip(stat, last_stat)]

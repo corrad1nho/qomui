@@ -5,7 +5,9 @@ remote
 nobind
 resolv-retry infinite
 auth SHA512
-cipher AES-256-CBC
+ auth-nocache
+cipher AES-256-GCM
+ncp-ciphers AES-256-GCM:AES-256-CBC:AES-128-GCM
 comp-lzo
 verb 3
 mute-replay-warnings

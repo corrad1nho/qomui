@@ -9,7 +9,8 @@ persist-tun
 remote-cert-tls server
 cipher AES-256-CBC
 comp-lzo 
-tun-ipv6
+fast-io
+ping-restart 60
 sndbuf 524288
 rcvbuf 524288
 verb 3

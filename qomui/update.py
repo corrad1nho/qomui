@@ -564,47 +564,64 @@ class ProtonDownload(QtCore.QThread):
         self.proton_server_dict = {}
         
     def run(self):
-        try:
-            path = "%s/temp" %DIRECTORY
-            server_url = "https://account.protonvpn.com/api/vpn/servers"
-            get_servers = json.loads(requests.get(server_url).content.decode("utf-8"))
-            
-            for s in get_servers["Servers"]:
-                name = s["Domain"]
-                country = country_translate(s["Country"])
-                ip = s["IPs"][0]["EntryIP"]
-                self.proton_server_dict[name] = {"name" : name, "country" : country, "city": "", "ip" : ip, "provider" : "ProtonVPN", "tunnel": "OpenVPN"}
-                
-            cert_url = "https://account.protonvpn.com/api/vpn/config?ID=34&Platform=Linux"
-            ovpn = requests.get(cert_url).content.decode("utf-8")
-
-            ca_cert = BeautifulSoup(ovpn, "lxml").find("ca")
-            with open("%s/proton_ca.crt" %path, "w") as ca:
-                ca.write(str(ca_cert))
-            
-            ta_key = "<tls-auth>\n%s" %ovpn.split("<tls-auth>")[1]
-            with open("%s/proton_ta.key" %path, "w") as ta:
-                ta.write(str(ta_key))
-                
-            with open("%s/proton_userpass.txt" %path, "w") as up:
-                up.write('%s\n%s' % (self.username, self.password))
-                
-            self.proton_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"},
-                                            "protocol_2" : {"protocol": "TCP", "port": "443"}
-                                            }
-            
-            proton_dict = {"server" : self.proton_server_dict, 
-                            "protocol" : self.proton_protocol_dict, 
-                            "provider" : "ProtonVPN", 
-                            "path" : path
-                            }
-                
-            self.down_finished.emit(proton_dict) 
         
+        headers = {'x-pm-appversion': 'Other',
+                   'x-pm-apiversion': '3',
+                   'Accept': 'application/vnd.protonmail.v1+json'
+                  } 
+        
+        try:
+            with requests.Session() as self.session:
+                self.session.headers.update(headers)
+                path = "%s/temp" %DIRECTORY
+                api_url = "https://api.protonmail.ch/vpn/logicals"
+                get_servers = json.loads(self.session.get(api_url).content.decode("utf-8"))
+                
+                with open ("%s/s.json" %path, "w") as s:
+                    json.dump(get_servers, s)
+                
+                for s in get_servers["LogicalServers"]:
+                    name = s["Domain"]
+                    cc = s["ExitCountry"]
+                    if cc == "UK":
+                        cc = "GB"
+                    country = country_translate(cc)
+                    city = s["City"]
+                    if city is None:
+                        city = ""
+                        
+                    ip = s["Servers"][0]["EntryIP"]
+                    self.proton_server_dict[name] = {"name" : name, "country" : country, "city": city, "ip" : ip, "provider" : "ProtonVPN", "tunnel": "OpenVPN"}
+
+                    
+                cert_url = "https://account.protonvpn.com/api/vpn/config?ID=34&Platform=Linux"
+                ovpn = requests.get(cert_url).content.decode("utf-8")
+
+                ca_cert = BeautifulSoup(ovpn, "lxml").find("ca")
+                with open("%s/proton_ca.crt" %path, "w") as ca:
+                    ca.write(str(ca_cert))
+                
+                ta_key = "<tls-auth>\n%s" %ovpn.split("<tls-auth>")[1]
+                with open("%s/proton_ta.key" %path, "w") as ta:
+                    ta.write(str(ta_key))
+                    
+                with open("%s/proton_userpass.txt" %path, "w") as up:
+                    up.write('%s\n%s' % (self.username, self.password))
+                    
+                self.proton_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"},
+                                                "protocol_2" : {"protocol": "TCP", "port": "443"}
+                                                }
+                
+                proton_dict = {"server" : self.proton_server_dict, 
+                                "protocol" : self.proton_protocol_dict, 
+                                "provider" : "ProtonVPN", 
+                                "path" : path
+                                }
+                    
+                self.down_finished.emit(proton_dict)
+            
         except requests.exceptions.RequestException as e:
             self.importFail.emit("Network error: no internet connection")
-            
-            
             
             
 class AddFolder(QtCore.QThread):
