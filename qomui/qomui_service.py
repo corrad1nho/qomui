@@ -227,6 +227,7 @@ class QomuiDbus(dbus.service.Object):
     
     @dbus.service.method(BUS_NAME, in_signature='ss', out_signature='s')
     def copy_rootdir(self, provider, certpath):
+        oldmask = os.umask(0o077)
         if not os.path.exists("%s/certs" %ROOTDIR):
             os.makedirs("%s/certs" %ROOTDIR)
     
@@ -307,6 +308,7 @@ class QomuiDbus(dbus.service.Object):
         for key in [file for file in os.listdir("%s/certs" % (ROOTDIR))]:
             Popen(['chown', 'root', '%s/certs/%s' % (ROOTDIR, key)])
             Popen(['chmod', '0600', '%s/certs/%s' % (ROOTDIR, key)])
+        os.umask(oldmask)
         return "copied"
        
     @dbus.service.method(BUS_NAME, in_signature='s', out_signature='')
@@ -461,6 +463,7 @@ class QomuiDbus(dbus.service.Object):
             self.openvpn()
             
     def wireguard(self):
+        oldmask = os.umask(0o077)
         path = "%s/wg_qomui.conf" %ROOTDIR
         if self.ovpn_dict["provider"] == "Mullvad":
             with open ("%s/certs/mullvad_wg.conf" %ROOTDIR, "r") as wg:
@@ -472,6 +475,7 @@ class QomuiDbus(dbus.service.Object):
                     
         else:
             shutil.copyfile("%s/%s" %(ROOTDIR, self.ovpn_dict["path"]), path)
+        os.umask(oldmask)
             
         Popen(['chmod', '0600', path])
             
