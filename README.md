@@ -15,7 +15,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
 - allow applications to bypass the VPN tunnel - to watch Netflix for example
-- experimental support for Wireguard
+- experimental support for WireGuard
 - command-line interface
 
 ### Screenshots
@@ -78,8 +78,8 @@ cgexec -g net_cls:bypass_qomui $yourcommand
 ```
 The idea is taken from [this post on severfault.com](https://serverfault.com/questions/669430/how-to-bypass-openvpn-per-application/761780#761780). Essentially, running an application outside the OpenVPN tunnel works by putting it in a network control group. This allows classifying and identifying network packets from processes in this cgroup in order to route them differently. Be aware that the implementation of this feature is still experimental. 
 
-### Wireguard
-You can add Wireguard config files from any provider as easily as OpenVPN files. Wireguard configs for Mullvad are now downloaded automatically alongside their OpenVPN configs as long as Wireguard is installed. If you choose to manually import Wireguard config files, Qomui will automatically recognize the type of file. As of now, Wireguard will not be installed automatically with DEB and RPM packages. You can find the official installation guidelines for different distributions [here](https://www.wireguard.com/install/).
+### WireGuard
+You can add WireGuard config files from any provider as easily as OpenVPN files. WireGuard configs for Mullvad are now downloaded automatically alongside their OpenVPN configs as long as WireGuard is installed. If you choose to manually import WireGuard config files, Qomui will automatically recognize the type of file. As of now, WireGuard will not be installed automatically with DEB and RPM packages. You can find the official installation guidelines for different distributions [here](https://www.wireguard.com/install/).
 
 ### Cli
 The cli interface is still experimental and missing some features, e.g. automatic reconnects. Avoid using the cli and the Gui concurrently. 

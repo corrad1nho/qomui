@@ -21,7 +21,7 @@ version 0.6.1:
 - [bugfix] old connection not killed after network change detected (in rare cases)
 
 version 0.6.0:
-- [new] support for Wireguard
+- [new] support for WireGuard
 - [new] cli-interface
 - [change] additional parameters parsed from .desktop-files
 - [change] update routine now uses dpkg/rpm if installed as DEB/RPM package - reinstall required!
@@ -48,7 +48,7 @@ version 0.5.0:
 - [bugfix] Crashes when modifying server during latency check
 - [bugfix] Changing country in modify dialog fails
 - [bugfix] Connection attempt fails when protocol/port not set
-- [bugfix] Wireguard servers downloaded from Mullvad even though not supported
+- [bugfix] WireGuard servers downloaded from Mullvad even though not supported
 
 version 0.4.1:
 - [bugfix] Crashes if no port/protocol selected
