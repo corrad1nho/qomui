@@ -111,7 +111,7 @@ class QomuiGui(QtWidgets.QWidget):
     bypass_dict = {}
     config_dict = {}
     packetmanager = None
-    tunnel_list = ["OpenVPN", "Wireguard"]
+    tunnel_list = ["OpenVPN", "WireGuard"]
     config_list = [
                    "firewall",
                    "autoconnect",
@@ -1409,8 +1409,8 @@ class QomuiGui(QtWidgets.QWidget):
             elif v["provider"] not in self.provider_list:
                 self.provider_list.append(v["provider"])
             try:
-                if v["tunnel"] == "Wireguard" and "Wireguard" not in self.tunnel_list:
-                    self.tunnel_list.append("Wireguard")
+                if v["tunnel"] == "WireGuard" and "WireGuard" not in self.tunnel_list:
+                    self.tunnel_list.append("WireGuard")
                     for t in self.tunnel_list:
                         self.tunnelBox.addItem(t)
                     self.tunnelBox.setVisible(True)
@@ -1530,7 +1530,7 @@ class QomuiGui(QtWidgets.QWidget):
                             if tunnel == "OpenVPN":
                                 self.serverListWidget.setRowHidden(index, False)
                                 getattr(self, key).setHidden(False)
-                            elif tunnel == "Wireguard":
+                            elif tunnel == "WireGuard":
                                 self.serverListWidget.setRowHidden(index, True)
                                 getattr(self, key).setHidden(True)
                     else:
@@ -1566,7 +1566,7 @@ class QomuiGui(QtWidgets.QWidget):
                             val["city"], fav=fav)
             
         try:
-            if val["tunnel"] == "Wireguard":
+            if val["tunnel"] == "WireGuard":
                 getattr(self, key).hide_button(0)
         except KeyError:
             pass
@@ -1724,7 +1724,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.ovpn_dict = utils.create_server_dict(current_dict, self.protocol_dict)
             
             try:
-                if self.ovpn_dict["tunnel"] == "Wireguard":
+                if self.ovpn_dict["tunnel"] == "WireGuard":
                     self.delete_hop()
             except KeyError:
                 pass
@@ -2745,7 +2745,7 @@ class ModifyServer(QtWidgets.QDialog):
     
     def load_config_file(self):
         try:
-            if self.server_info["tunnel"] == "Wireguard":
+            if self.server_info["tunnel"] == "WireGuard":
                 self.configBrowser.setVisible(False)
                 self.configLabel.setVisible(False)
                 self.changeAllBox.setVisible(False)

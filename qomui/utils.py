@@ -49,7 +49,7 @@ def create_server_dict(current_dict, protocol_dict):
         
         elif provider == "Mullvad":
             try:
-                if current_dict["tunnel"] == "Wireguard":
+                if current_dict["tunnel"] == "WireGuard":
                     current_dict.update({"port": "51820", "protocol": "UDP"})
                 else:
                     current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})

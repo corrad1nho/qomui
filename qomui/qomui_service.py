@@ -453,7 +453,7 @@ class QomuiDbus(dbus.service.Object):
             pass
         
         try:
-            if self.ovpn_dict["tunnel"] == "Wireguard":
+            if self.ovpn_dict["tunnel"] == "WireGuard":
                 self.wireguard()
             else:
                 self.openvpn()

@@ -313,7 +313,7 @@ class MullvadDownload(QtCore.QThread):
                                                                 "ip" : ip,
                                                                 "port" : port,
                                                                 "public_key" : public_key,
-                                                                "tunnel" : "Wireguard"}
+                                                                "tunnel" : "WireGuard"}
                                     
                     
                     private_key = check_output(["wg", "genkey"]).decode("utf-8").split("\n")[0]
@@ -698,9 +698,9 @@ class AddFolder(QtCore.QThread):
                         protocol = line.split(" ")[1]
                         proto_line = 1
                     
-                    #Wireguard
+                    #WireGuard
                     elif line.startswith("Endpoint ="):
-                        tunnel = "Wireguard"
+                        tunnel = "WireGuard"
                         ip_port = line.split(" = ")[1]
                         ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
                         result = ipsearch.search(line)
