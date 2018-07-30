@@ -241,7 +241,6 @@ class AirVPNDownload(QtCore.QThread):
 class MullvadDownload(QtCore.QThread):
      down_finished = QtCore.pyqtSignal(object)
      importFail = QtCore.pyqtSignal(str)
-     omit = ["brigde", "wireguard"]
     
      def __init__(self, accountnumber):
         QtCore.QThread.__init__(self)
