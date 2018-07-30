@@ -38,11 +38,11 @@ Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to
 
 #### Ubuntu
 
-Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.2/qomui-0.6.2-amd64.deb)
+Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.3/qomui-0.6.3-amd64.deb)
 
 #### Fedora
 
-Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.2/qomui-0.6.2-1.x86_64.rpm)
+Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.3/qomui-0.6.3-1.x86_64.rpm)
 
 #### Arch
 
@@ -111,6 +111,13 @@ qomui-cli --help
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.6.3:
+- [change] bypass mode supports ipv6 now
+- [change] WireGuard is now written correctly (pull request from zx2c4) - requires all WireGuard configs to be readded
+- [change] exit dialog has a 5 sec timeout now
+- [change] umask set before chmod to avoid race conditions (pull request from zx2c4)
+- [bugfix] bypass should now work properly with WireGuard connections
+
 version 0.6.2:
 - [change] api-url for ProtonVPN updated - the one introduced in last update was out of date
 - [change] added support for Windscribe's stealth feature (OpenVPN over SSL)
@@ -119,15 +126,4 @@ version 0.6.2:
 - [change] adjusted OpenVPN configs of Mullvad and Windscribe to match official ones
 - [bugfix] tray icon not always updated after establishing double hop connection 
 - [bugfix] qomui crashes while performing latency checks when server(s) are deleted
-
-version 0.6.1:
-- [new] support for Windscribe
-- [new] support for ProtonVPN
-- [change] missing flags for Windscribe added
-- [change] autocompletion for "c" and "v" options in cli
-- [change] most cli commands are not case-sensitive anymore
-- [bugfix] alternative dns servers not parsed correctly
-- [bugfix] crashes when loading default configuration
-- [bugfix] configs are not imported if url cannot be resolved
-- [bugfix] old connection not killed after network change detected (in rare cases)
 

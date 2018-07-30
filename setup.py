@@ -3,7 +3,7 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.6.2"
+VERSION = "0.6.3"
 
 data_files = [
         ('/usr/share/applications/', ['resources/qomui.desktop']),

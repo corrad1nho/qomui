@@ -96,7 +96,6 @@ class favouriteButton(QtWidgets.QAbstractButton):
     def sizeHint(self):
         return QtCore.QSize(25, 25)
 
-
 class QomuiGui(QtWidgets.QWidget):
     status = "inactive"
     server_dict = {}
@@ -965,20 +964,45 @@ class QomuiGui(QtWidgets.QWidget):
             self.showNormal()
     
     def closeEvent(self, event):
-        ret = self.messageBox("Do you want to exit program or minimize to tray?",
-                              "",
-                              buttons=["Minimize", "Exit", "Cancel"],
-                              icon="Question"
-                             )
-        if ret == 1:
+        self.exit_event = event
+        self.confirm = QtWidgets.QMessageBox()
+        self.timeout = 5
+        self.confirm.setText("Do you want to exit program or minimize to tray?")
+        info = "Closing in %s seconds" %self.timeout
+        self.confirm.setInformativeText(info)
+        self.confirm.setIcon(QtWidgets.QMessageBox.Question)
+        self.confirm.addButton(QtWidgets.QPushButton("Minimize"), QtWidgets.QMessageBox.NoRole)
+        self.confirm.addButton(QtWidgets.QPushButton("Exit"), QtWidgets.QMessageBox.YesRole)
+        self.confirm.addButton(QtWidgets.QPushButton("Cancel"), QtWidgets.QMessageBox.RejectRole)
+        self.timer = QtCore.QTimer(self)
+        self.timer.setInterval(1000)
+        self.timer.timeout.connect(self.change_timeout)
+        self.timer.start()
+        
+        ret = self.confirm.exec_()
+        self.timer.stop()
+
+        if ret == 2:
+            self.exit_event.ignore()
+            
+        elif ret == 0:
+            self.hide()
+    
+        elif ret == 1:
             self.tray.hide()
             self.kill()
-            event.accept()
-        elif ret == 0:
-            event.ignore()
-            self.hide()
-        elif ret == 2:
-            event.ignore()
+            self.exit_event.accept()
+
+    def change_timeout(self):
+        self.timeout -= 1
+        info = "Closing in %s seconds" %self.timeout
+        self.confirm.setInformativeText(info)
+        if self.timeout <= 0:
+            self.timer.stop()
+            self.confirm.hide()
+            self.tray.hide()
+            self.kill()
+            self.exit_event.accept()
             
     def load_json(self, json_file):
         try:

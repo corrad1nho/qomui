@@ -1,5 +1,13 @@
 ##Changelog
 
+version 0.6.3:
+- [change] bypass mode supports ipv6 now
+- [change] alternative DNS servers are used for bypass
+- [change] WireGuard is now written correctly (pull request from zx2c4) - requires all WireGuard configs to be readded
+- [change] exit dialog has a 5 sec timeout now
+- [change] umask set before chmod to avoid race conditions (pull request from zx2c4)
+- [bugfix] bypass should now work properly with WireGuard connections
+
 version 0.6.2:
 - [change] api-url for ProtonVPN updated - the one introduced in last update was out of date
 - [change] added support for Windscribe's stealth feature (OpenVPN over SSL)

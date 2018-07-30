@@ -13,7 +13,7 @@ import logging
 import logging.handlers
 import json
 import signal
-from subprocess import Popen, PIPE, check_output, CalledProcessError, STDOUT
+from subprocess import Popen, PIPE, check_output, check_call, CalledProcessError, STDOUT
 import dbus
 import dbus.service
 from dbus.mainloop.pyqt5 import DBusQtMainLoop
@@ -348,22 +348,47 @@ class QomuiDbus(dbus.service.Object):
         except AttributeError:
             pass
         
-        default_gateway = self.default_gateway_check()["gateway"]
-        if default_gateway != "None":
+        default_routes = self.default_gateway_check()
+        default_gateway_4 = default_routes["gateway"]
+        default_gateway_6 = default_routes["gateway_6"]
+        self.default_interface_4 = default_routes["interface"]
+        self.default_interface_6 = default_routes["interface_6"]
+        
+        if default_gateway_4 != "None" or default_gateway_6 != "None":
             try:
                 if self.config["bypass"] == 1:
-                    pid = bypass.create_cgroup(self.ug["user"], self.ug["group"], 
-                                               self.default_interface, default_gateway
+                    bypass.create_cgroup(self.ug["user"], self.ug["group"], 
+                                               self.default_interface_4, default_gateway_4,
+                                               self.default_interface_6, default_gateway_6
                                                )
-                    self.dnsmasq_pid = (pid, "dnsmasq")
-                    self.logger.debug("dnsmasq-PID = %s" %pid)
-                elif self.config["bypass"] == 0:
+                    
+                    if self.default_interface_4 != "None":
+                        interface = self.default_interface_4
+                    
+                    else:
+                        interface = self.default_interface_6
+                    
                     try:
-                        bypass.delete_cgroup(self.default_interface)
+                        dnsmasq = Popen(["dnsmasq", "--port=5354", "--interface=%s" %interface,
+                                         "--server=%s" %self.config["alt_dns1"],
+                                         "--server=%s" %self.config["alt_dns2"]
+                                         ])
+                        
+                        self.logger.debug(dnsmasq.pid +2)
+                        self.dnsmasq_pid = (dnsmasq.pid +2, "dnsmasq")
+
+                    except CalledProcessError:
+                        logging.error("Failed to start dnsmasq for cgroup qomui_bypass")
+                        
+                elif self.config["bypass"] == 0:
+                    
+                    try:
+                        bypass.delete_cgroup(self.default_interface_4, self.default_interface_6)
                     except AttributeError:
                         pass
+                    
             except KeyError:
-                self.logger.warning('Could not read all values from  file')
+                self.logger.warning('Config file corrupted - bypass option does not exist')
     
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='a{ss}')
     def default_gateway_check(self):
@@ -371,13 +396,28 @@ class QomuiDbus(dbus.service.Object):
             route_cmd = ["ip", "route", "show", "default", "0.0.0.0/0"]
             default_route = check_output(route_cmd).decode("utf-8")
             parse_route = default_route.split(" ")
-            self.default_interface = parse_route[4]
-            default_gateway = parse_route[2]
-            default_interface = parse_route[4]
-            return {"gateway" : default_gateway, "interface" : default_interface}
+            default_gateway_4 = parse_route[2]
+            default_interface_4 = parse_route[4]
+            
         except (CalledProcessError, IndexError):
             self.logger.info('Could not identify default gateway - no network connectivity')
-            return {"gateway" : "None", "interface" : "None"}
+            default_gateway_4 = "None"
+            default_interface_4 = "None"
+        
+        try:
+            route_cmd = ["ip", "-6", "route", "show", "default", "::/0"]
+            default_route = check_output(route_cmd).decode("utf-8")
+            parse_route = default_route.split(" ")
+            default_gateway_6 = parse_route[2]
+            default_interface_6 = parse_route[4]
+            
+        except (CalledProcessError, IndexError):
+            self.logger.info('Could not identify default gateway for ipv6 - no network connectivity')
+            default_gateway_6 = "None"
+            default_interface_6 = "None"
+        
+        return {"gateway" : default_gateway_4, "gateway_6" : default_gateway_6, 
+                "interface" : default_interface_4, "interface_6" : default_interface_6}
         
     @dbus.service.signal(BUS_NAME, signature='s')
     def reply(self, msg):
@@ -475,8 +515,8 @@ class QomuiDbus(dbus.service.Object):
                     
         else:
             shutil.copyfile("%s/%s" %(ROOTDIR, self.ovpn_dict["path"]), path)
-        os.umask(oldmask)
             
+        os.umask(oldmask)
         Popen(['chmod', '0600', path])
             
         self.wg(path)
@@ -655,8 +695,8 @@ class QomuiDbus(dbus.service.Object):
         name = self.ovpn_dict["name"]
         self.logger.info("Establishing connection to %s" %name)
         
-        wg_rules = [["-I", "INPUT", "1", "-i", "wg_qomui", "-j", "ACCEPT"],
-                    ["-I", "OUTPUT", "1", "-o", "wg_qomui", "-j", "ACCEPT"]
+        wg_rules = [["-I", "INPUT", "2", "-i", "wg_qomui", "-j", "ACCEPT"],
+                    ["-I", "OUTPUT", "2", "-o", "wg_qomui", "-j", "ACCEPT"]
                     ]
                     
         for rule in wg_rules:
@@ -671,6 +711,23 @@ class QomuiDbus(dbus.service.Object):
             for line in cmd_wg.stdout:
                 logging.info(line)
             self.wg_connect = 1
+            
+            #Necessary, otherwise bypass mode breaks
+            if self.config["bypass"] == 1:
+                
+                try:
+                    check_call(["ip", "rule", "del", "fwmark", "11", "table", "bypass_qomui"])
+                    check_call(["ip", "-6", "rule", "del", "fwmark", "11", "table", "bypass_qomui"])
+                except CalledProcessError:
+                    pass
+                
+                try:    
+                    check_call(["ip", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
+                    check_call(["ip", "-6", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
+                    self.logger.debug("Packet classification for bypass table reset")
+                except CalledProcessError:
+                    self.logger.warning("Could not reset packet classification for bypass table")
+            
             self.reply("success")
         
         except (CalledProcessError, FileNotFoundError):
