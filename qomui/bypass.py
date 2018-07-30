@@ -62,7 +62,7 @@ def create_cgroup(user, group, default_interface, default_gateway, default_inter
         cgroup_iptables.pop(2)
         cgroup_iptables.insert(2, ["-I", "OUTPUT", "1", "-m", "cgroup", "--cgroup", "0x00110011", "-j", "DROP"])
         cgroup_iptables.pop(3)
-        cgroup_iptables.insert(3, ["-I", "OUTPUT", "1", "-m", "cgroup", "--cgroup", "0x00110011", "-j", "DROP"])
+        cgroup_iptables.insert(3, ["-I", "INPUT", "1", "-m", "cgroup", "--cgroup", "0x00110011", "-j", "DROP"])
         
         for rule in cgroup_iptables:
             firewall.add_rule_6(rule)
