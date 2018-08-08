@@ -15,7 +15,7 @@ class LatencyCheck(QtCore.QThread):
         QtCore.QThread.__init__(self)
         self.server_dict = server_dict
         self.interface = interface
-            
+
     def run(self):
         try:
             for k,v in self.server_dict.items():
@@ -26,7 +26,7 @@ class LatencyCheck(QtCore.QThread):
                         ip = v["ip1"]
                     except KeyError:
                         ip = v["prim_ip"]
-                
+
                 try:
                     pinger = check_output(["ping", "-c", "1", "-W", "1", "-I", "%s" %self.interface, "%s" %ip]).decode("utf-8")
                     latencysearch = re.search(r'rtt min/avg/max/mdev = \d+(?:\.\d+)?/\d+(?:\.\d+)?/\d+(?:\.\d+)?/\d+(?:\.\d+)?', pinger)
@@ -37,17 +37,16 @@ class LatencyCheck(QtCore.QThread):
                         latency = "999"
                 except CalledProcessError:
                     latency = "999"
-                
+
                 latency_float = float(latency)
                 if latency != "999":
                     latency_string = "{0:.1f} ms".format(latency_float)
                 else:
                     latency_string = "N.A."
-                
+
                 self.lat_signal.emit((k, latency_string, latency_float))
-                
+
         except RuntimeError:
             logging.debug("RuntimeError: Latency check is already running")
-            
+
         self.finished.emit()
-                
