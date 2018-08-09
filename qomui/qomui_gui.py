@@ -151,9 +151,9 @@ class QomuiGui(QtWidgets.QWidget):
                                                            )
                 except CalledProcessError:
                     QtWidgets.QMessageBox.critical(self,
-                                            "Error",
-                                            "Failed to start Qomui service",
-                                            QtWidgets.QMessageBox.Ok)
+                                                    "Error",
+                                                    "Failed to start Qomui service",
+                                                    QtWidgets.QMessageBox.Ok)
                     sys.exit(1)
 
             elif ret == 1:
