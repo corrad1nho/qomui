@@ -1946,7 +1946,7 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             check_call([temp_bash])
         except CalledProcessError:
-            logger.warning("Could not start %s" %app)
+            self.logger.warning("Could not start %s" %app)
 
     def modify_server(self):
         if self.serverListWidget.isVisible() is False:
