@@ -13,7 +13,7 @@ ROOTDIR = "/usr/share/qomui/"
 
 def create_cgroup(user, group, default_interface, default_gateway, default_interface_6, default_gateway_6):
 
-    cleanup = delete_cgroup(default_interface, default_interface_6)
+    delete_cgroup(default_interface, default_interface_6)
 
     cgroup_iptables = [["-t", "mangle", "-A", "OUTPUT", "-m", "cgroup", 
                        "--cgroup", "0x00110011", "-j", "MARK", "--set-mark", "11"],
