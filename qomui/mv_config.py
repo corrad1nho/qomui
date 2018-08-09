@@ -40,10 +40,3 @@ if __name__ == "__main__":
         print("Updateconf can only be run as root")
         sys.exit(1)
     copy(sys.argv[1:])
-
-
-    
-
-
-
-    

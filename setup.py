@@ -37,10 +37,10 @@ def post_install(i):
                     os.chmod(fmod, 0o774)
                 else:
                     os.chmod(fmod, 0o664)
-    
+
     except (FileNotFoundError, PermissionError) as e:
         pass
-    
+
 
 class CustomInstall(install):
     def run(self):
@@ -81,7 +81,3 @@ setup(name="qomui",
             ]},
       cmdclass={'install': CustomInstall}
       )
-
-    
-    
-    
