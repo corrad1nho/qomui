@@ -150,10 +150,10 @@ class QomuiGui(QtWidgets.QWidget):
                                                            '/org/qomui/service'
                                                            )
                 except CalledProcessError:
-                    errorMsg = QtWidgets.QMessageBox.critical(self,
-                                                "Error",
-                                                "Failed to start Qomui service",
-                                                QtWidgets.QMessageBox.Ok)
+                    QtWidgets.QMessageBox.critical(self,
+                                            "Error",
+                                            "Failed to start Qomui service",
+                                            QtWidgets.QMessageBox.Ok)
                     sys.exit(1)
 
             elif ret == 1:
@@ -161,10 +161,10 @@ class QomuiGui(QtWidgets.QWidget):
                     check_call(["pkexec", "systemctl", "start", "qomui.service"])
                     self.qomui_dbus = self.dbus.get_object('org.qomui.service', '/org/qomui/service')
                 except CalledProcessError:
-                    errorMsg = QtWidgets.QMessageBox.critical(self,
-                                                "Error",
-                                                "Failed to start Qomui service",
-                                                QtWidgets.QMessageBox.Ok)
+                    QtWidgets.QMessageBox.critical(self,
+                                                    "Error",
+                                                    "Failed to start Qomui service",
+                                                    QtWidgets.QMessageBox.Ok)
                     sys.exit(1)
 
             elif ret == 2:
