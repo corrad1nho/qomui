@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from PyQt5 import QtCore
-import requests
-import os
-from bs4 import BeautifulSoup
 import json
-import time
 import zipfile
 import gzip
 import tarfile
-from subprocess import Popen, PIPE, check_output, CalledProcessError, check_call, run
+import requests
+import os
 import re
-import sys
 import io
 import logging
 import shutil
 import pycountry
 import uuid
+from PyQt5 import QtCore
+from bs4 import BeautifulSoup
+from subprocess import PIPE, check_output, CalledProcessError, run
 
 
 try:
@@ -86,7 +84,7 @@ class AirVPNDownload(QtCore.QThread):
                             }
 
                 url = "https://airvpn.org/index.php?app=core&module=global&section=login&do=process"
-                post = self.session.post(url, data=payload)
+                self.session.post(url, data=payload)
                 cook = self.session.cookies.get_dict()
 
                 if "coppa" in cook:
@@ -461,7 +459,6 @@ class WsDownload(QtCore.QThread):
         self.ws_protocol_dict = {}
 
     def run(self):
-        init_url = "https://res.windscribe.com/res/init"
         login_url = "https://windscribe.com/login"
 
         try:
@@ -569,18 +566,17 @@ class ProtonDownload(QtCore.QThread):
                    'Accept': 'application/vnd.protonmail.v1+json'
                   } 
 
+        
         try:
             with requests.Session() as self.session:
                 self.session.headers.update(headers)
                 path = "%s/temp" %DIRECTORY
                 api_url = "https://api.protonmail.ch/vpn/logicals"
                 get_servers = json.loads(self.session.get(api_url).content.decode("utf-8"))
-
-                with open ("%s/s.json" %path, "w") as s:
-                    json.dump(get_servers, s)
-
+                
                 for s in get_servers["LogicalServers"]:
                     name = s["Domain"]
+                    server_id = s["ID"]
                     cc = s["ExitCountry"]
                     if cc == "UK":
                         cc = "GB"
@@ -588,37 +584,37 @@ class ProtonDownload(QtCore.QThread):
                     city = s["City"]
                     if city is None:
                         city = ""
-
+                        
                     ip = s["Servers"][0]["EntryIP"]
                     self.proton_server_dict[name] = {"name" : name, "country" : country, "city": city, "ip" : ip, "provider" : "ProtonVPN", "tunnel": "OpenVPN"}
 
-
-                cert_url = "https://account.protonvpn.com/api/vpn/config?ID=34&Platform=Linux"
+                    
+                cert_url = "https://api.protonmail.ch/vpn/config?Platform=Linux&LogicalID=%s&Protocol=udp" %server_id
                 ovpn = requests.get(cert_url).content.decode("utf-8")
-
+                
                 ca_cert = BeautifulSoup(ovpn, "lxml").find("ca")
                 with open("%s/proton_ca.crt" %path, "w") as ca:
                     ca.write(str(ca_cert))
-
+                
                 ta_key = "<tls-auth>\n%s" %ovpn.split("<tls-auth>")[1]
                 with open("%s/proton_ta.key" %path, "w") as ta:
                     ta.write(str(ta_key))
-
+                    
                 with open("%s/proton_userpass.txt" %path, "w") as up:
                     up.write('%s\n%s' % (self.username, self.password))
-
+                    
                 self.proton_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"},
                                                 "protocol_2" : {"protocol": "TCP", "port": "443"}
                                                 }
-
+                
                 proton_dict = {"server" : self.proton_server_dict, 
                                 "protocol" : self.proton_protocol_dict, 
                                 "provider" : "ProtonVPN", 
                                 "path" : path
                                 }
-
+                    
                 self.down_finished.emit(proton_dict)
-
+            
         except requests.exceptions.RequestException as e:
             self.importFail.emit("Network error: no internet connection")
 
