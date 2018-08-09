@@ -136,8 +136,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.logger.debug('Successfully connected to DBUS system service')
         except dbus.exceptions.DBusException:
             self.logger.error('DBus Error: Qomui-Service is currently not available')
-            info = "Error: Qomui-service is not active"
-            question = "Do you want to start it, enable it permanently or close Qomui?"
+
             ret = self.messageBox("Error: Qomui-service is not active",
                                   "Do you want to start it, enable it permanently or close Qomui?",
                                   buttons = ["Enable", "Start", "Close"],
