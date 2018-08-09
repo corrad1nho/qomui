@@ -49,7 +49,7 @@ def add_rule_6(rule):
         elif check[2] == "-A":
             check[2] = "-C"
         apply_rule = check_call(ip6_cmd + check, stdout=devnull, stderr=devnull)
-        logging.debug("ipt6ables: %s already exists" %rule)
+        logging.debug("ip6tables: %s already exists" %rule)
         a = 0
     except (IndexError, CalledProcessError):
         pass
