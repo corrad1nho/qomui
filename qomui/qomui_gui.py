@@ -1122,7 +1122,7 @@ class QomuiGui(QtWidgets.QWidget):
             update_cmd.append('-f')
 
         try:
-            update = check_call(update_cmd)
+            check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
             self.qomui_service.load_firewall()
             self.qomui_service.bypass(utils.get_user_group())
@@ -1247,7 +1247,7 @@ class QomuiGui(QtWidgets.QWidget):
         else:
             provider = self.addProviderEdit.text()
             if provider == "":
-                errorMsg = QtWidgets.QMessageBox.critical(self,
+                QtWidgets.QMessageBox.critical(self,
                                                 "Error",
                                                 "Please enter a provider name",
                                                 QtWidgets.QMessageBox.Ok)
@@ -1291,10 +1291,10 @@ class QomuiGui(QtWidgets.QWidget):
             header = "Import failed"
             msg = info
 
-        fail_msg = QtWidgets.QMessageBox.information(self,
-                                                header,
-                                                msg,
-                                                QtWidgets.QMessageBox.Ok)
+        QtWidgets.QMessageBox.information(self,
+                                            header,
+                                            msg,
+                                            QtWidgets.QMessageBox.Ok)
 
         try:
             shutil.rmtree("%s/temp/" % (HOMEDIR))
@@ -1339,7 +1339,7 @@ class QomuiGui(QtWidgets.QWidget):
         if provider not in self.provider_list:
             self.provider_list.append(provider)
         self.copy_rootdir(provider, content["path"])
-        find_favourites = []
+
         for k, v in content["server"].items():
             try:
                 if self.server_dict[k]["favourite"] == "on":
