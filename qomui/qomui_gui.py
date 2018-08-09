@@ -136,8 +136,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.logger.debug('Successfully connected to DBUS system service')
         except dbus.exceptions.DBusException:
             self.logger.error('DBus Error: Qomui-Service is currently not available')
-            info = "Error: Qomui-service is not active"
-            question = "Do you want to start it, enable it permanently or close Qomui?"
+
             ret = self.messageBox("Error: Qomui-service is not active",
                                   "Do you want to start it, enable it permanently or close Qomui?",
                                   buttons = ["Enable", "Start", "Close"],
@@ -151,10 +150,10 @@ class QomuiGui(QtWidgets.QWidget):
                                                            '/org/qomui/service'
                                                            )
                 except CalledProcessError:
-                    errorMsg = QtWidgets.QMessageBox.critical(self,
-                                                "Error",
-                                                "Failed to start Qomui service",
-                                                QtWidgets.QMessageBox.Ok)
+                    QtWidgets.QMessageBox.critical(self,
+                                                    "Error",
+                                                    "Failed to start Qomui service",
+                                                    QtWidgets.QMessageBox.Ok)
                     sys.exit(1)
 
             elif ret == 1:
@@ -162,10 +161,10 @@ class QomuiGui(QtWidgets.QWidget):
                     check_call(["pkexec", "systemctl", "start", "qomui.service"])
                     self.qomui_dbus = self.dbus.get_object('org.qomui.service', '/org/qomui/service')
                 except CalledProcessError:
-                    errorMsg = QtWidgets.QMessageBox.critical(self,
-                                                "Error",
-                                                "Failed to start Qomui service",
-                                                QtWidgets.QMessageBox.Ok)
+                    QtWidgets.QMessageBox.critical(self,
+                                                    "Error",
+                                                    "Failed to start Qomui service",
+                                                    QtWidgets.QMessageBox.Ok)
                     sys.exit(1)
 
             elif ret == 2:
@@ -1123,7 +1122,7 @@ class QomuiGui(QtWidgets.QWidget):
             update_cmd.append('-f')
 
         try:
-            update = check_call(update_cmd)
+            check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
             self.qomui_service.load_firewall()
             self.qomui_service.bypass(utils.get_user_group())
@@ -1248,7 +1247,7 @@ class QomuiGui(QtWidgets.QWidget):
         else:
             provider = self.addProviderEdit.text()
             if provider == "":
-                errorMsg = QtWidgets.QMessageBox.critical(self,
+                QtWidgets.QMessageBox.critical(self,
                                                 "Error",
                                                 "Please enter a provider name",
                                                 QtWidgets.QMessageBox.Ok)
@@ -1292,10 +1291,10 @@ class QomuiGui(QtWidgets.QWidget):
             header = "Import failed"
             msg = info
 
-        fail_msg = QtWidgets.QMessageBox.information(self,
-                                                header,
-                                                msg,
-                                                QtWidgets.QMessageBox.Ok)
+        QtWidgets.QMessageBox.information(self,
+                                            header,
+                                            msg,
+                                            QtWidgets.QMessageBox.Ok)
 
         try:
             shutil.rmtree("%s/temp/" % (HOMEDIR))
@@ -1340,7 +1339,7 @@ class QomuiGui(QtWidgets.QWidget):
         if provider not in self.provider_list:
             self.provider_list.append(provider)
         self.copy_rootdir(provider, content["path"])
-        find_favourites = []
+
         for k, v in content["server"].items():
             try:
                 if self.server_dict[k]["favourite"] == "on":
@@ -1947,7 +1946,7 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             check_call([temp_bash])
         except CalledProcessError:
-            logger.warning("Could not start %s" %app)
+            self.logger.warning("Could not start %s" %app)
 
     def modify_server(self):
         if self.serverListWidget.isVisible() is False:
