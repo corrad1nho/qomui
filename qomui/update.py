@@ -24,8 +24,12 @@ except AttributeError:
     def _fromUtf8(s):
         return s
 
+if __debug__:
+    ROOTDIR = "%s/resources" %(os.getcwd())
+else:
+    ROOTDIR = "/usr/share/qomui"
+
 DIRECTORY = "%s/.qomui" % (os.path.expanduser("~"))
-ROOTDIR = "/usr/share/qomui"
 supported_providers = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe", "Manually add config files"]
 
 def country_translate(cc):
