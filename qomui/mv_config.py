@@ -7,10 +7,7 @@ import shutil
 import getopt
 from subprocess import Popen
 
-if __debug__:
-    ROOTDIR = "%s/resources" %(os.getcwd())
-else:
-    ROOTDIR = "/usr/share/qomui"
+ROOTDIR = "/usr/share/qomui"
 
 def copy(argv):
     try:

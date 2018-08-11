@@ -16,11 +16,7 @@ import getpass
 import signal
 from qomui import utils, update
 
-if __debug__:
-    ROOTDIR = "%s/resources" %(os.getcwd())
-else:
-    ROOTDIR = "/usr/share/qomui"
-
+ROOTDIR = "/usr/share/qomui"
 HOMEDIR = "%s/.qomui" % (os.path.expanduser("~"))
 SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 app = QtCore.QCoreApplication(sys.argv)

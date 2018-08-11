@@ -1,1 +1,1 @@
-{"alt_dns1": "208.67.222.222", "alt_dns2": "208.67.220.220", "firewall": 0, "autoconnect": 0, "ipv6_disable": 0, "minimize": 0, "alt_dns": 0, "bypass": 0, "ping": 0, "simpletray": 0}
+{"alt_dns1": "208.67.222.222", "alt_dns2": "208.67.220.220", "firewall": 0, "autoconnect": 0, "minimize": 0, "ipv6_disable": 0, "alt_dns": 0, "bypass": 0, "ping": 0, "simpletray": 0, "block_lan": 0, "preserve_rules": 0, "fw_gui_only": 0}

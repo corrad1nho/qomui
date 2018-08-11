@@ -6,7 +6,6 @@ from subprocess import CalledProcessError, check_output
 import re
 import logging
 
-
 class LatencyCheck(QtCore.QThread):
     lat_signal = QtCore.pyqtSignal(tuple)
     finished = QtCore.pyqtSignal()

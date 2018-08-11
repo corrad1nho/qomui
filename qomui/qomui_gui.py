@@ -51,11 +51,9 @@ class DbusLogHandler(logging.Handler):
         except (dbus.exceptions.DBusException, TypeError):
             pass
 
-if __debug__:
-    ROOTDIR = "%s/resources" %(os.getcwd())
-else:
-    ROOTDIR = "/usr/share/qomui"
 
+    
+ROOTDIR = "/usr/share/qomui"
 HOMEDIR = "%s/.qomui" % (os.path.expanduser("~"))
 SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 JSON_FILE_LIST = [("config_dict", "%s/config.json" %ROOTDIR),
@@ -711,7 +709,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.optionsTabBt.clicked.connect(self.tab_switch)
         self.logTabBt.clicked.connect(self.tab_switch)
         self.providerTabBt.clicked.connect(self.tab_switch)
-        self.applyOptBt.clicked.connect(self.applyoptions)
+        self.applyOptBt.clicked.connect(self.read_option_change)
         self.cancelOptBt.clicked.connect(self.cancelOptions)
         self.restoreDefaultOptBt.clicked.connect(self.restoreDefaults)
         self.firewallEditBt.clicked.connect(self.show_firewall_editor)
@@ -993,6 +991,7 @@ class QomuiGui(QtWidgets.QWidget):
         elif ret == 1:
             self.tray.hide()
             self.kill()
+            self.qomui_service.load_firewall(2)
             self.exit_event.accept()
 
     def change_timeout(self):
@@ -1070,6 +1069,12 @@ class QomuiGui(QtWidgets.QWidget):
             pass
 
         try:
+            if self.config_dict["firewall"] == 1 and self.config_dict["fw_gui_only"] == 1:
+                self.qomui_service.load_firewall(1)
+        except KeyError:
+            pass
+
+        try:
             if self.config_dict["bypass"] == 1:
                 self.qomui_service.bypass(utils.get_user_group())
                 self.bypassTabBt.setVisible(True) 
@@ -1104,7 +1109,7 @@ class QomuiGui(QtWidgets.QWidget):
     def cancelOptions(self):
         self.setOptiontab(self.config_dict)
 
-    def applyoptions(self):
+    def read_option_change(self):
         temp_config_dict = {}
         temp_config_dict["alt_dns1"] = self.altDnsEdit1.text().replace("\n", "")
         temp_config_dict["alt_dns2"] = self.altDnsEdit2.text().replace("\n", "")
@@ -1114,35 +1119,38 @@ class QomuiGui(QtWidgets.QWidget):
                 temp_config_dict[option] = 1
             elif getattr(self, "%sOptCheck" %option).checkState() == 0:
                 temp_config_dict[option] = 0
+        
+        self.save_options(temp_config_dict)
 
+    def save_options(self, temp_config, firewall=None):
         with open ('%s/config_temp.json' % (HOMEDIR), 'w') as config:
-            json.dump(temp_config_dict, config)
+            json.dump(temp_config, config)
 
         update_cmd = ['pkexec', sys.executable, '-m', 'qomui.mv_config',
                       '-d', '%s' %(HOMEDIR)]
 
-        if self.firewall_rules_changed is True:
+        if firewall is not None:
             update_cmd.append('-f')
 
         try:
             check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
-            self.qomui_service.load_firewall()
+            self.qomui_service.load_firewall(1)
             self.qomui_service.bypass(utils.get_user_group())
             QtWidgets.QMessageBox.information(self,
                                             "Updated",
                                             "Configuration updated successfully",
                                             QtWidgets.QMessageBox.Ok)
 
-            if temp_config_dict["ping"] == 1:
+            if temp_config["ping"] == 1:
                 self.get_latencies()
 
-            if temp_config_dict["bypass"] == 1:
+            if temp_config["bypass"] == 1:
                 self.bypassTabBt.setVisible(True)
             else:
                 self.bypassTabBt.setVisible(False)
 
-            self.config_dict = temp_config_dict
+            self.config_dict = temp_config
 
         except CalledProcessError as e:
             self.logger.info("Non-zero exit status: configuration changes not applied")
@@ -1882,12 +1890,13 @@ class QomuiGui(QtWidgets.QWidget):
             self.logger.info("Dbus-service not available")
 
     def show_firewall_editor(self):
-        editor = FirewallEditor()
-        editor.rule_change.connect(self.firewall_update)
+        editor = FirewallEditor(self.config_dict)
+        editor.fw_change.connect(self.firewall_update)
         editor.exec_()
 
-    def firewall_update(self):
-        self.firewall_rules_changed = True  
+    def firewall_update(self, config):
+        print(config)
+        self.save_options(config, firewall="change")
 
     def select_application(self):
         selector = AppSelector()
@@ -2480,9 +2489,14 @@ class NetMon(QtCore.QThread):
             return ("%s %s" % (split[0], split[1]))
 
 class FirewallEditor(QtWidgets.QDialog):
-    rule_change = QtCore.pyqtSignal()
+    fw_change = QtCore.pyqtSignal(dict)
+    options = [
+            "block_lan",
+            "preserve_rules",
+            "fw_gui_only"
+            ]
 
-    def __init__ (self, parent=None):
+    def __init__ (self, config, parent=None):
         super(FirewallEditor, self).__init__(parent)
         try:
             with open('%s/firewall.json' %ROOTDIR, 'r') as fload:
@@ -2491,6 +2505,7 @@ class FirewallEditor(QtWidgets.QDialog):
             with open('%s/firewall_default.json' %ROOTDIR, 'r') as fload:
                 self.firewall_dict = json.load(fload)
 
+        self.config_dict = config
         self.setupUi(self)
         self.display_rules()
 
@@ -2507,6 +2522,15 @@ class FirewallEditor(QtWidgets.QDialog):
         self.headerLabel.setFont(bold_font)
         self.headerLabel.setObjectName(_fromUtf8("headerLabel"))
         self.verticalLayout.addWidget(self.headerLabel)
+        self.block_lan_check = QtWidgets.QCheckBox()
+        self.block_lan_check.setObjectName(_fromUtf8("headerLabel"))
+        self.verticalLayout.addWidget(self.block_lan_check)
+        self.fw_gui_only_check = QtWidgets.QCheckBox()
+        self.fw_gui_only_check.setObjectName(_fromUtf8("headerLabel"))
+        self.verticalLayout.addWidget(self.fw_gui_only_check)
+        self.preserve_rules_check = QtWidgets.QCheckBox()
+        self.preserve_rules_check.setObjectName(_fromUtf8("headerLabel"))
+        self.verticalLayout.addWidget(self.preserve_rules_check)
         self.warnLabel = QtWidgets.QLabel(Form)
         self.warnLabel.setObjectName(_fromUtf8("warnLabel"))
         self.verticalLayout.addWidget(self.warnLabel)
@@ -2553,6 +2577,7 @@ class FirewallEditor(QtWidgets.QDialog):
         self.horizontalLayout.addWidget(self.cancelButton)
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.retranslateUi(Form)
+        self.set_options()
         QtCore.QMetaObject.connectSlotsByName(Form)
         self.cancelButton.clicked.connect(self.cancel)
         self.saveButton.clicked.connect(self.save_rules)
@@ -2562,6 +2587,9 @@ class FirewallEditor(QtWidgets.QDialog):
         Form.setWindowTitle(_translate("Form", "Edit firewall", None))
         self.headerLabel.setText(_translate("Form", "Edit firewall rules", None))
         self.warnLabel.setText(_translate("Form", "Warning: Only for advanced users ", None))
+        self.block_lan_check.setText(_translate("Form", "Block lan/private networks", None))
+        self.fw_gui_only_check.setText(_translate("Form", "Activate firewall only when gui is running", None))
+        self.preserve_rules_check.setText(_translate("Form", "Preserve pre-existing firewall rules", None))
         self.ipv4Label.setText(_translate("Form", "IPv4 rules", None))
         self.ipv6Label.setText(_translate("Form", "IPv6 rules", None))
         self.saveButton.setText(_translate("Form", "Save", None))
@@ -2570,6 +2598,16 @@ class FirewallEditor(QtWidgets.QDialog):
         self.cancelButton.setIcon(QtGui.QIcon.fromTheme("dialog-no"))
         self.restoreButton.setText(_translate("Form", "Restore defaults", None))
         self.restoreButton.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
+
+    def set_options(self):
+        for option in self.options:
+            try:
+                if self.config_dict[option] == 1:
+                    getattr(self, "%s_check" %option).setCheckState(2)
+                else:
+                    getattr(self, "%s_check" %option).setCheckState(0)
+            except KeyError:
+                getattr(self, "%s_check" %option).setCheckState(0)
 
     def display_rules(self):
         for rule in self.firewall_dict["ipv4rules"]:
@@ -2583,7 +2621,7 @@ class FirewallEditor(QtWidgets.QDialog):
         with open('%s/firewall_default.json' %ROOTDIR, 'r') as fload:
             self.firewall_dict = json.load(fload)
         self.display_rules()
-
+    
     def save_rules(self):
         new_ipv4_rules = []
         new_ipv6_rules = []
@@ -2599,8 +2637,14 @@ class FirewallEditor(QtWidgets.QDialog):
         with open ("%s/firewall_temp.json" % HOMEDIR, "w") as firedump:
                 json.dump(self.firewall_dict, firedump)
 
-        self.rule_change.emit()
+        for option in self.options:
+            if getattr(self, "%s_check" %option).checkState() == 2:
+                self.config_dict[option] = 1
+            else:
+                self.config_dict[option] = 0
+
         self.hide()
+        self.fw_change.emit(self.config_dict)
 
     def cancel(self):
         self.hide()

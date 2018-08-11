@@ -24,11 +24,7 @@ except AttributeError:
     def _fromUtf8(s):
         return s
 
-if __debug__:
-    ROOTDIR = "%s/resources" %(os.getcwd())
-else:
-    ROOTDIR = "/usr/share/qomui"
-
+ROOTDIR = "/usr/share/qomui"
 DIRECTORY = "%s/.qomui" % (os.path.expanduser("~"))
 supported_providers = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe", "Manually add config files"]
 
@@ -110,13 +106,15 @@ class AirVPNDownload(QtCore.QThread):
                 number = protocols[0].find('input').get('id')
                 mode = protocols[1].string
                 port = protocols[2].string
-                self.Airvpn_protocol_dict[number] = {"protocol" : mode,
+                self.Airvpn_protocol_dict[number] = {
+                                                    "protocol" : mode,
                                                      "port" : port,
                                                      "ip" : "ip%s" %protocols[3].string,
                                                      "ipv6" : "ipv4"
                                                      }
 
-                self.Airvpn_protocol_dict["%s-v6" %number] = {"protocol" : mode,
+                self.Airvpn_protocol_dict["%s-v6" %number] = {
+                                                            "protocol" : mode,
                                                             "port" : port,
                                                             "ip" : "ip%s" %protocols[3].string,
                                                             "ipv6" : "ipv6",
@@ -130,11 +128,13 @@ class AirVPNDownload(QtCore.QThread):
             name = item.find("a").get('href').split("/")[2]
             city = item.find("span", {"style":"font-size:0.7em;"}).text
             country = item.find("img").get("alt")
-            self.Airvpn_server_dict[name] = {"name" : name,
+            self.Airvpn_server_dict[name] = {
+                                            "name" : name,
                                              "provider": "Airvpn",
                                              "city": city,
                                              "country" : country,
-                                             "tunnel" : "OpenVPN"}
+                                             "tunnel" : "OpenVPN"
+                                             }
 
         self.Download()
 
@@ -229,7 +229,8 @@ class AirVPNDownload(QtCore.QThread):
                                 self.Airvpn_server_dict[server]["ip4_6"] = line.split(" ")[1]
 
 
-            Airvpn_dict = {"server" : self.Airvpn_server_dict,
+            Airvpn_dict = {
+                        "server" : self.Airvpn_server_dict,
                         "protocol" : self.Airvpn_protocol_dict,
                         "provider" : "Airvpn", 
                         "path" : filepath
@@ -278,7 +279,8 @@ class MullvadDownload(QtCore.QThread):
                         city = info[2].string
                         ip = info[3].string
                         country = self.cc_translate(country_raw)
-                        self.Mullvad_server_dict[server] = {"name" : server,
+                        self.Mullvad_server_dict[server] = {
+                                                            "name" : server,
                                                             "provider" : "Mullvad",
                                                             "city" : city,
                                                             "country" : country,
@@ -286,7 +288,8 @@ class MullvadDownload(QtCore.QThread):
                                                             "tunnel" : "OpenVPN"
                                                             }
 
-                self.Mullvad_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"}, 
+                self.Mullvad_protocol_dict = {
+                                            "protocol_1" : {"protocol": "UDP", "port": "1194"}, 
                                             "protocol_2" : {"protocol": "UDP", "port": "53"},
                                             "protocol_3" : {"protocol": "TCP", "port": "80"},
                                             "protocol_4" : {"protocol": "TCP", "port": "443"}
@@ -308,14 +311,16 @@ class MullvadDownload(QtCore.QThread):
                                     ip = relay["ipv4_addr_in"]
                                     public_key = relay["public_key"]
                                     port = "51820"
-                                    self.Mullvad_server_dict[server] = {"name" : server,
-                                                                "provider" : "Mullvad",
-                                                                "city" : city,
-                                                                "country" : country,
-                                                                "ip" : ip,
-                                                                "port" : port,
-                                                                "public_key" : public_key,
-                                                                "tunnel" : "WireGuard"}
+                                    self.Mullvad_server_dict[server] = {
+                                                                        "name" : server,
+                                                                        "provider" : "Mullvad",
+                                                                        "city" : city,
+                                                                        "country" : country,
+                                                                        "ip" : ip,
+                                                                        "port" : port,
+                                                                        "public_key" : public_key,
+                                                                        "tunnel" : "WireGuard"
+                                                                        }
 
 
                     private_key = check_output(["wg", "genkey"]).decode("utf-8").split("\n")[0]
@@ -329,7 +334,8 @@ class MullvadDownload(QtCore.QThread):
                     if pub_up.status_code < 400:
                         wg_address = pub_up.content.decode("utf-8").split("\n")[0]
 
-                        wg_conf = ["[Interface]\n",
+                        wg_conf = [
+                                    "[Interface]\n",
                                     "DNS = 193.138.219.228\n",
                                     "\n",
                                     "[Peer]\n",
@@ -352,11 +358,12 @@ class MullvadDownload(QtCore.QThread):
 
 
                 if auth == 0:
-                    Mullvad_dict = {"server" : self.Mullvad_server_dict, 
-                                            "protocol" : self.Mullvad_protocol_dict, 
-                                            "provider" : "Mullvad", 
-                                            "path" : certpath
-                                            }
+                    Mullvad_dict = {
+                                    "server" : self.Mullvad_server_dict, 
+                                    "protocol" : self.Mullvad_protocol_dict, 
+                                    "provider" : "Mullvad", 
+                                    "path" : certpath
+                                    }
 
                     self.down_finished.emit(Mullvad_dict)
 
@@ -417,9 +424,14 @@ class PiaDownload(QtCore.QThread):
                 except AttributeError:
                     country = raw_name
 
-                self.pia_server_dict[name] = {"name" : name, "country" : country, 
-                                              "ip" : ip, "city" : "", "provider" : "PIA", "tunnel" : "OpenVPN"
-                                                  }
+                self.pia_server_dict[name] = {
+                                                "name" : name, 
+                                                "country" : country,
+                                                "ip" : ip, 
+                                                "city" : "", 
+                                                "provider" : "PIA", 
+                                                "tunnel" : "OpenVPN"
+                                                }
 
             with requests.Session() as self.session:
                 download_ip = self.session.get(url_strong)
@@ -430,10 +442,13 @@ class PiaDownload(QtCore.QThread):
             with open("%s/pia_userpass.txt" %(filepath), "w") as passfile:
                     passfile.write("%s\n%s" %(self.username, self.password))
 
-            self.pia_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1197"}, 
-                                        "protocol_2" : {"protocol": "TCP", "port": "502"}}
+            self.pia_protocol_dict = {
+                                    "protocol_1" : {"protocol": "UDP", "port": "1197"}, 
+                                    "protocol_2" : {"protocol": "TCP", "port": "502"}
+                                    }
 
-            pia_dict = {"server" : self.pia_server_dict, 
+            pia_dict = {
+                        "server" : self.pia_server_dict, 
                         "protocol" : self.pia_protocol_dict, 
                         "provider" : "PIA", 
                         "path" : filepath,
@@ -448,7 +463,8 @@ class PiaDownload(QtCore.QThread):
 class WsDownload(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(object)
     importFail = QtCore.pyqtSignal(str)
-    header = {"User-Agent" : "Mozilla/5.0 (X11; Linux x86_64; rv:61.0) Gecko/20100101 Firefox/61.0",
+    header = {
+            "User-Agent" : "Mozilla/5.0 (X11; Linux x86_64; rv:61.0) Gecko/20100101 Firefox/61.0",
             "Accept" : "*/*",
             "Accept-Language" : "en-US,en;q=0.5",
             "Accept-Encoding" : "gzip, deflate, br",
@@ -477,7 +493,8 @@ class WsDownload(QtCore.QThread):
                 self.session.headers.pop("Host", None)
                 self.session.headers.pop("Origin", None)
 
-                payload = {'login' : '1',
+                payload = {
+                            'login' : '1',
                             'upgrade' : '0',
                             'username' : self.username,
                             'password' : self.password,
@@ -521,13 +538,20 @@ class WsDownload(QtCore.QThread):
                     ip2 = n["ip3"]
                     name = n["hostname"].replace("staticnetcontent", "windscribe")
                     country = country_translate(countrycode)
-                    self.ws_server_dict[name] = {"name" : name, "country" : country, 
-                                        "ip" : ip, "ip2" : ip2, "city" : city, "provider" : "Windscribe", "tunnel" : "OpenVPN"
-                                            }
+                    self.ws_server_dict[name] = {
+                                                "name" : name, 
+                                                "country" : country, 
+                                                "ip" : ip, 
+                                                "ip2" : ip2, 
+                                                "city" : city, 
+                                                "provider" : "Windscribe", 
+                                                "tunnel" : "OpenVPN"
+                                                }
             except KeyError:
                 pass
 
-        self.ws_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "443"},
+        self.ws_protocol_dict = {
+                                    "protocol_1" : {"protocol": "UDP", "port": "443"},
                                     "protocol_2" : {"protocol": "UDP", "port": "80"},
                                     "protocol_3" : {"protocol": "UDP", "port": "53"},
                                     "protocol_4" : {"protocol": "UDP", "port": "1194"},
@@ -590,7 +614,14 @@ class ProtonDownload(QtCore.QThread):
                         city = ""
                         
                     ip = s["Servers"][0]["EntryIP"]
-                    self.proton_server_dict[name] = {"name" : name, "country" : country, "city": city, "ip" : ip, "provider" : "ProtonVPN", "tunnel": "OpenVPN"}
+                    self.proton_server_dict[name] = {
+                                                    "name" : name, 
+                                                    "country" : country, 
+                                                    "city": city, 
+                                                    "ip" : ip, 
+                                                    "provider" : "ProtonVPN", 
+                                                    "tunnel": "OpenVPN"
+                                                    }
 
                     
                 cert_url = "https://api.protonmail.ch/vpn/config?Platform=Linux&LogicalID=%s&Protocol=udp" %server_id
@@ -607,9 +638,10 @@ class ProtonDownload(QtCore.QThread):
                 with open("%s/proton_userpass.txt" %path, "w") as up:
                     up.write('%s\n%s' % (self.username, self.password))
                     
-                self.proton_protocol_dict = {"protocol_1" : {"protocol": "UDP", "port": "1194"},
-                                                "protocol_2" : {"protocol": "TCP", "port": "443"}
-                                                }
+                self.proton_protocol_dict = {
+                                            "protocol_1" : {"protocol": "UDP", "port": "1194"},
+                                            "protocol_2" : {"protocol": "TCP", "port": "443"}
+                                            }
                 
                 proton_dict = {"server" : self.proton_server_dict, 
                                 "protocol" : self.proton_protocol_dict, 
@@ -731,7 +763,8 @@ class AddFolder(QtCore.QThread):
                     country_check = check_output(["geoiplookup", "%s" %ip]).decode("utf-8")
                     cc = country_check.split(" ")[3].split(",")[0]
                     country = country_translate(cc)
-                    custom_server_dict[name] = {"name": name, 
+                    custom_server_dict[name] = {
+                                                "name": name, 
                                                 "provider" : self.provider, 
                                                 "city" : "",
                                                 "path" : "%s/%s" %(self.provider, f), 
@@ -749,7 +782,13 @@ class AddFolder(QtCore.QThread):
         with open("%s/%s-auth.txt" % (temp_path, self.provider) , "w") as passfile:
             passfile.write('%s\n%s' % (self.username, self.password))
 
-        custom_dict = {"server" : custom_server_dict, "provider" : self.provider, "path" : temp_path, "failed" : failed_list}
+        custom_dict = {
+                        "server" : custom_server_dict, 
+                        "provider" : self.provider, 
+                        "path" : temp_path, 
+                        "failed" : failed_list
+                        }
+
         self.down_finished.emit(custom_dict) 
 
     def sanity_check(self, path):

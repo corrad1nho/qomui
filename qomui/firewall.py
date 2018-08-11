@@ -5,11 +5,7 @@ import logging
 from subprocess import check_call, check_output, CalledProcessError
 from collections import Counter
 
-if __debug__:
-    ROOTDIR = "%s/resources" %(os.getcwd())
-else:
-    ROOTDIR = "/usr/share/qomui"
-
+ROOTDIR = "/usr/share/qomui"
 saved_rules = []
 saved_rules_6 = []
 ip_cmd = ["iptables", "--wait",]
@@ -70,7 +66,7 @@ def add_rule_6(rule):
         if "-D" not in rule:
             logging.warning("ip6tables: failed to apply %s" %rule)
 
-def apply_rules(opt):
+def apply_rules(opt, block_lan=0, preserve=0):
     firewall_rules = get_config()
     save_existing_rules(firewall_rules)
     save_existing_rules_6(firewall_rules)
@@ -84,15 +80,24 @@ def apply_rules(opt):
     logging.info("iptables: flushed existing rules")
 
     for rule in saved_rules:
-        add_rule(rule)
+        if preserve == 1:
+            add_rule(rule)
         
     for rule in saved_rules_6:
-        add_rule_6(rule)
+        if preserve == 1:
+            add_rule_6(rule)
         
     if opt == 1:
         for rule in firewall_rules["defaults"]:
             add_rule(rule)
-            
+
+        if block_lan == 0:
+            for rule in firewall_rules["ipv4local"]:
+                add_rule(rule)
+        
+            for rule in firewall_rules["ipv6local"]:
+                add_rule_6(rule)
+
         for rule in firewall_rules["defaultsv6"]:
             add_rule_6(rule)
         
@@ -120,7 +125,7 @@ def save_existing_rules(firewall_rules):
         rule = shlex.split(rpl)
         if len(rule) != 0:
             match = 0
-            omit = firewall_rules["ipv4rules"] + firewall_rules["flush"]
+            omit = firewall_rules["ipv4rules"] + firewall_rules["flush"] + firewall_rules["ipv4local"]
             for x in omit:
                 if Counter(x) == Counter(rule):
                     match = 1
@@ -135,7 +140,7 @@ def save_existing_rules_6(firewall_rules):
         rule = shlex.split(rpl)
         if len(rule) != 0:
             match = 0
-            omit = firewall_rules["ipv6rules"] + firewall_rules["flushv6"]
+            omit = firewall_rules["ipv6rules"] + firewall_rules["flushv6"] + firewall_rules["ipv6local"]
             for x in omit:
                 if Counter(x) == Counter(rule):
                     match = 1

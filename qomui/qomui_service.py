@@ -20,11 +20,7 @@ from dbus.mainloop.pyqt5 import DBusQtMainLoop
 
 from qomui import firewall, bypass 
 
-if __debug__:
-    ROOTDIR = "%s/resources" %(os.getcwd())
-else:
-    ROOTDIR = "/usr/share/qomui"
-
+ROOTDIR = "/usr/share/qomui"
 OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
 BUS_NAME = "org.qomui.service"
@@ -63,7 +59,7 @@ class QomuiDbus(dbus.service.Object):
         self.filehandler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.setLevel(logging.DEBUG)
         self.logger.debug("Dbus-service successfully initialized")
-        self.load_firewall()
+        self.load_firewall(0)
 
     @dbus.service.method(BUS_NAME)
     def restart(self):
@@ -100,8 +96,8 @@ class QomuiDbus(dbus.service.Object):
     def conn_info(self, msg):
         return msg
 
-    @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
-    def load_firewall(self):
+    @dbus.service.method(BUS_NAME, in_signature='i', out_signature='')
+    def load_firewall(self, activate):
         try:
             with open('%s/config.json' % (ROOTDIR), 'r') as c:
                 self.config = json.load(c)
@@ -110,8 +106,42 @@ class QomuiDbus(dbus.service.Object):
             self.logger.error('%s: Could not open config.json - loading default configuration' % e)
             with open('%s/default_config.json' % (ROOTDIR), 'r') as c:
                 self.config = json.load(c)
+        
+        try:
+            if self.config["fw_gui_only"] == 0:
+                activate = 1
+
+        except KeyError:
+            activate = 1
+
+        try:
+            if self.config["preserve_rules"] == 1:
+                preserve = 1
+            else:
+                preserve = 0
+        
+        except KeyError:
+            preserve = 0
+
+        try:
+            if self.config["block_lan"] == 1:
+                block_lan = 1
+            else:
+                block_lan = 0
+        
+        except KeyError:
+            block_lan = 0
+
         try: 
-            firewall.apply_rules(self.config["firewall"])
+            if activate == 1:
+                firewall.apply_rules(self.config["firewall"], block_lan=block_lan, preserve=preserve)
+            elif activate == 2:
+                if self.config["fw_gui_only"] == 1:
+                    firewall.apply_rules(0, block_lan=block_lan, preserve=1)
+                    try:
+                        bypass.delete_cgroup(self.default_interface_4, self.default_interface_6)
+                    except AttributeError:
+                        pass
             self.disable_ipv6(self.config["ipv6_disable"])
 
         except KeyError:
