@@ -20,10 +20,14 @@ from dbus.mainloop.pyqt5 import DBusQtMainLoop
 
 from qomui import firewall, bypass 
 
+if __debug__:
+    ROOTDIR = "%s/resources" %(os.getcwd())
+else:
+    ROOTDIR = "/usr/share/qomui"
+
 OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
 BUS_NAME = "org.qomui.service"
-ROOTDIR = "/usr/share/qomui"
 SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 
 class GuiLogHandler(logging.Handler):

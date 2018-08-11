@@ -5,7 +5,11 @@ import logging
 from subprocess import check_call, check_output, CalledProcessError
 from collections import Counter
 
-rootdir = "/usr/share/qomui"
+if __debug__:
+    ROOTDIR = "%s/resources" %(os.getcwd())
+else:
+    ROOTDIR = "/usr/share/qomui"
+
 saved_rules = []
 saved_rules_6 = []
 ip_cmd = ["iptables", "--wait",]
@@ -141,18 +145,13 @@ def save_existing_rules_6(firewall_rules):
             
 def get_config():
     try:
-        with open ("%s/firewall.json" %(rootdir), "r") as f:
+        with open ("%s/firewall.json" %(ROOTDIR), "r") as f:
                 return json.load(f)
     except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
         logging.debug("Loading default firewall configuration")
         try:
-            with open ("%s/firewall_default.json" %(rootdir), "r") as f:
+            with open ("%s/firewall_default.json" %(ROOTDIR), "r") as f:
                     return json.load(f)
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
                 logging.debug("Failed to load firewall configuration")
                 return None
-        
-        
-
-    
-

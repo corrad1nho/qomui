@@ -9,7 +9,6 @@ from qomui import firewall
 cgroup_path = "/sys/fs/cgroup/net_cls/bypass_qomui"
 cls_id = "0x00110011"
 default_interface = None
-ROOTDIR = "/usr/share/qomui/"
 
 def create_cgroup(user, group, default_interface, default_gateway, default_interface_6, default_gateway_6):
 

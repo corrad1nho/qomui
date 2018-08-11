@@ -51,9 +51,12 @@ class DbusLogHandler(logging.Handler):
         except (dbus.exceptions.DBusException, TypeError):
             pass
 
+if __debug__:
+    ROOTDIR = "%s/resources" %(os.getcwd())
+else:
+    ROOTDIR = "/usr/share/qomui"
 
 HOMEDIR = "%s/.qomui" % (os.path.expanduser("~"))
-ROOTDIR = "/usr/share/qomui"
 SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 JSON_FILE_LIST = [("config_dict", "%s/config.json" %ROOTDIR),
                   ("server_dict", "%s/server.json" %HOMEDIR), 
@@ -1050,7 +1053,7 @@ class QomuiGui(QtWidgets.QWidget):
                     pass
 
         except FileNotFoundError:
-            self.logger.warning("/usr/share/qomui/VERSION does not exist")
+            self.logger.warning("%s/VERSION does not exist" % ROOTDIR)
             self.versionInfo.setText("N.A.")
 
         for saved_file in JSON_FILE_LIST:
