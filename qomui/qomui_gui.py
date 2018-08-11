@@ -13,10 +13,9 @@ import random
 import logging
 from PyQt5 import QtCore, QtGui, Qt, QtWidgets
 from dbus.mainloop.pyqt5 import DBusQtMainLoop
-from subprocess import CalledProcessError, check_call, check_output, Popen
+from subprocess import CalledProcessError, check_call
 import psutil
 import shlex
-import glob
 import configparser
 import requests
 import bisect
@@ -757,7 +756,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.applyOptBt.setIcon(QtGui.QIcon.fromTheme("dialog-ok"))
         self.cancelOptBt.setText(_translate("Form", "Cancel", None))
         self.cancelOptBt.setIcon(QtGui.QIcon.fromTheme("dialog-no"))
-        self.firewallEditBt.setText(_translate("Form", "Edit firewall rules", None))
+        self.firewallEditBt.setText(_translate("Form", "Configure firewall", None))
         self.firewallEditBt.setIcon(QtGui.QIcon.fromTheme("edit"))
         self.addBypassAppBt.setText(_translate("Form", "Add Application", None))
         self.addBypassAppBt.setIcon(QtGui.QIcon.fromTheme("list-add"))
@@ -2585,7 +2584,7 @@ class FirewallEditor(QtWidgets.QDialog):
 
     def retranslateUi(self, Form):
         Form.setWindowTitle(_translate("Form", "Edit firewall", None))
-        self.headerLabel.setText(_translate("Form", "Edit firewall rules", None))
+        self.headerLabel.setText(_translate("Form", "Configure firewall", None))
         self.warnLabel.setText(_translate("Form", "Warning: Only for advanced users ", None))
         self.block_lan_check.setText(_translate("Form", "Block lan/private networks", None))
         self.fw_gui_only_check.setText(_translate("Form", "Activate firewall only when gui is running", None))

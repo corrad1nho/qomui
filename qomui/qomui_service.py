@@ -746,6 +746,19 @@ class QomuiDbus(dbus.service.Object):
                 logging.info(line)
             self.wg_connect = 1
 
+            with open("%s/wg_qomui.conf" %ROOTDIR, "r") as dns_check:
+                lines = dns_check.readlines()
+                for line in lines:
+                    if line.startswith("DNS ="):
+                        dns_servers = line.split("=")[1].replace(" ", "").split(",")
+                         self.dns = dns_servers[0]
+                        try:
+                            self.dns_2 = dns_servers[1]
+                        except IndexError:
+                            self.dns_2 = None
+
+            self.update_dns(dns1=self.dns, dns2=self.dns_2)
+
             #Necessary, otherwise bypass mode breaks
             if self.config["bypass"] == 1:
 
@@ -770,7 +783,6 @@ class QomuiDbus(dbus.service.Object):
 
 
     def ovpn(self, ovpn_file, h, cwd_ovpn):
-        self.dns_found = 0
         logging.info("Establishing new OpenVPN tunnel")
         name = self.ovpn_dict["name"]
         last_ip = self.ovpn_dict["ip"]
@@ -815,8 +827,6 @@ class QomuiDbus(dbus.service.Object):
                     self.connect_status = 1
                     self.reply("success")
                     self.logger.info("Successfully connected to %s" %name)
-                    if self.dns_found == 0:
-                        self.update_dns()
                 elif line.find('TUN/TAP device') != -1:
                     if h == "2":
                         self.tun = line_format.split(" ")[3]
@@ -829,14 +839,16 @@ class QomuiDbus(dbus.service.Object):
                     if dns_option_1 != -1:
                         option = line_format[dns_option_1:].split(",")[0]
                         self.dns = option.split(" ")[2]
-                        self.dns_found = 1
                         dns_option_2 = line_format.find('dhcp-option', dns_option_1+20)
                         if dns_option_2 != -1:
                             option = line_format[dns_option_2:].split(",")[0]
                             self.dns_2 = option.split(" ")[2]
                             self.update_dns(dns1=self.dns, dns2=self.dns_2)
                         else:
+                            self.dns_2 = None
                             self.update_dns(dns1=self.dns)
+                    else:
+                        self.update_dns()
                 elif line.find("Restart pause, 10 second(s)") != -1:
                     self.reply("fail1")
                     self.logger.info("Connection attempt failed") 
