@@ -1,5 +1,12 @@
 ##Changelog
 
+version 0.6.4:
+- [change] added new firewall options
+- [change] code cleanup
+- [change] WireGuard connections now honor DNS override
+- [bugfix] Proton api url updated
+- [bugfix] added all local ipv4 ranges 
+
 version 0.6.3:
 - [change] bypass mode supports ipv6 now
 - [change] alternative DNS servers are used for bypass

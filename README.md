@@ -111,19 +111,18 @@ qomui-cli --help
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
 
 ### Changelog
+version 0.6.4:
+- [change] added new firewall options
+- [change] code cleanup
+- [change] WireGuard connections now honor DNS override
+- [bugfix] Proton api url updated
+- [bugfix] added all local ipv4 ranges 
+
 version 0.6.3:
 - [change] bypass mode supports ipv6 now
+- [change] alternative DNS servers are used for bypass
 - [change] WireGuard is now written correctly (pull request from zx2c4) - requires all WireGuard configs to be readded
 - [change] exit dialog has a 5 sec timeout now
 - [change] umask set before chmod to avoid race conditions (pull request from zx2c4)
 - [bugfix] bypass should now work properly with WireGuard connections
-
-version 0.6.2:
-- [change] api-url for ProtonVPN updated - the one introduced in last update was out of date
-- [change] added support for Windscribe's stealth feature (OpenVPN over SSL)
-- [change] postrm functions added to deb/rpm/aur packages 
-- [change] automatic reconnections for double hop if first hop fails/disconnects
-- [change] adjusted OpenVPN configs of Mullvad and Windscribe to match official ones
-- [bugfix] tray icon not always updated after establishing double hop connection 
-- [bugfix] qomui crashes while performing latency checks when server(s) are deleted
 

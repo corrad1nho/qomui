@@ -3,7 +3,8 @@
 
 import os
 import logging
-from subprocess import check_call, Popen, CalledProcessError
+from subprocess import check_call, CalledProcessError
+
 from qomui import firewall
 
 cgroup_path = "/sys/fs/cgroup/net_cls/bypass_qomui"
@@ -14,19 +15,20 @@ def create_cgroup(user, group, default_interface, default_gateway, default_inter
 
     delete_cgroup(default_interface, default_interface_6)
 
-    cgroup_iptables = [["-t", "mangle", "-A", "OUTPUT", "-m", "cgroup", 
-                       "--cgroup", "0x00110011", "-j", "MARK", "--set-mark", "11"],
-                        ["-t", "nat", "-A", "POSTROUTING", "-m", "cgroup", 
-                       "--cgroup", "0x00110011", "-o", "%s" %default_interface , "-j", "MASQUERADE"],
-                        ["-I", "OUTPUT", "1", "-m", "cgroup", 
-                       "--cgroup", "0x00110011", "-j", "ACCEPT"],
-                        ["-I", "INPUT", "1", "-m", "cgroup", 
-                       "--cgroup", "0x00110011", "-j", "ACCEPT"],
-                        ["-t", "nat", "-A", "OUTPUT", "-m", "cgroup", "--cgroup", 
-                         "0x00110011", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"],
-                        ["-t", "nat", "-A", "OUTPUT", "-m", "cgroup", "--cgroup", 
-                         "0x00110011", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
-                        ]
+    cgroup_iptables = [
+        ["-t", "mangle", "-A", "OUTPUT", "-m", "cgroup",
+         "--cgroup", "0x00110011", "-j", "MARK", "--set-mark", "11"],
+        ["-t", "nat", "-A", "POSTROUTING", "-m", "cgroup",
+         "--cgroup", "0x00110011", "-o", "%s" %default_interface, "-j", "MASQUERADE"],
+        ["-I", "OUTPUT", "1", "-m", "cgroup",
+         "--cgroup", "0x00110011", "-j", "ACCEPT"],
+        ["-I", "INPUT", "1", "-m", "cgroup",
+         "--cgroup", "0x00110011", "-j", "ACCEPT"],
+        ["-t", "nat", "-A", "OUTPUT", "-m", "cgroup", "--cgroup",
+         "0x00110011", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"],
+        ["-t", "nat", "-A", "OUTPUT", "-m", "cgroup", "--cgroup",
+         "0x00110011", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
+        ]
 
     if not os.path.exists(cgroup_path):
         os.makedirs(cgroup_path)
@@ -34,7 +36,7 @@ def create_cgroup(user, group, default_interface, default_gateway, default_inter
             setcid.write(cls_id)
             setcid.close()
 
-    try: 
+    try:
         check_call(["ip", "route", "show", "table", "bypass_qomui"])
         logging.debug("No routing table added - table bypass_qomui already exists")
     except CalledProcessError:
@@ -47,8 +49,8 @@ def create_cgroup(user, group, default_interface, default_gateway, default_inter
 
     if default_gateway_6 != "None":
         cgroup_iptables.pop(1)
-        cgroup_iptables.insert(1, ["-t", "nat", "-A", "POSTROUTING", "-m", "cgroup", 
-                        "--cgroup", "0x00110011", "-o", "%s" %default_interface_6 , "-j", "MASQUERADE"])
+        cgroup_iptables.insert(1, ["-t", "nat", "-A", "POSTROUTING", "-m", "cgroup", "--cgroup",
+                                   "0x00110011", "-o", "%s" %default_interface_6, "-j", "MASQUERADE"])
 
         for rule in cgroup_iptables:
             firewall.add_rule_6(rule)
@@ -56,8 +58,8 @@ def create_cgroup(user, group, default_interface, default_gateway, default_inter
     else:
         logging.debug("Blocking ipv6 via bypass_qomui")
         cgroup_iptables.pop(1)
-        cgroup_iptables.insert(1, ["-t", "nat", "-A", "POSTROUTING", "-m", "cgroup", 
-                        "--cgroup", "0x00110011", "-o", "%s" %default_interface , "-j", "MASQUERADE"])
+        cgroup_iptables.insert(1, ["-t", "nat", "-A", "POSTROUTING", "-m", "cgroup",
+                                   "--cgroup", "0x00110011", "-o", "%s" %default_interface, "-j", "MASQUERADE"])
         cgroup_iptables.pop(2)
         cgroup_iptables.insert(2, ["-I", "OUTPUT", "1", "-m", "cgroup", "--cgroup", "0x00110011", "-j", "DROP"])
         cgroup_iptables.pop(3)
@@ -79,7 +81,7 @@ def create_cgroup(user, group, default_interface, default_gateway, default_inter
     try:
         check_call(["ip", "route", "flush", "table", "bypass_qomui"])
         check_call(["ip", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
-        check_call(["ip", "route", "add", "default", "via", 
+        check_call(["ip", "route", "add", "default", "via",
                     "%s" %default_gateway, "dev", "%s" %default_interface, "table", "bypass_qomui"])
     except CalledProcessError:
         logging.error("Could not set ipv4 routes for cgroup")
@@ -87,7 +89,7 @@ def create_cgroup(user, group, default_interface, default_gateway, default_inter
     try:
         check_call(["ip", "-6", "route", "flush", "table", "bypass_qomui"])
         check_call(["ip", "-6", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
-        check_call(["ip", "-6", "route", "add", "default", "via", 
+        check_call(["ip", "-6", "route", "add", "default", "via",
                     "%s" %default_gateway_6, "dev", "%s" %default_interface_6, "table", "bypass_qomui"])
     except CalledProcessError:
         logging.error("Could not set ipv6 routes for cgroup")
@@ -97,32 +99,33 @@ def create_cgroup(user, group, default_interface, default_gateway, default_inter
     except CalledProcessError:
         logging.error("Creating cgroup failed")
 
-    with open ("/proc/sys/net/ipv4/conf/all/rp_filter", 'w') as rp_edit_all:
+    with open("/proc/sys/net/ipv4/conf/all/rp_filter", 'w') as rp_edit_all:
         rp_edit_all.write("2")
-    with open ("/proc/sys/net/ipv4/conf/%s/rp_filter" %default_interface, 'w') as rp_edit_int:
+    with open("/proc/sys/net/ipv4/conf/%s/rp_filter" %default_interface, 'w') as rp_edit_int:
         rp_edit_int.write("2")
 
     logging.info("Succesfully created cgroup to bypass OpenVPN tunnel")
 
 def delete_cgroup(default_interface, default_interface_6):
 
-    cgroup_iptables_del = [["-t", "mangle", "-D", "OUTPUT", "-m", "cgroup", 
-                       "--cgroup", "0x00110011", "-j", "MARK", "--set-mark", "11"],
-                        ["-t", "nat", "-D", "POSTROUTING", "-m", "cgroup", 
-                       "--cgroup", "0x00110011", "-o", "%s" %default_interface , "-j", "MASQUERADE"],
-                        ["-D", "OUTPUT", "-m", "cgroup", 
-                       "--cgroup", "0x00110011", "-j", "ACCEPT"],
-                        ["-D", "INPUT", "-m", "cgroup", 
-                       "--cgroup", "0x00110011", "-j", "ACCEPT"],
-                        ["-t", "nat", "-D", "OUTPUT", "-m", "cgroup", "--cgroup", 
-                         "0x00110011", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"],
-                        ["-t", "nat", "-D", "OUTPUT", "-m", "cgroup", "--cgroup", 
-                         "0x00110011", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
-                        ]
+    cgroup_iptables_del = [
+        ["-t", "mangle", "-D", "OUTPUT", "-m", "cgroup",
+         "--cgroup", "0x00110011", "-j", "MARK", "--set-mark", "11"],
+        ["-t", "nat", "-D", "POSTROUTING", "-m", "cgroup",
+         "--cgroup", "0x00110011", "-o", "%s" %default_interface, "-j", "MASQUERADE"],
+        ["-D", "OUTPUT", "-m", "cgroup",
+         "--cgroup", "0x00110011", "-j", "ACCEPT"],
+        ["-D", "INPUT", "-m", "cgroup",
+         "--cgroup", "0x00110011", "-j", "ACCEPT"],
+        ["-t", "nat", "-D", "OUTPUT", "-m", "cgroup", "--cgroup",
+         "0x00110011", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"],
+        ["-t", "nat", "-D", "OUTPUT", "-m", "cgroup", "--cgroup",
+         "0x00110011", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
+        ]
 
-    with open ("/proc/sys/net/ipv4/conf/all/rp_filter", 'w') as rp_edit_all:
+    with open("/proc/sys/net/ipv4/conf/all/rp_filter", 'w') as rp_edit_all:
         rp_edit_all.write("1")
-    with open ("/proc/sys/net/ipv4/conf/%s/rp_filter" %default_interface, 'w') as rp_edit_int:
+    with open("/proc/sys/net/ipv4/conf/%s/rp_filter" %default_interface, 'w') as rp_edit_int:
         rp_edit_int.write("1")
 
     try:
@@ -135,8 +138,8 @@ def delete_cgroup(default_interface, default_interface_6):
         firewall.add_rule(rule)
 
     cgroup_iptables_del.pop(1)
-    cgroup_iptables_del.insert(1, ["-t", "nat", "-D", "POSTROUTING", "-m", "cgroup", 
-                    "--cgroup", "0x00110011", "-o", "%s" %default_interface_6 , "-j", "MASQUERADE"])
+    cgroup_iptables_del.insert(1, ["-t", "nat", "-D", "POSTROUTING", "-m", "cgroup",
+                                   "--cgroup", "0x00110011", "-o", "%s" %default_interface_6, "-j", "MASQUERADE"])
 
     for rule in cgroup_iptables_del:
         firewall.add_rule_6(rule)
