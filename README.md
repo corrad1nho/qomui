@@ -28,7 +28,7 @@ Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to
 - Qomui should work on any GNU/Linux distribution 
 - python (>=3.5)
 - python-pyqt5, python-dbus, and python-dbus.mainloop.pyqt5, python-setuptools, pip 
-- Additional python packages: psutil, requests, pycountry, beautifulsoup4, lxml, pexpect
+- Additional python packages: psutil, requests, beautifulsoup4, lxml, pexpect
 - openvpn, dnsutils and stunnel
 - geoip and geoip-database (optional: to identify server locations)
 - dnsmasq, libcgroup, libcgroup-tools, iptables >= 1.6 (optional: required for bypassing OpenVPN)
