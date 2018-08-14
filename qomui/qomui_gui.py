@@ -871,11 +871,14 @@ class QomuiGui(QtWidgets.QWidget):
                                 icon = "Question"
                                 )
             if ret == 1:
-                self.kill()
-                self.qomui_service.restart()
-                os.execl(sys.executable, sys.executable, * sys.argv)
+                self.restart_qomui()
         else:
             self.show_failmsg("Upgrade failed", "See log for further details")
+
+    def restart_qomui(self):
+        self.kill()
+        self.qomui_service.restart()
+        os.execl(sys.executable, sys.executable, * sys.argv)
 
     def check_update(self):
         if self.packetmanager in ["None", "DEB", "RPM"]:
@@ -1040,6 +1043,12 @@ class QomuiGui(QtWidgets.QWidget):
             with open("{}/VERSION".format(ROOTDIR), "r") as v:
                 version = v.read().split("\n")
                 self.installed = version[0]
+                service_version = self.qomui_service.get_version()
+                if service_version != self.installed and service_version != "None":
+                    self.logger.warning("qomui-service is running different version than qomui-gui: {} vs {}".format(service_version,
+                                                                                                                    self.installed))
+                    self.logger.info("Restarting qomui-gui and qomui-service")
+                    self.restart_qomui()
                 self.versionInfo.setText(self.installed)
                 try:
                     pm_check = version[1]
@@ -2437,6 +2446,7 @@ class NetMon(QtCore.QThread):
     def run(self):
         connected = True
         check_url = "https://ipinfo.io/ip"
+
         try:
             ip = requests.get(check_url).content.decode("utf-8").split("\n")[0]
             self.ip.emit(ip)

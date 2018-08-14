@@ -41,28 +41,17 @@ def country_translate(cc):
 class AirVPNDownload(QtCore.QThread):
     down_finished = QtCore.pyqtSignal(object)
     importFail = QtCore.pyqtSignal(str)
-    download_form = {"customdirectives" : "",
-                     "download_index" : "0",
-                     "download_mode" : "zip",
-                     "fileprefix" : "",
-                     "noembedkeys" : "on",
-                     "proxy_mode" : "none",
-                     "resolve" : "on",
-                     "system" : "linux",
-                     "tosaccept" : "on",
-                     "tosaccept2" : "on",
-                     "withbinary" : "",
-                     "do" : "javascript:Download('zip');"}
 
     def __init__(self, username, password):
         QtCore.QThread.__init__(self)
         self.username = username
         self.password = password
+
+    def run(self):
         self.Airvpn_server_dict = {}
         self.Airvpn_protocol_dict = {}
         self.url = "https://airvpn.org"
 
-    def run(self):
         try:
             with requests.Session() as self.session:
                 auth_parse = BeautifulSoup(self.session.get(self.url).content, "lxml")
@@ -129,37 +118,52 @@ class AirVPNDownload(QtCore.QThread):
         self.Download()
 
     def Download(self):
-        self.download_form["csrf_token"] = self.csrf
+        download_form = {
+                    "customdirectives" : "",
+                    "download_index" : "0",
+                    "download_mode" : "zip",
+                    "fileprefix" : "",
+                    "noembedkeys" : "on",
+                    "proxy_mode" : "none",
+                    "resolve" : "on",
+                    "system" : "linux",
+                    "tosaccept" : "on",
+                    "tosaccept2" : "on",
+                    "withbinary" : "",
+                    "do" : "javascript:Download('zip');"
+                    }
+
+        download_form["csrf_token"] = self.csrf
         for key, value in self.Airvpn_server_dict.items():
             server_chosen = "server_" + key.lower()
-            self.download_form[server_chosen] = "on"
+            download_form[server_chosen] = "on"
 
         try:
-            self.download_form["protocol_14"] = "on"
-            self.download_form["protocol_18"] = "on"
-            self.download_form["iplayer"] = "ipv4"
+            download_form["protocol_14"] = "on"
+            download_form["protocol_18"] = "on"
+            download_form["iplayer"] = "ipv4"
 
             download = self.session.post("https://airvpn.org/generator/",
-                                         data=self.download_form
+                                         data=download_form
                                          )
             filepath = "{}/temp".format(DIRECTORY)
             z = zipfile.ZipFile(io.BytesIO(download.content))
             z.extractall(filepath)
             temp = "{}/temp".format(DIRECTORY)
 
-            self.download_form["protocol_31"] = "on"
-            self.download_form["protocol_39"] = "on"
+            download_form["protocol_31"] = "on"
+            download_form["protocol_39"] = "on"
 
             download = self.session.post("https://airvpn.org/generator/",
-                                         data=self.download_form
+                                         data=download_form
                                          )
             z = zipfile.ZipFile(io.BytesIO(download.content))
             z.extractall(filepath)
             temp = "{}/temp".format(DIRECTORY)
 
-            self.download_form["iplayer"] = "ipv6_ipv4"
+            download_form["iplayer"] = "ipv6_ipv4"
             download = self.session.post("https://airvpn.org/generator/",
-                                         data=self.download_form
+                                         data=download_form
                                          )
 
             filepath_6 = "{}/temp/ipv6".format(DIRECTORY)

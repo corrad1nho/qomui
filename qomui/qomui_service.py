@@ -45,6 +45,7 @@ class QomuiDbus(dbus.service.Object):
     connect_status = 0
     config = {}
     wg_connect = 0
+    version = "None"
 
     def __init__(self):
         self.sys_bus = dbus.SystemBus()
@@ -60,7 +61,21 @@ class QomuiDbus(dbus.service.Object):
         self.filehandler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.setLevel(logging.DEBUG)
         self.logger.debug("Dbus-service successfully initialized")
+        self.check_version()
         self.load_firewall(0)
+
+    def check_version(self):
+        try:
+            with open("{}/VERSION".format(ROOTDIR), "r") as v:
+                version = v.read().split("\n")
+                self.version = version[0]
+
+        except FileNotFoundError:
+            self.logger.warning("{}/VERSION does not exist".format(ROOTDIR))
+
+    @dbus.service.method(BUS_NAME, in_signature='', out_signature='s')
+    def get_version(self):
+        return self.version
 
     @dbus.service.method(BUS_NAME)
     def restart(self):
