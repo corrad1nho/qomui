@@ -1959,19 +1959,24 @@ class QomuiGui(QtWidgets.QWidget):
             self.logger.warning("Could not start {}".format(app))
 
     def modify_server(self):
-        if self.serverListWidget.isVisible() is False:
-            item = self.serverListFilterWidget.currentItem()
-            data = item.data(QtCore.Qt.UserRole)
-            self.modify_row = self.serverListFilterWidget.row(item)
-        else:
-            item = self.serverListWidget.currentItem()
-            data = item.data(QtCore.Qt.UserRole)
-            self.modify_row = self.serverListWidget.row(item)
+        try:
+            if self.serverListWidget.isVisible() is False:
+                item = self.serverListFilterWidget.currentItem()
+                data = item.data(QtCore.Qt.UserRole)
+                self.modify_row = self.serverListFilterWidget.row(item)
+            else:
+                item = self.serverListWidget.currentItem()
+                data = item.data(QtCore.Qt.UserRole)
+                self.modify_row = self.serverListWidget.row(item)
+
+        except AttributeError:
+            pass
         try:
             editor = ModifyServer(key=data,
                                   server_info=self.server_dict[data])
             editor.modified.connect(self.apply_edit)
             editor.exec_()
+
         except (UnboundLocalError, KeyError):
             pass
 

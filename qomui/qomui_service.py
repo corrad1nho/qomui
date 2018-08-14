@@ -446,7 +446,7 @@ class QomuiDbus(dbus.service.Object):
 
                     try:
                         dnsmasq = Popen(
-                                        ["dnsmasq", "--port=5354", "--(interface)={}".format(interface),
+                                        ["dnsmasq", "--port=5354", "--interface={}".format(interface),
                                          "--server={}".format(self.config["alt_dns1"]),
                                          "--server={}".format(self.config["alt_dns2"])]
                                          )

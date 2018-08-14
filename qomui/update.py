@@ -750,7 +750,7 @@ class AddFolder(QtCore.QThread):
                     file_edit.close()
 
                 if ip_found != 0:
-                    country_check = check_output(["geo(ip)lookup", "{}".format(ip)]).decode("utf-8")
+                    country_check = check_output(["geoiplookup", "{}".format(ip)]).decode("utf-8")
                     cc = country_check.split(" ")[3].split(",")[0]
                     country = country_translate(cc)
                     custom_server_dict[name] = {
