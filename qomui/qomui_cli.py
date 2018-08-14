@@ -17,7 +17,7 @@ import signal
 from qomui import utils, update
 
 ROOTDIR = "/usr/share/qomui"
-HOMEDIR = "%s/.qomui" % (os.path.expanduser("~"))
+HOMEDIR = "{}/.qomui".format(os.path.expanduser("~"))
 SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 app = QtCore.QCoreApplication(sys.argv)
 
@@ -57,24 +57,24 @@ class QomuiCli(QtCore.QObject):
             sys.exit(0)
 
         if args["set_protocol"] is not None:
-            protocol_dict = self.load_json("%s/protocol.json" %HOMEDIR)
+            protocol_dict = self.load_json("{}/protocol.json".format(HOMEDIR))
             provider = args["set_protocol"]
             try:
                 for k,v in protocol_dict[provider].items():
                     if k != "selected":
                         number = k.split("_")[1]
                         attrs = ", ".join(v.values())
-                        print("%s: %s" %(number, attrs))
+                        print("{}: {}".format(number, attrs))
 
                 choice = input("Enter number of protocol: ")
-                prot_chosen = "protocol_%s" %choice
+                prot_chosen = "protocol_{}".format(choice)
                 print(prot_chosen)
 
                 if prot_chosen in protocol_dict[provider].keys():
                     protocol_dict[provider]["selected"] = prot_chosen
-                    with open ("%s/protocol.json" % HOMEDIR, "w") as p:
+                    with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
                         json.dump(protocol_dict, p)
-                    print("Port/Protocol for %s successfully changed" %provider)
+                    print("Port/Protocol for {} successfully changed".format(provider))
 
                 else:
                     print("Invalid number: Protocol/Port has not been changed")
@@ -85,8 +85,8 @@ class QomuiCli(QtCore.QObject):
             sys.exit(0)
 
         if args["connect"] is not None:
-            self.server_dict = self.load_json("%s/server.json" %HOMEDIR)
-            self.protocol_dict = self.load_json("%s/protocol.json" %HOMEDIR)
+            self.server_dict = self.load_json("{}/server.json".format(HOMEDIR))
+            self.protocol_dict = self.load_json("{}/protocol.json".format(HOMEDIR))
             keys = self.server_dict.keys()
 
             if args["via"] is not None:
@@ -96,7 +96,7 @@ class QomuiCli(QtCore.QObject):
                     self.set_hop(hop_server)
 
                 else:
-                    print("Sorry, %s does not exist" %hop_server)
+                    print("Sorry, {} does not exist".format(hop_server))
                     self.autocomplete(keys, action="set_hop")
 
             server = args["connect"]
@@ -105,17 +105,17 @@ class QomuiCli(QtCore.QObject):
                 self.establish_connection(server)
 
             else:
-                print("Sorry, %s does not exist" %server)
+                print("Sorry, {} does not exist".format(server))
                 self.autocomplete(keys, action="establish_connection")
 
         if args["list"] is not None:
-            server_dict = self.load_json("%s/server.json" %HOMEDIR)
+            server_dict = self.load_json("{}/server.json".format(HOMEDIR))
             for k,v in server_dict.items():
                 v_lower = [v.lower() for v in v.values()]
                 a_lower = [a.lower() for a in args["list"]]
                 check = all(i in v_lower for i in a_lower)
                 if check:
-                    formatted = "%s - %s - %s" %(k, v["country"], v["provider"])
+                    format(ted) = "{} - {} - {}".format(k, v["country"], v["provider"])
                     print(formatted)
 
             sys.exit(0)
@@ -127,7 +127,7 @@ class QomuiCli(QtCore.QObject):
                     config[o] = 1
 
                 else:
-                    print('"%s" is not a valid option') 
+                    print('"{}" is not a valid option') 
 
             update_conf = self.applyoptions(config)
 
@@ -137,7 +137,7 @@ class QomuiCli(QtCore.QObject):
                 if o in config.keys():
                     config[o] = 0
                 else:
-                    print('"%s" is not a valid option')
+                    print('"{}" is not a valid option')
 
             update_conf = self.applyoptions(config)
 
@@ -154,8 +154,8 @@ class QomuiCli(QtCore.QObject):
         if args["delete_provider"] is not None:
             del_list = []
             provider = args["delete_provider"]
-            self.server_dict = self.load_json("%s/server.json" %HOMEDIR)
-            self.protocol_dict = self.load_json("%s/protocol.json" %HOMEDIR)
+            self.server_dict = self.load_json("{}/server.json".format(HOMEDIR))
+            self.protocol_dict = self.load_json("{}/protocol.json".format(HOMEDIR))
             for k, v in self.server_dict.items():
                 if v["provider"] == provider:
                     del_list.append(k)
@@ -167,10 +167,10 @@ class QomuiCli(QtCore.QObject):
                 pass
 
             self.qomui_service.delete_provider(provider)
-            with open ("%s/server.json" % HOMEDIR, "w") as s:
+            with open ("{}/server.json".format(HOMEDIR), "w") as s:
                 json.dump(self.server_dict, s)
 
-            print("%s deleted" %provider)
+            print("{} deleted".format(provider))
             sys.exit(0)
 
         if args["add"] is not None:
@@ -218,9 +218,9 @@ class QomuiCli(QtCore.QObject):
         path = "None"
         print("Automatic download is available for the following providers: Airvpn, Mullvad, PIA, Windscribe and ProtonVPN")
         if provider not in SUPPORTED_PROVIDERS:
-            path = input("Enter path of folder containing config files of %s:\n" %provider) 
+            path = input("Enter path of folder containing config files of {}:\n".format(provider)) 
             if not os.path.exists(path):
-                print("%s is not a valid path" %path)
+                print("{} is not a valid (path)".format(path))
                 sys.exit(1)
 
         print("Please enter your credentials")
@@ -231,8 +231,8 @@ class QomuiCli(QtCore.QObject):
             username = input("Enter username:\n")
             password = getpass.getpass("Enter password:\n")
 
-        if not os.path.exists("%s/temp" % (HOMEDIR)):
-            os.makedirs("%s/temp" % (HOMEDIR))
+        if not os.path.exists("{}/temp".format(HOMEDIR)):
+            os.makedirs("{}/temp".format(HOMEDIR))
         self.qomui_service.allow_provider_ip(provider)
         print("Please wait....")
 
@@ -287,7 +287,7 @@ class QomuiCli(QtCore.QObject):
         elif info == "nothing":
             print("Import Error: No config files found or folder seems to contain many unrelated files")
         else:
-            print("Import Failed: %s" %info)
+            print("Import Failed: {}".format(info))
 
         sys.exit(1)
 
@@ -296,10 +296,10 @@ class QomuiCli(QtCore.QObject):
         self.qomui_service.block_dns()
         copy = self.qomui_service.copy_rootdir(provider, content["path"])
         if copy == "copied":
-            shutil.rmtree("%s/temp/" % (HOMEDIR))
+            shutil.rmtree("{}/temp/".format(HOMEDIR))
 
-        self.server_dict = self.load_json("%s/server.json" %HOMEDIR)
-        self.protocol_dict = self.load_json("%s/protocol.json" %HOMEDIR)
+        self.server_dict = self.load_json("{}/server.json".format(HOMEDIR))
+        self.protocol_dict = self.load_json("{}/protocol.json".format(HOMEDIR))
 
         find_favourites = []
         for k, v in content["server"].items():
@@ -332,13 +332,13 @@ class QomuiCli(QtCore.QObject):
         except KeyError:
             pass
 
-        with open ("%s/server.json" % HOMEDIR, "w") as s:
+        with open ("{}/server.json".format(HOMEDIR), "w") as s:
             json.dump(self.server_dict, s)
 
-        with open ("%s/protocol.json" % HOMEDIR, "w") as p:
+        with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
             json.dump(self.protocol_dict, p) 
 
-        print("Succesfully added config files for %s" %provider)
+        print("Succesfully added config files for {}".format(provider))
         sys.exit(0)
 
     def kill(self):
@@ -347,7 +347,7 @@ class QomuiCli(QtCore.QObject):
     def show_config(self, config):
         print("Current configuration:")
         for k,v in config.items():
-            print("%s : %s" %(k,v))
+            print("{} : {}".format(k,v))
 
         sys.exit(0)
 
@@ -356,7 +356,7 @@ class QomuiCli(QtCore.QObject):
             if self.hop_active == 1:
                 self.hop_active = 0
             else:
-                print("Connection to %s successful" %self.ovpn_dict["name"])
+                print("Connection to {} successful".format(self.ovpn_dict["name"])
                 app.quit()
 
         elif reply == "fail2":
@@ -383,24 +383,24 @@ class QomuiCli(QtCore.QObject):
         except FileNotFoundError:
             if json_file == "/usr/share/qomui/config.json":
                 try:
-                    with open ("%s/default_config.json" %ROOTDIR, 'r') as j:
+                    with open ("{}/default_config.json".format(ROOTDIR), 'r') as j:
                         print("Loading default configuration")
                         return json.load(j)
                 except FileNotFoundError:
-                    print("%s does not exist" %json_file)
+                    print("{} does not exist".format(json_file))
                     return {}
             else:
                 return {}
-                print("%s does not exist" %json_file)
+                print("{} does not exist".format(json_file))
 
 
     def applyoptions(self, temp_config):
 
-        with open ('%s/config_temp.json' % (HOMEDIR), 'w') as config:
+        with open ('{}/config_temp.json'.format(HOMEDIR), 'w') as config:
             json.dump(temp_config, config)
 
         update_cmd = ['sudo', sys.executable, '-m', 'qomui.mv_config',
-                        '-d', '%s' %(HOMEDIR)]
+                        '-d', '{}'.format(HOMEDIR)]
 
         update = Popen(update_cmd, stdin=PIPE, stdout=PIPE, universal_newlines=True)
         prompt = update.communicate("" + '\n')[1]
@@ -421,7 +421,7 @@ class QomuiCli(QtCore.QObject):
         self.show_config(self.get_config())
 
     def get_config(self):
-        config_dict = self.load_json("%s/config.json" %ROOTDIR)
+        config_dict = self.load_json("{}/config.json".format(ROOTDIR))
         return config_dict
 
 

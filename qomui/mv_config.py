@@ -18,18 +18,18 @@ def copy(argv):
         if opt == "-d":
             homedir = arg
             try:
-                shutil.copyfile("%s/config_temp.json" %(homedir), "%s/config.json" %(ROOTDIR))
-                Popen(['chown', 'root', '%s/config.json' %(ROOTDIR)])
-                Popen(['chmod', '644', '%s/config.json' %(ROOTDIR)])
-                os.remove("%s/config_temp.json" %(homedir))
+                shutil.copyfile("{}/config_temp.json".format(homedir), "{}/config.json".format(ROOTDIR))
+                Popen(['chown', 'root', '{}/config.json'.format(ROOTDIR)])
+                Popen(['chmod', '644', '{}/config.json'.format(ROOTDIR)])
+                os.remove("{}/config_temp.json".format(homedir))
             except FileNotFoundError:
                 sys.exit(1)
         if opt == "-f":
             try:
-                shutil.copyfile("%s/firewall_temp.json" %(homedir), "%s/firewall.json" %(ROOTDIR))
-                Popen(['chown', 'root', '%s/firewall.json' % (ROOTDIR)])
-                Popen(['chmod', '644', '%s/firewall.json' % (ROOTDIR)])
-                os.remove("%s/firewall_temp.json" %(homedir))
+                shutil.copyfile("{}/firewall_temp.json".format(homedir), "{}/firewall.json".format(ROOTDIR))
+                Popen(['chown', 'root', '{}/firewall.json'.format(ROOTDIR)])
+                Popen(['chmod', '644', '{}/firewall.json'.format(ROOTDIR)])
+                os.remove("{}/firewall_temp.json".format(homedir))
             except FileNotFoundError:
                 pass
 

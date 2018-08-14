@@ -27,7 +27,7 @@ class LatencyCheck(QtCore.QThread):
                         ip = v["prim_ip"]
 
                 try:
-                    pinger = check_output(["ping", "-c", "1", "-W", "1", "-I", "%s" %self.interface, "%s" %ip]).decode("utf-8")
+                    pinger = check_output(["ping", "-c", "1", "-W", "1", "-I", "{}".format(self.interface), "{}".format(ip)]).decode("utf-8")
                     latencysearch = re.search(r'rtt min/avg/max/mdev = \d+(?:\.\d+)?/\d+(?:\.\d+)?/\d+(?:\.\d+)?/\d+(?:\.\d+)?', pinger)
                     if latencysearch != None:
                         latencyraw = str(latencysearch.group())

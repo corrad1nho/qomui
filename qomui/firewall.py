@@ -25,7 +25,7 @@ def add_rule(rule):
             elif check[2] == "-A":
                 check[2] = "-C"
             check_call(ip_cmd + check, stdout=devnull, stderr=devnull)
-            logging.debug("iptables: %s already exists" %rule)
+            logging.debug("iptables: {} already exists".format(rule))
             a = 0
     except (IndexError, CalledProcessError):
         pass
@@ -33,11 +33,11 @@ def add_rule(rule):
     try:
         if a == 1:
             check_call(ip_cmd + rule, stdout=devnull, stderr=devnull)
-            logging.debug("iptables: applied %s" %rule)
+            logging.debug("iptables: applied {}".format(rule))
 
     except CalledProcessError:
         if "-D" not in rule:
-            logging.warning("iptables: failed to apply %s" %rule)
+            logging.warning("iptables: failed to apply {}".format(rule))
 
 def add_rule_6(rule):
     a = 1
@@ -52,7 +52,7 @@ def add_rule_6(rule):
             elif check[2] == "-A":
                 check[2] = "-C"
             check_call(ip6_cmd + check, stdout=devnull, stderr=devnull)
-            logging.debug("ipt6ables: %s already exists" %rule)
+            logging.debug("ipt6ables: {} already exists".format(rule))
             a = 0
     except (IndexError, CalledProcessError):
         pass
@@ -60,11 +60,11 @@ def add_rule_6(rule):
     try:
         if a == 1:
             check_call(ip6_cmd + rule, stdout=devnull, stderr=devnull)
-            logging.debug("ip6tables: applied %s" %rule)
+            logging.debug("ip6tables: applied {}".format(rule))
 
     except CalledProcessError:
         if "-D" not in rule:
-            logging.warning("ip6tables: failed to apply %s" %rule)
+            logging.warning("ip6tables: failed to apply {}".format(rule))
 
 def apply_rules(opt, block_lan=0, preserve=0):
     fw_rules = get_config()
@@ -150,12 +150,12 @@ def save_existing_rules_6(fw_rules):
 
 def get_config():
     try:
-        with open("%s/firewall.json" %ROOTDIR, "r") as f:
+        with open("{}/firewall.json".format(ROOTDIR), "r") as f:
             return json.load(f)
     except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
         logging.debug("Loading default firewall configuration")
         try:
-            with open("%s/firewall_default.json" %ROOTDIR, "r") as f:
+            with open("{}/firewall_default.json".format(ROOTDIR), "r") as f:
                 return json.load(f)
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
             logging.debug("Failed to load firewall configuration")

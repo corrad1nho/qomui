@@ -37,7 +37,7 @@ def create_server_dict(current_dict, protocol_dict):
                     tlscrypt = "off"
 
                 if ipv6 == "on":
-                    ip = current_dict["%s_6" %ip_chosen]
+                    ip = current_dict["{}_6".format(ip_chosen)]
                 else:
                     ip = current_dict[ip_chosen]
 
