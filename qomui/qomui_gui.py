@@ -1049,7 +1049,13 @@ class QomuiGui(QtWidgets.QWidget):
                 version = v.read().split("\n")
                 self.installed = version[0]
                 self.logger.info("Qomui version {}".format(self.installed))
-                service_version = self.qomui_service.get_version()
+
+                try:
+                    service_version = self.qomui_service.get_version2()
+                except dbus.exceptions.DBusException:
+                    service_version = self.installed
+                    self.logger.error("Checking version of qomui-service failed")
+
                 if service_version != self.installed and service_version != "None":
                     self.logger.warning("qomui-service is running different version than qomui-gui: {} vs {}".format(service_version,
                                                                                                                     self.installed))
@@ -1243,30 +1249,25 @@ class QomuiGui(QtWidgets.QWidget):
                                 options=QtWidgets.QFileDialog.ReadOnly)
 
                     folderpath = QtCore.QFileInfo(dialog[0]).absolutePath()
-                    if folderpath != "":
-                        self.thread = update.AddFolder(credentials, folderpath)
-                        self.thread.down_finished.connect(self.downloaded)
-                        self.thread.importFail.connect(self.import_fail)
-                        self.thread.start()
-                        self.update_bar("start", provider)
 
                 except TypeError:
                     pass
 
-        self.qomui_service.allow_provider_ip(provider)
-        setattr(self, "import_{}".format(provider), update.AddServers(
-                                                                    username,
-                                                                    password,
-                                                                    provider,
-                                                                    folderpath=folderpath
-                                                                    ))
+        if folderpath != "":
+            self.qomui_service.allow_provider_ip(provider)
+            setattr(self, "import_{}".format(provider), update.AddServers(
+                                                                        username,
+                                                                        password,
+                                                                        provider,
+                                                                        folderpath=folderpath
+                                                                        ))
 
-        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-        getattr(self, "import_{}".format(provider)).log.connect(self.log_from_thread)
-        getattr(self, "import_{}".format(provider)).finished.connect(self.downloaded)
-        getattr(self, "import_{}".format(provider)).failed.connect(self.import_failed)
-        getattr(self, "import_{}".format(provider)).start()
-        self.update_bar("start", provider)
+            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+            getattr(self, "import_{}".format(provider)).log.connect(self.log_from_thread)
+            getattr(self, "import_{}".format(provider)).finished.connect(self.downloaded)
+            getattr(self, "import_{}".format(provider)).failed.connect(self.import_failed)
+            getattr(self, "import_{}".format(provider)).start()
+            self.update_bar("start", provider)
 
     def log_from_thread(self, log):
         getattr(logging, log[0])(log[1])
@@ -2421,8 +2422,15 @@ class ActiveWidget(QtWidgets.QWidget):
 
         return "{} {} {}".format(city, protocol, port)
 
-    def show_ip(self, ip):
-        self.statusLabel.setText("Active connection - IP: {}".format(ip))
+    def show_ip(self, ips):
+        if ips[0] is None:
+            self.statusLabel.setText("Active connection - IP: {}".format(ips[1]))
+
+        elif ips[1] is None:
+            self.statusLabel.setText("Active connection - IP: {}".format(ips[0]))
+
+        else:
+            self.statusLabel.setText("Active connection - IP: {} - {}".format(ips[0], ips[1]))
 
     def update_time(self, t):
         self.timeStatLabel.setText(t)
@@ -2451,7 +2459,7 @@ class LineWidget(QtWidgets.QWidget):
 
 class NetMon(QtCore.QThread):
     stat = QtCore.pyqtSignal(list)
-    ip = QtCore.pyqtSignal(str)
+    ip = QtCore.pyqtSignal(tuple)
     time = QtCore.pyqtSignal(str)
     lost = QtCore.pyqtSignal()
     log = QtCore.pyqtSignal(tuple)
@@ -2463,12 +2471,28 @@ class NetMon(QtCore.QThread):
 
     def run(self):
         connected = True
-        check_url = "https://ipinfo.io/ip"
+        check_url = "https://ipv4.ipleak.net/json"
+        check_url_6 = "https://ipv6.ipleak.net/json"
 
         try:
-            ip = requests.get(check_url).content.decode("utf-8").split("\n")[0]
-            self.log.emit(("info", "External IP = {}".format(ip)))
-            self.ip.emit(ip)
+
+            try:
+                query = requests.get(check_url, timeout=1).content.decode("utf-8")
+                ip = json.loads(query)["ip"]
+
+            except (KeyError, requests.exceptions.RequestException):
+                ip = None
+
+            try:
+                query = requests.get(check_url_6, timeout=1).content.decode("utf-8")
+                ip_6 = json.loads(query)["ip"]
+
+            except (KeyError, requests.exceptions.RequestException):
+                ip_6 = None
+
+            self.log.emit(("info", "External IP = {} - {}".format(ip, ip_6)))
+            self.ip.emit((ip, ip_6))
+
         except:
             self.log.emit(("error", "Could not determine external ip address"))
 

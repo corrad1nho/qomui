@@ -186,10 +186,12 @@ class QomuiDbus(dbus.service.Object):
             self.kill_pid(i)
 
         if self.wg_connect == 1:
+
             try:
                 wg_down = Popen(["wg-quick", "down", "{}/wg_qomui.conf".format(ROOTDIR)], stdout=PIPE, stderr=STDOUT)
                 for line in wg_down.stdout:
-                    logging.info(line)
+                    logging.info("WireGuard: " + line.decode("utf-8").replace("\n", ""))
+
             except CalledProcessError:
                 pass
 
@@ -206,9 +208,11 @@ class QomuiDbus(dbus.service.Object):
 
     def kill_pid(self, i):
         if psutil.pid_exists(i[0]):
+
             try:
                 self.logger.debug("OS: process {} killed - {}".format(i[0], i[1]))
                 Popen(['kill', '{}'.format(i[0])])
+
             except CalledProcessError:
                 self.logger.debug("OS: process {} does not exist anymore".format(i))
 
@@ -367,19 +371,26 @@ class QomuiDbus(dbus.service.Object):
                 f_source = "{}/{}".format(certpath, f)
                 f_dest = "{}/{}/{}".format(ROOTDIR, provider, f)
                 if os.path.isfile(f_source):
+
                     try:
                         shutil.copyfile(f_source, f_dest)
                         self.logger.debug("copied {} to {}".format(f, f_dest))
+
                     except FileNotFoundError:
                         if not os.path.exists("{}/{}".format(ROOTDIR, provider)):
                             os.makedirs("{}/{}".format(ROOTDIR, provider))
+
                         shutil.copyfile(f_source,f_dest)
                         self.logger.debug("copied {} to {}".format(f, f_dest))
+
                 elif os.path.isdir(f_source):
+
                     try:
                         shutil.rmtree(f_dest)
+
                     except (NotADirectoryError, FileNotFoundError):
                         pass
+
                     shutil.copytree(f_source, f_dest)
                     self.logger.debug("copied folder {} to {}".format(f, f_dest))
 
@@ -387,6 +398,7 @@ class QomuiDbus(dbus.service.Object):
                 auth_file = "{}/{}/{}-auth.txt".format(ROOTDIR, provider, provider)
                 shutil.copyfile(auth_file, "{}/certs/{}-auth.txt".format(ROOTDIR, provider))
                 os.remove(auth_file)
+
             except FileNotFoundError:
                 pass
 
@@ -534,7 +546,7 @@ class QomuiDbus(dbus.service.Object):
             if self.packetmanager == "DEB":
                 deb_pack = "qomui-{}-amd64.deb".format(self.version[1:])
                 deb_url = "{}releases/download/v{}/{}".format(base_url, self.version[1:], deb_pack)
-                deb_down = requests.get(deb_url, stream=True)
+                deb_down = requests.get(deb_url, stream=True, timeout=2))
                 with open('{}/{}'.format(ROOTDIR, deb_pack), 'wb') as deb:
                     shutil.copyfileobj(deb_down.raw, deb)
 
@@ -543,7 +555,7 @@ class QomuiDbus(dbus.service.Object):
             elif self.packetmanager == "RPM":
                 rpm_pack = "qomui-{}-1.x86_64.rpm".format(self.version[1:])
                 rpm_url = "{}releases/download/v{}/{}".format(base_url, self.version[1:], rpm_pack)
-                rpm_down = requests.get(rpm_url, stream=True)
+                rpm_down = requests.get(rpm_url, stream=True, timeout=2))
                 with open('{}/{}'.format(ROOTDIR, rpm_pack), 'wb') as rpm:
                     shutil.copyfileobj(rpm_down.raw, rpm)
 
@@ -800,7 +812,7 @@ class QomuiDbus(dbus.service.Object):
             self.tun = "wg_qomui"
             cmd_wg = Popen(['wg-quick', 'up', '{}'.format(wg_file)], stdout=PIPE, stderr=STDOUT)
             for line in cmd_wg.stdout:
-                logging.info(line)
+                logging.info("WireGuard: " + line.decode("utf-8").replace("\n", ""))
             self.wg_connect = 1
 
             with open("{}/wg_qomui.conf".format(ROOTDIR), "r") as dns_check:

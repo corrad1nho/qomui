@@ -67,7 +67,7 @@ class AddServers(QtCore.QThread):
 
         try:
             with requests.Session() as self.session:
-                auth_parse = BeautifulSoup(self.session.get(self.url).content, "lxml")
+                auth_parse = BeautifulSoup(self.session.get(self.url, timeout=2).content, "lxml")
                 auth = auth_parse.find("input", {"type": "hidden"}).get("value")
                 payload = {'auth_key' : auth,
                         'referer' : self.url,
@@ -91,9 +91,9 @@ class AddServers(QtCore.QThread):
             self.failed.emit(("Network error: no internet connection", "Airvpn"))
 
     def airvpn_parse_info(self):
-        csrf_parse = BeautifulSoup(self.session.get('{}/generator'.format(self.url)).content, "lxml")
+        csrf_parse = BeautifulSoup(self.session.get('{}/generator'.format(self.url), timeout=2).content, "lxml")
         self.csrf = csrf_parse.find("input", {"type" : "hidden"}).get("value")
-        mode_list = self.session.get('{}/generator'.format(self.url))
+        mode_list = self.session.get('{}/generator'.format(self.url), timeout=2)
         mode_list_parse = BeautifulSoup(mode_list.content, "lxml")
         self.log.emit(("info", "Parsing Airvpn protocols"))
 
@@ -118,7 +118,7 @@ class AddServers(QtCore.QThread):
                                                             }
 
 
-        get_list = requests.get('{}/status'.format(self.url))
+        get_list = requests.get('{}/status'.format(self.url), timeout=2)
         get_list_parse = BeautifulSoup(get_list.content, "lxml")
         servers = get_list_parse.findAll("div", {"class":"air_server_box_1"})
         self.log.emit(("info", "Generating server list"))
@@ -264,7 +264,7 @@ class AddServers(QtCore.QThread):
 
             try:
                 url = "https://mullvad.net/download/latest/source/"
-                src = self.session.get(url)
+                src = self.session.get(url, timeout=2)
                 with open("{}/temp/tar".format(DIRECTORY), 'wb') as temp_file:
                     temp_file.write(gzip.decompress(src.content))
                     tar = tarfile.open("{}/temp/tar".format(DIRECTORY))
@@ -274,7 +274,7 @@ class AddServers(QtCore.QThread):
                 with open("{}/mullvad_userpass.txt".format(certpath), "w") as passfile:
                     passfile.write("{}\nm".format(self.username))
 
-                page = self.session.get('https://www.mullvad.net/en/servers/')
+                page = self.session.get('https://www.mullvad.net/en/servers/', timeout=2)
                 self.log.emit(("info", "Fetching server list for Mullvad"))
                 server_page = BeautifulSoup(page.content, "lxml")
                 server_parse = server_page.find_all("div", {"class":"section-content server-table"})
@@ -306,7 +306,7 @@ class AddServers(QtCore.QThread):
                     self.log.emit(("info", "Creating WireGuard config files for Mullvad"))
                     wg_list = []
                     wg_api = "https://api.mullvad.net/public/relays/wireguard/v1/"
-                    wg_get = self.session.get(wg_api)
+                    wg_get = self.session.get(wg_api, timeout=2)
                     wg_dict = wg_get.json()
                     for c in wg_dict["countries"]:
                         for k,v in c.items():
@@ -399,7 +399,7 @@ class AddServers(QtCore.QThread):
         url_strong =  "https://www.privateinternetaccess.com/openvpn/openvpn-strong.zip"
         try:
             with requests.Session() as self.session:
-                download_ip = self.session.get(url_ip)
+                download_ip = self.session.get(url_ip, timeout=2)
                 filepath = "{}/temp/ip".format(DIRECTORY)
                 z = zipfile.ZipFile(io.BytesIO(download_ip.content))
                 z.extractall(filepath)
@@ -436,7 +436,7 @@ class AddServers(QtCore.QThread):
                                                 }
 
             with requests.Session() as self.session:
-                download_ip = self.session.get(url_strong)
+                download_ip = self.session.get(url_strong, timeout=2)
                 filepath = "{}/temp/strong".format(DIRECTORY)
                 z = zipfile.ZipFile(io.BytesIO(download_ip.content))
                 z.extractall(filepath)
@@ -480,7 +480,7 @@ class AddServers(QtCore.QThread):
             with requests.Session() as self.session:
                 self.session.headers.update(self.header)
                 self.temp = "{}/temp".format(DIRECTORY)
-                self.session.get(login_url)
+                self.session.get(login_url, timeout=2)
                 self.session.headers.update({"Host" : "res.windscribe.com",
                                             "Origin" : "https://windscribe.com"})
                 post = self.session.post("https://res.windscribe.com/res/logintoken")
@@ -499,7 +499,7 @@ class AddServers(QtCore.QThread):
 
                 post = self.session.post(login_url, data=payload)
                 cred_url = "https://windscribe.com/getconfig/credentials"
-                get_cred = self.session.get(cred_url)
+                get_cred = self.session.get(cred_url, timeout=2)
                 credentials = json.loads(get_cred.content.decode("utf-8"))
 
                 try:
@@ -518,7 +518,7 @@ class AddServers(QtCore.QThread):
     def windscribe_get_servers(self):
         self.log.emit(("info", "Generating server list for Windscribe"))
         cert_url = "https://assets.windscribe.com/desktop/other/openvpn_cert.zip"
-        get_certs = self.session.get(cert_url)
+        get_certs = self.session.get(cert_url, timeout=2)
         z = zipfile.ZipFile(io.BytesIO(get_certs.content))
         z.extractall(self.temp)
 
@@ -526,7 +526,7 @@ class AddServers(QtCore.QThread):
         random = uid.hex
         api_url = "https://assets.windscribe.com/serverlist/openvpn/1/{}".format(random)
 
-        data = json.loads(self.session.get(api_url).content.decode("utf-8"))
+        data = json.loads(self.session.get(api_url, timeout=2).content.decode("utf-8"))
 
         for s in data["data"]:
             try:
@@ -589,7 +589,7 @@ class AddServers(QtCore.QThread):
                 self.session.headers.update(headers)
                 path = "{}/temp".format(DIRECTORY)
                 api_url = "https://api.protonmail.ch/vpn/logicals"
-                get_servers = json.loads(self.session.get(api_url).content.decode("utf-8"))
+                get_servers = json.loads(self.session.get(api_url, timeout=2).content.decode("utf-8"))
 
                 for s in get_servers["LogicalServers"]:
                     name = s["Domain"]
@@ -614,7 +614,7 @@ class AddServers(QtCore.QThread):
 
 
                 cert_url = "https://api.protonmail.ch/vpn/config?Platform=Linux&LogicalID={}&Protocol=udp".format(server_id)
-                ovpn = requests.get(cert_url).content.decode("utf-8")
+                ovpn = requests.get(cert_url, timeout=2).content.decode("utf-8")
 
                 ca_cert = BeautifulSoup(ovpn, "lxml").find("ca")
                 with open("{}/proton_ca.crt".format(path), "w") as ca:
@@ -806,7 +806,7 @@ class UpdateCheck(QtCore.QThread):
     def run(self):
         url = "https://api.github.com/repos/corrad1nho/qomui/releases/latest"
         try:
-            check_version = requests.get(url)
+            check_version = requests.get(url, timeout=2)
             latest_release = check_version.json()["tag_name"]
             self.release_found.emit(latest_release)
         except:
