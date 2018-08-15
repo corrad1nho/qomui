@@ -60,7 +60,7 @@ class QomuiDbus(dbus.service.Object):
         self.logger.addHandler(self.filehandler)
         self.filehandler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.setLevel(logging.DEBUG)
-        self.logger.debug("Dbus-service successfully initialized")
+        self.logger.info("Dbus-service successfully initialized")
         self.check_version()
         self.load_firewall(0)
 
@@ -88,6 +88,14 @@ class QomuiDbus(dbus.service.Object):
         log = logging.makeLogRecord(record)
         self.filehandler.handle(log)
         self.gui_handler.handle(log)
+
+    @dbus.service.method(BUS_NAME, in_signature='s', out_signature='')
+    def log_level_change(self, level):
+        self.logger.setLevel(getattr(logging, level.upper()))
+        self.config["log_level"] = level
+
+        with open('{}/config.json'.format(ROOTDIR), 'w') as save_config:
+            json.dump(self.config, save_config)
 
     @dbus.service.method(BUS_NAME, in_signature='a{ss}', out_signature='')
     def connect_to_server(self, ovpn_dict):
@@ -122,6 +130,12 @@ class QomuiDbus(dbus.service.Object):
             self.logger.error('{}: Could not open config.json - loading default configuration'.format(e))
             with open('{}/default_config.json'.format(ROOTDIR), 'r') as c:
                 self.config = json.load(c)
+
+        try:
+            self.logger.setLevel(self.config["log_level"].upper())
+
+        except KeyError:
+            pass
 
         try:
             if self.config["fw_gui_only"] == 0:
@@ -546,7 +560,7 @@ class QomuiDbus(dbus.service.Object):
             if self.packetmanager == "DEB":
                 deb_pack = "qomui-{}-amd64.deb".format(self.version[1:])
                 deb_url = "{}releases/download/v{}/{}".format(base_url, self.version[1:], deb_pack)
-                deb_down = requests.get(deb_url, stream=True, timeout=2))
+                deb_down = requests.get(deb_url, stream=True, timeout=2)
                 with open('{}/{}'.format(ROOTDIR, deb_pack), 'wb') as deb:
                     shutil.copyfileobj(deb_down.raw, deb)
 
@@ -555,7 +569,7 @@ class QomuiDbus(dbus.service.Object):
             elif self.packetmanager == "RPM":
                 rpm_pack = "qomui-{}-1.x86_64.rpm".format(self.version[1:])
                 rpm_url = "{}releases/download/v{}/{}".format(base_url, self.version[1:], rpm_pack)
-                rpm_down = requests.get(rpm_url, stream=True, timeout=2))
+                rpm_down = requests.get(rpm_url, stream=True, timeout=2)
                 with open('{}/{}'.format(ROOTDIR, rpm_pack), 'wb') as rpm:
                     shutil.copyfileobj(rpm_down.raw, rpm)
 

@@ -810,4 +810,4 @@ class UpdateCheck(QtCore.QThread):
             latest_release = check_version.json()["tag_name"]
             self.release_found.emit(latest_release)
         except:
-            self.log.emit("error", "Failed to check if update is available")
+            self.log.emit(("error", "Failed to check if update is available"))

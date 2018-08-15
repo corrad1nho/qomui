@@ -38,19 +38,6 @@ except AttributeError:
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig)
 
-class DbusLogHandler(logging.Handler):
-    def __init__(self, qomui_service, parent = None):
-        super(DbusLogHandler, self).__init__()
-        self.qomui_service = qomui_service
-
-    def emit(self, record):
-        try:
-            msg = json.dumps(dict(record.__dict__))
-            self.qomui_service.share_log(msg)
-        except (dbus.exceptions.DBusException, TypeError):
-            pass
-
-
 
 ROOTDIR = "/usr/share/qomui"
 HOMEDIR = "{}/.qomui".format(os.path.expanduser("~"))
@@ -61,6 +48,18 @@ JSON_FILE_LIST = [("config_dict", "{}/config.json".format(ROOTDIR)),
                   ("bypass_dict", "{}/bypass_apps.json".format(HOMEDIR))
                   ]
 
+class DbusLogHandler(logging.Handler):
+    def __init__(self, qomui_service, parent = None):
+        super(DbusLogHandler, self).__init__()
+        self.qomui_service = qomui_service
+
+    def emit(self, record):
+        try:
+            msg = json.dumps(dict(record.__dict__))
+            self.qomui_service.share_log(msg)
+
+        except (dbus.exceptions.DBusException, TypeError):
+            pass
 
 class favouriteButton(QtWidgets.QAbstractButton):
     def __init__(self, parent=None):
@@ -322,7 +321,10 @@ class QomuiGui(QtWidgets.QWidget):
         self.gridLayout_2.setObjectName(_fromUtf8("gridLayout_2"))
         self.logText = QtWidgets.QPlainTextEdit(self.logTab)
         self.logText.setReadOnly(True)
-        self.gridLayout_2.addWidget(self.logText, 2, 0, 1, 1)
+        self.gridLayout_2.addWidget(self.logText, 0, 0, 1, 4)
+        self.logBox = QtWidgets.QComboBox(self.logTab)
+        self.logBox.setObjectName(_fromUtf8("logBox"))
+        self.gridLayout_2.addWidget(self.logBox, 1, 3, 1, 1)
         self.tabWidget.addWidget(self.logTab)
         self.optionsTab = QtWidgets.QWidget()
         self.optionsTab.setObjectName(_fromUtf8("optionsTab"))
@@ -524,10 +526,10 @@ class QomuiGui(QtWidgets.QWidget):
         self.protocolListWidget = QtWidgets.QListWidget(self.providerTab)
         self.protocolListWidget.setObjectName("protocolListWidget")
         self.verticalLayout_30.addWidget(self.protocolListWidget)
-        self.overrorMsgideCheck = QtWidgets.QCheckBox(self.providerTab)
-        self.overrorMsgideCheck.setObjectName("overrorMsgideCheck")
-        self.overrorMsgideCheck.setVisible(False)
-        self.verticalLayout_30.addWidget(self.overrorMsgideCheck)
+        self.overrideCheck = QtWidgets.QCheckBox(self.providerTab)
+        self.overrideCheck.setObjectName("overrideCheck")
+        self.overrideCheck.setVisible(False)
+        self.verticalLayout_30.addWidget(self.overrideCheck)
         self.horizontalLayout_31 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_31.setObjectName("horizontalLayout_31")
         self.chooseProtocolBox = QtWidgets.QComboBox(self.providerTab)
@@ -718,7 +720,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.addBypassAppBt.clicked.connect(self.select_application)
         self.delBypassAppBt.clicked.connect(self.del_bypass_app)
         self.favouriteButton.toggled.connect(self.show_favourite_servers)
-        self.overrorMsgideCheck.toggled.connect(self.override_protocol_show)
+        self.overrideCheck.toggled.connect(self.override_protocol_show)
         self.delProviderBt.clicked.connect(self.del_provider)
         self.addProviderBox.activated[str].connect(self.providerChosen)
         self.addProviderDownloadBt.clicked.connect(self.add_server_configs)
@@ -727,6 +729,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.modify_serverBt.clicked.connect(self.modify_server)
         self.updateQomuiBt.clicked.connect(self.update_qomui)
         self.WaitBar.abort.connect(self.abort_action)
+        self.logBox.activated[str].connect(self.log_level)
 
     def retranslateUi(self, Form):
         s = ""
@@ -771,7 +774,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.delProviderLabel.setText(_translate("Form", "Delete provider:", None))
         self.delProviderBt.setText(_translate("Form", "Delete", None))
         self.delProviderBt.setIcon(QtGui.QIcon.fromTheme("edit-delete"))
-        self.overrorMsgideCheck.setText(_translate("Form",
+        self.overrideCheck.setText(_translate("Form",
                                         "Override settings from config file", None))
         self.portOverrideLabel.setText(_translate("Form", "Port", None))
         self.savePortButton.setText(_translate("Form", "Save", None))
@@ -837,6 +840,9 @@ class QomuiGui(QtWidgets.QWidget):
             self.addProviderBox.addItem(provider)
         self.addProviderBox.addItem("Manually add config file folder")
 
+        self.logBox.addItem("Info")
+        self.logBox.addItem("Debug")
+
     def messageBox(self, text, info, buttons=[], icon="Question"):
         box = QtWidgets.QMessageBox(self)
         box.setText(text)
@@ -862,6 +868,10 @@ class QomuiGui(QtWidgets.QWidget):
 
         ret = box.exec_()
         return ret
+
+    def log_level(self, level):
+        self.logger.setLevel(getattr(logging, level.upper()))
+        self.qomui_service.log_level_change(level)
 
     def restart(self, new_version):
         self.update_bar("stop", "Qomui")
@@ -1051,7 +1061,8 @@ class QomuiGui(QtWidgets.QWidget):
                 self.logger.info("Qomui version {}".format(self.installed))
 
                 try:
-                    service_version = self.qomui_service.get_version2()
+                    service_version = self.qomui_service.get_version()
+
                 except dbus.exceptions.DBusException:
                     service_version = self.installed
                     self.logger.error("Checking version of qomui-service failed")
@@ -1062,12 +1073,14 @@ class QomuiGui(QtWidgets.QWidget):
                     self.logger.info("Restarting qomui-gui and qomui-service")
                     self.restart_qomui()
                 self.versionInfo.setText(self.installed)
+
                 try:
                     pm_check = version[1]
                     if pm_check != "":
                         self.packetmanager = pm_check
                     else:
                         self.packetmanager = "None"
+
                 except IndexError:
                     pass
 
@@ -1085,12 +1098,14 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             if self.config_dict["minimize"] == 0:
                 self.setWindowState(QtCore.Qt.WindowActive)
+
         except KeyError:
             pass
 
         try:
             if self.config_dict["firewall"] == 1 and self.config_dict["fw_gui_only"] == 1:
                 self.qomui_service.load_firewall(1)
+
         except KeyError:
             pass
 
@@ -1098,6 +1113,15 @@ class QomuiGui(QtWidgets.QWidget):
             if self.config_dict["bypass"] == 1:
                 self.qomui_service.bypass(utils.get_user_group())
                 self.bypassTabBt.setVisible(True)
+
+        except KeyError:
+            pass
+
+        try:
+            self.logger.setLevel(getattr(logging, self.config_dict["log_level"].upper()))
+            if self.config_dict["log_level"] == "Debug":
+                self.logBox.setCurrentIndex(1)
+
         except KeyError:
             pass
 
@@ -1626,7 +1650,7 @@ class QomuiGui(QtWidgets.QWidget):
     def pop_ProtocolListWidget(self, provider):
         if provider in SUPPORTED_PROVIDERS:
             self.protocolListWidget.setVisible(True)
-            self.overrorMsgideCheck.setVisible(False)
+            self.overrideCheck.setVisible(False)
             self.portOverrideLabel.setVisible(False)
             self.chooseProtocolBox.setVisible(False)
             self.portEdit.setVisible(False)
@@ -1656,12 +1680,12 @@ class QomuiGui(QtWidgets.QWidget):
                     self.protocolListWidget.addItem(item)
         else:
             self.protocolListWidget.setVisible(False)
-            self.overrorMsgideCheck.setVisible(True)
+            self.overrideCheck.setVisible(True)
             try:
                 protocol = self.protocol_dict[provider]["protocol"]
                 port = self.protocol_dict[provider]["port"]
                 self.override_protocol_show(True, protocol=protocol, port=port)
-                self.overrorMsgideCheck.setChecked(True)
+                self.overrideCheck.setChecked(True)
             except KeyError:
                 pass
 
@@ -1702,7 +1726,7 @@ class QomuiGui(QtWidgets.QWidget):
         protocol = self.chooseProtocolBox.currentText()
         port = self.portEdit.text()
         provider = self.providerProtocolBox.currentText()
-        if self.overrorMsgideCheck.checkState() == 2:
+        if self.overrideCheck.checkState() == 2:
             self.protocol_dict[provider] = {"protocol" : protocol, "port": port}
             with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
                 json.dump(self.protocol_dict, p)
@@ -2477,17 +2501,19 @@ class NetMon(QtCore.QThread):
         try:
 
             try:
-                query = requests.get(check_url, timeout=1).content.decode("utf-8")
+                query = requests.get(check_url, timeout=2).content.decode("utf-8")
                 ip = json.loads(query)["ip"]
 
             except (KeyError, requests.exceptions.RequestException):
+                self.log.emit("info", "Could not determine external ipv4 address")
                 ip = None
 
             try:
-                query = requests.get(check_url_6, timeout=1).content.decode("utf-8")
+                query = requests.get(check_url_6, timeout=2).content.decode("utf-8")
                 ip_6 = json.loads(query)["ip"]
 
             except (KeyError, requests.exceptions.RequestException):
+                self.log.emit("info", "Could not determine external ipv6 address")
                 ip_6 = None
 
             self.log.emit(("info", "External IP = {} - {}".format(ip, ip_6)))
