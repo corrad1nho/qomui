@@ -5,9 +5,10 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.6.4"
+VERSION = "0.6.5"
 
 data_files = [
+        ('/usr/share/qomui', ['resources/countries.json']),
         ('/usr/share/applications/', ['resources/qomui.desktop']),
         ('/etc/systemd/system/', ['resources/qomui.service']),
         ('/etc/dbus-1/system.d/', ['resources/org.qomui.service.conf']),
@@ -58,13 +59,12 @@ setup(name="qomui",
         'beautifulsoup4',
         'pexpect',
         'psutil',
-        'pycountry',
         'requests',
         'lxml'
         ],
       classifiers=[
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: End Users/Desktop',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3',

@@ -1,5 +1,16 @@
 ##Changelog
 
+version 0.6.5:
+- [change] automatic restart if background service is running an older version than the gui
+- [change] pending tasks such as connecting to a server can be cancelled now
+- [change] multiple progress bars are now shown for concurrent actions
+- [change] string formatting changed to new style
+- [change] dropped pycountry dependency - using simple json instead
+- [change] added more log messages
+- [change] added log levels
+- [change] external ipv6 address displayed (if available)
+- [bugfix] crashes when trying to modify server when none is selected
+
 version 0.6.4:
 - [change] added new firewall options
 - [change] code cleanup

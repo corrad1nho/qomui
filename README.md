@@ -38,11 +38,11 @@ Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to
 
 #### Ubuntu
 
-Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.4/qomui-0.6.4-amd64.deb)
+Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.5/qomui-0.6.5-amd64.deb)
 
 #### Fedora
 
-Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.4/qomui-0.6.4-1.x86_64.rpm)
+Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.5/qomui-0.6.5-1.x86_64.rpm)
 
 #### Arch
 
@@ -63,12 +63,14 @@ sudo python3 setup.py install
 ```
 
 ### Usage
-Qomui contains two components: qomui-gui and qomui-service. The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service"). Be aware that if you choose to activate the firewall and enable qomui-service all internet connectivity will be blocked as long as no OpenVPN connection has been established whether or not the gui is running. 
+Qomui contains two components: qomui-gui and qomui-service (and qomui-cli: see below). The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service" - this is not recommended). Be aware that if you choose to activate the firewall and enable qomui-service all internet connectivity will be blocked as long as no OpenVPN/WireGuard connection has been established whether or not the gui is running. Alternatively, the "Edit firewall" dialog in the options tab offers a setting to enable/disable the firewall if you start/quit the gui. You can also add custom iptables rules there. 
 
-Current configurations for AirVPN, Mullvad, ProtonVPN, PIA and Windscribe can be automatically downloaded via the provider tab. For all other providers you can conveniently add a config file folder. Qomui will automatically resolve host names, determine the location of servers (using geoip-database) and save your username and password (in a file readable only by root). You can mark servers as favorites and choose to always connect to one of those randomly. 
+Current configurations for AirVPN, Mullvad, ProtonVPN, PIA and Windscribe can be automatically downloaded via the provider tab. For all other providers you can conveniently add a config file folder. Qomui will automatically resolve host names, determine the location of servers (using geoip-database) and save your username and password (in a file readable only by root).
+
+Once you added server configurations, you can browse and filter them in the server tab. Furthermore, you can mark servers as favourites and connect to one of them randomly. To see a list of all favourited servers click on the star in the upper right. 
 
 ### Double-Hop
-To create a "double-hop" simply choose a first server via the "hop"-button before connecting to the second one. You can mix connections to different providers. However, the double-hop feature does not support OpenVPN over SSL or SSH. Also be aware that depending on your choice of servers this feature may drastically reduce the speed of your internet connection and increase your ping. In any case, you will likely have to sacrifice some bandwith. In my opinion, the added benefits of increased privacy, being able to use different providers as entry and exit node and making it more difficult to be tracked are worth it, though. This feature was inspired by suggestions to simply run a second instance of OpenVPN in a virtual machine to create a double-hop. If that is possible, it should be possible to do the same by manipulating the routing table without the need to fire up a VM. Invaluable resources on the topic were [this discussion on the Openvpn forum](https://forums.openvpn.net/viewtopic.php?f=15&t=7483) and [this github repository](https://github.com/TomAshley303/VPN-Chain). 
+To create a "double-hop" simply choose a first server via the "hop"-button before connecting to the second one. You can mix connections to different providers. However, the double-hop feature does not support OpenVPN over SSL/SSH and WireGuard. Also be aware that depending on your choice of servers this feature may drastically reduce the speed of your internet connection and increase your ping. In any case, you will likely have to sacrifice some bandwith. In my opinion, the added benefits of increased privacy, being able to use different providers as entry and exit node and making it more difficult to be tracked are worth it, though. This feature was inspired by suggestions to simply run a second instance of OpenVPN in a virtual machine to create a double-hop. If that is possible, it should be possible to do the same by manipulating the routing table without the need to fire up a VM. Invaluable resources on the topic were [this discussion on the Openvpn forum](https://forums.openvpn.net/viewtopic.php?f=15&t=7483) and [this github repository](https://github.com/TomAshley303/VPN-Chain). 
 
 ### Bypass OpenVPN
 Qomui includes the option to allow applications such as web browsers to bypass an existing OpenVPN tunnel. This feature is fully compatible with Qomui's firewall activated and double-hop connections. When activated, you can either add and launch applications via the respective tab or via console by issuing your command the following way:
@@ -108,21 +110,23 @@ qomui-cli --help
 ```
 
 ### About this project
-Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. Hence, I'm aware that there is a lot of code that could probably be improved, streamlined and made more beautiful. I might have made some horrible mistakes, too. I'd appreciate any feedback as well as suggestions for new features.
+Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. At this stage, Qomui is a beta release at best. So, don't expect it to run flawlessly even though I test every release extensively on different machines. My resources are limited, though. Hence, I'd appreciate any feedback, bug reports and suggestions for new features.
 
 ### Changelog
+version 0.6.5:
+- [change] automatic restart if background service is running an older version than the gui
+- [change] pending tasks such as connecting to a server can be cancelled now
+- [change] multiple progress bars are now shown for concurrent actions
+- [change] string formatting changed to new style
+- [change] dropped pycountry dependency - using simple json instead
+- [change] added more log messages
+- [change] added log levels
+- [change] external ipv6 address displayed (if available)
+- [bugfix] crashes when trying to modify server when none is selected
+
 version 0.6.4:
 - [change] added new firewall options
 - [change] code cleanup
 - [change] WireGuard connections now honor DNS override
 - [bugfix] Proton api url updated
 - [bugfix] added all local ipv4 ranges 
-
-version 0.6.3:
-- [change] bypass mode supports ipv6 now
-- [change] alternative DNS servers are used for bypass
-- [change] WireGuard is now written correctly (pull request from zx2c4) - requires all WireGuard configs to be readded
-- [change] exit dialog has a 5 sec timeout now
-- [change] umask set before chmod to avoid race conditions (pull request from zx2c4)
-- [bugfix] bypass should now work properly with WireGuard connections
-

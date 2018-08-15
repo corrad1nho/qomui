@@ -115,7 +115,7 @@ class QomuiCli(QtCore.QObject):
                 a_lower = [a.lower() for a in args["list"]]
                 check = all(i in v_lower for i in a_lower)
                 if check:
-                    format(ted) = "{} - {} - {}".format(k, v["country"], v["provider"])
+                    formatted = "{} - {} - {}".format(k, v["country"], v["provider"])
                     print(formatted)
 
             sys.exit(0)
@@ -317,7 +317,7 @@ class QomuiCli(QtCore.QObject):
             if self.hop_active == 1:
                 self.hop_active = 0
             else:
-                print("Connection to {} successful".format(self.ovpn_dict["name"])
+                print("Connection to {} successful".format(self.ovpn_dict["name"]))
                 app.quit()
 
         elif reply == "fail2":

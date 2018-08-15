@@ -29,7 +29,7 @@ SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe", "M
 
 def country_translate(cc):
     try:
-        with open("countries.json", "r") as c_json:
+        with open("{}/countries.json".format(ROOTDIR), "r") as c_json:
             cc_lib = json.load(c_json)
 
         country = cc_lib[cc.upper()]
@@ -648,7 +648,7 @@ class AddServers(QtCore.QThread):
         self.configs = [f for f in os.listdir(self.folderpath) if f.endswith('.ovpn') or f.endswith('.conf')]
         if len(self.configs) == 0:
             self.failed.emit(("nothing", self.provider))
-            self.log.emit(("Error", "No config files found in {}".format(self.folderpath)))
+            self.log.emit(("error", "No config files found in {}".format(self.folderpath)))
 
         elif self.sanity_check(self.folderpath) >= 10:
             self.log.emit(("Warning", "{} seems to contain many unrelated files - aborting".format(self.folderpath)))

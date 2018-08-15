@@ -1370,7 +1370,7 @@ class QomuiGui(QtWidgets.QWidget):
 
         else:
             self.update_bar("stop", action)
-            self.logger("Importing {} aborted".format(action))
+            self.logger.info("Importing {} aborted".format(action))
             getattr(self, "import_{}".format(action)).terminate()
             getattr(self, "import_{}".format(action)).wait()
             shutil.rmtree("{}/temp/".format(HOMEDIR))
@@ -2505,7 +2505,7 @@ class NetMon(QtCore.QThread):
                 ip = json.loads(query)["ip"]
 
             except (KeyError, requests.exceptions.RequestException):
-                self.log.emit("info", "Could not determine external ipv4 address")
+                self.log.emit(("info", "Could not determine external ipv4 address"))
                 ip = None
 
             try:
@@ -2513,7 +2513,7 @@ class NetMon(QtCore.QThread):
                 ip_6 = json.loads(query)["ip"]
 
             except (KeyError, requests.exceptions.RequestException):
-                self.log.emit("info", "Could not determine external ipv6 address")
+                self.log.emit(("info", "Could not determine external ipv6 address"))
                 ip_6 = None
 
             self.log.emit(("info", "External IP = {} - {}".format(ip, ip_6)))
