@@ -202,8 +202,11 @@ class QomuiGui(QtWidgets.QWidget):
         self.ActiveWidget = ActiveWidget(Form)
         self.gridLayout.addWidget(self.ActiveWidget, 0, 0, 1, 2)
         self.ActiveWidget.setVisible(False)
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout()
+        self.verticalLayout_2.setObjectName(_fromUtf8("verticalLayout_2"))
+        self.gridLayout.addLayout(self.verticalLayout_2, 1, 0, 1, 2)
         self.WaitBar = WaitBarWidget(Form)
-        self.gridLayout.addWidget(self.WaitBar, 1, 0, 1, 2)
+        self.verticalLayout_2.addWidget(self.WaitBar)
         self.WaitBar.setVisible(False)
         self.verticalLayout_3 = QtWidgets.QVBoxLayout()
         self.verticalLayout_3.setObjectName(_fromUtf8("verticalLayout_3"))
@@ -883,6 +886,7 @@ class QomuiGui(QtWidgets.QWidget):
     def check_update(self):
         if self.packetmanager in ["None", "DEB", "RPM"]:
             self.check_thread = update.UpdateCheck()
+            self.check_thread.log.connect(self.log_from_thread)
             self.check_thread.release_found.connect(self.release_compare)
             self.check_thread.start()
 
@@ -1043,6 +1047,7 @@ class QomuiGui(QtWidgets.QWidget):
             with open("{}/VERSION".format(ROOTDIR), "r") as v:
                 version = v.read().split("\n")
                 self.installed = version[0]
+                self.logger.info("Qomui version {}".format(self.installed))
                 service_version = self.qomui_service.get_version()
                 if service_version != self.installed and service_version != "None":
                     self.logger.warning("qomui-service is running different version than qomui-gui: {} vs {}".format(service_version,
@@ -1183,10 +1188,11 @@ class QomuiGui(QtWidgets.QWidget):
     def providerChosen(self):
         provider = self.addProviderBox.currentText()
 
-        p_txt = {"Airvpn" : ("Username", "Password"),
+        p_txt = {
+                "Airvpn" : ("Username", "Password"),
                 "PIA" : ("Username", "Password"),
                 "Windscribe" : ("Username", "Password"),
-                "Mullvad" : ("Account Numner", "N.A. - Leave empty"),
+                "Mullvad" : ("Account Number", "N.A. - Leave empty"),
                 "ProtonVPN" : ("OpenVPN username", "OpenVPN password")
                 }
 
@@ -1211,75 +1217,23 @@ class QomuiGui(QtWidgets.QWidget):
 
     def add_server_configs(self):
         if not os.path.exists("{}/temp".format(HOMEDIR)):
-               os.makedirs("{}/temp".format(HOMEDIR))
+            os.makedirs("{}/temp".format(HOMEDIR))
 
+        folderpath = None
         provider = self.addProviderBox.currentText()
+        username = self.addProviderUserEdit.text()
+        password = self.addProviderPassEdit.text()
+
         if provider not in SUPPORTED_PROVIDERS:
             provider = self.addProviderEdit.text()
-
-        self.qomui_service.allow_provider_ip(provider)
-        if provider == "Airvpn":
-            username = self.addProviderUserEdit.text()
-            password = self.addProviderPassEdit.text()
-            self.down_thread = update.AirVPNDownload(username, password)
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-            self.update_bar("start", provider)
-        elif provider == "Mullvad":
-            account_number = self.addProviderUserEdit.text()
-            self.down_thread = update.MullvadDownload(account_number)
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-            self.update_bar("start", provider)
-        elif provider == "ProtonVPN":
-            username = self.addProviderUserEdit.text()
-            password = self.addProviderPassEdit.text()
-            self.down_thread = update.ProtonDownload(username, password)
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-            self.update_bar("start", provider)
-        elif provider == "PIA":
-            username = self.addProviderUserEdit.text()
-            password = self.addProviderPassEdit.text()
-            self.down_thread = update.PiaDownload(username, password)
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-            self.update_bar("start", provider)
-        elif provider == "Windscribe":
-            username = self.addProviderUserEdit.text()
-            password = self.addProviderPassEdit.text()
-            self.down_thread = update.WsDownload(username, password)
-            QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-            self.update_bar("start", provider)
-
-        else:
-            provider = self.addProviderEdit.text()
             if provider == "":
-                QtWidgets.QMessageBox.critical(self,
+                QtWidgets.QMessageBox.critical(
+                                                self,
                                                 "Error",
                                                 "Please enter a provider name",
-                                                QtWidgets.QMessageBox.Ok)
-
-            elif provider in SUPPORTED_PROVIDERS:
-                self.provider = provider
-                self.add_server_configs()
-
+                                                QtWidgets.QMessageBox.Ok
+                                                )
             else:
-                credentials = (self.addProviderUserEdit.text(),
-                               self.addProviderPassEdit.text(),
-                               self.addProviderEdit.text()
-                               )
                 try:
                     dialog = QtWidgets.QFileDialog.getOpenFileName(self,
                                 caption="Choose Folder",
@@ -1294,26 +1248,41 @@ class QomuiGui(QtWidgets.QWidget):
                         self.thread.importFail.connect(self.import_fail)
                         self.thread.start()
                         self.update_bar("start", provider)
+
                 except TypeError:
                     pass
 
-    def import_fail(self, info):
+        self.qomui_service.allow_provider_ip(provider)
+        self.down_thread = update.AddServers(username, password, provider, folderpath=folderpath)
+        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        self.down_thread.log.connect(self.log_from_thread)
+        self.down_thread.finished.connect(self.downloaded)
+        self.down_thread.failed.connect(self.import_failed)
+        self.down_thread.start()
+        self.update_bar("start", provider)
+
+    def log_from_thread(self, log):
+        getattr(logging, log[0])(log[1])
+
+    def import_failed(self, info):
         QtWidgets.QApplication.restoreOverrideCursor()
-        self.update_bar("stop", None)
-        if info == "Airvpn":
+        self.update_bar("stop", info[1])
+        if info[0] == "AuthError":
             header = "Authentication failed"
             msg = "Perhaps the credentials you entered are wrong"
-        elif info == "nothing":
+        elif info[0] == "nothing":
             header = "Import Error"
             msg = "No config files found or folder seems\nto contain many unrelated files"
         else:
             header = "Import failed"
-            msg = info
+            msg = info[0]
 
-        QtWidgets.QMessageBox.information(self,
+        QtWidgets.QMessageBox.information(
+                                            self,
                                             header,
                                             msg,
-                                            QtWidgets.QMessageBox.Ok)
+                                            QtWidgets.QMessageBox.Ok
+                                            )
 
         try:
             shutil.rmtree("{}/temp/".format(HOMEDIR))
@@ -1345,13 +1314,18 @@ class QomuiGui(QtWidgets.QWidget):
 
     def update_bar(self, text, provider):
         if text == "stop":
-            self.WaitBar.setVisible(False)
+            getattr(self, "{}Bar".format(provider)).setVisible(False)
+            self.verticalLayout_2.removeWidget(getattr(self, "{}Bar".format(provider)))
+
         elif text == "start":
-            self.WaitBar.setVisible(True)
-            self.WaitBar.setText("Importing {}".format(provider))
+            setattr(self, "{}Bar".format(provider), WaitBarWidget(self))
+            self.verticalLayout_2.addWidget(getattr(self, "{}Bar".format(provider)))
+            getattr(self, "{}Bar".format(provider)).setText("Importing {}".format(provider))
+
         elif text == "upgrade":
-            self.WaitBar.setVisible(True)
-            self.WaitBar.setText("Updating {}".format(provider))
+            setattr(self, "{}Bar".format(provider), WaitBarWidget(self))
+            self.verticalLayout_2.addWidget(getattr(self, "{}Bar".format(provider)))
+            getattr(self, "{}Bar".format(provider)).setText("Updating {}".format(provider))
 
     def downloaded(self, content):
         provider = content["provider"]
@@ -2380,9 +2354,14 @@ class ActiveWidget(QtWidgets.QWidget):
         self.calcThread = NetMon(self.tun, self.tun_hop)
         self.calcThread.stat.connect(self.show_stats)
         self.calcThread.ip.connect(self.show_ip)
+        self.calcThread.log.connect(self.log_from_thread)
         self.calcThread.time.connect(self.update_time)
         self.calcThread.lost.connect(self.reconnect_signal)
         self.calcThread.start()
+        logging.debug("Monitoring thread initialized")
+
+    def log_from_thread(self, msg):
+        getattr(logging, msg[0])(msg[1])
 
     def reconnect_signal(self):
         self.reconnect.emit()
@@ -2437,6 +2416,7 @@ class NetMon(QtCore.QThread):
     ip = QtCore.pyqtSignal(str)
     time = QtCore.pyqtSignal(str)
     lost = QtCore.pyqtSignal()
+    log = QtCore.pyqtSignal(tuple)
 
     def __init__(self, tun, tun_hop=None):
         QtCore.QThread.__init__(self)
@@ -2449,9 +2429,10 @@ class NetMon(QtCore.QThread):
 
         try:
             ip = requests.get(check_url).content.decode("utf-8").split("\n")[0]
+            self.log.emit(("info", "External IP = {}".format(ip)))
             self.ip.emit(ip)
         except:
-            logging.debug("Could not determine external ip address")
+            self.log.emit(("error", "Could not determine external ip address"))
 
         t0 = time.time()
         accum = (0, 0)
@@ -2485,6 +2466,7 @@ class NetMon(QtCore.QThread):
                 break
 
         connected = False
+        self.log.emit(("info", "Interface {} does not exist anymore".format(self.tun)))
         self.lost.emit()
 
     def time_format(self, e):

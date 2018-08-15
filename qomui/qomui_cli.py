@@ -43,7 +43,7 @@ class QomuiCli(QtCore.QObject):
 
         except dbus.exceptions.DBusException:
             print("Error: qomui-service is not available")
-            print('Use "systemctl start qomui" to run the background service') 
+            print('Use "systemctl start qomui" to run the background service')
             print("Exiting...")
             sys.exit(1)
 
@@ -127,7 +127,7 @@ class QomuiCli(QtCore.QObject):
                     config[o] = 1
 
                 else:
-                    print('"{}" is not a valid option') 
+                    print('"{}" is not a valid option')
 
             update_conf = self.applyoptions(config)
 
@@ -188,7 +188,7 @@ class QomuiCli(QtCore.QObject):
         do(line)
 
     def establish_connection(self, server):
-        self.ovpn_dict = utils.create_server_dict(self.server_dict[server], 
+        self.ovpn_dict = utils.create_server_dict(self.server_dict[server],
                                                                 self.protocol_dict
                                                                 )
 
@@ -197,7 +197,7 @@ class QomuiCli(QtCore.QObject):
         else:
             self.ovpn_dict.update({"hop":"0"})
 
-        self.kill()    
+        self.kill()
         self.qomui_service.connect_to_server(self.ovpn_dict)
 
         config = self.get_config()
@@ -208,7 +208,7 @@ class QomuiCli(QtCore.QObject):
             pass
 
     def set_hop(self, server):
-        self.hop_server_dict = utils.create_server_dict(self.server_dict[server], 
+        self.hop_server_dict = utils.create_server_dict(self.server_dict[server],
                                                                     self.protocol_dict
                                                                     )
         self.qomui_service.set_hop(self.hop_server_dict)
@@ -218,14 +218,15 @@ class QomuiCli(QtCore.QObject):
         path = "None"
         print("Automatic download is available for the following providers: Airvpn, Mullvad, PIA, Windscribe and ProtonVPN")
         if provider not in SUPPORTED_PROVIDERS:
-            path = input("Enter path of folder containing config files of {}:\n".format(provider)) 
+            path = input("Enter path of folder containing config files of {}:\n".format(provider))
             if not os.path.exists(path):
                 print("{} is not a valid (path)".format(path))
                 sys.exit(1)
 
         print("Please enter your credentials")
         if provider == "Mullvad":
-            username = input("Enter account number:\n")  
+            username = input("Enter account number:\n")
+            password = "None"
 
         else:
             username = input("Enter username:\n")
@@ -236,53 +237,13 @@ class QomuiCli(QtCore.QObject):
         self.qomui_service.allow_provider_ip(provider)
         print("Please wait....")
 
-        if provider == "Airvpn":
-            username = username
-            password = password
-            self.down_thread = update.AirVPNDownload(username, password)
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-        elif provider == "Mullvad":
-            account_number = username
-            self.down_thread = update.MullvadDownload(account_number)
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-        elif provider == "PIA":
-            username = username
-            password = password
-            self.down_thread = update.PiaDownload(username, password)
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-        elif provider == "Windscribe":
-            username = username
-            password = password
-            self.down_thread = update.WsDownload(username, password)
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-        elif provider == "ProtonVPN":
-            username = username
-            password = password
-            self.down_thread = update.ProtonDownload(username, password)
-            self.down_thread.importFail.connect(self.import_fail)
-            self.down_thread.down_finished.connect(self.downloaded)
-            self.down_thread.start()
-        else:
-            credentials = (username,
-                            password,
-                            provider
-                            )
-
-            self.thread = update.AddFolder(credentials, path)
-            self.thread.down_finished.connect(self.downloaded)
-            self.thread.importFail.connect(self.import_fail)
-            self.thread.start()
+        self.down_thread = update.AddServers(username, password, provider, folderpath=folderpath)
+        self.down_thread.finished.connect(self.downloaded)
+        self.down_thread.failed.connect(self.import_failed)
+        self.down_thread.start()
 
     def import_fail(self, info):
-        if info == "Airvpn":
+        if info == "AuthError":
             print("Authentication failed: Perhaps the credentials you entered are wrong")
         elif info == "nothing":
             print("Import Error: No config files found or folder seems to contain many unrelated files")
@@ -336,7 +297,7 @@ class QomuiCli(QtCore.QObject):
             json.dump(self.server_dict, s)
 
         with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
-            json.dump(self.protocol_dict, p) 
+            json.dump(self.protocol_dict, p)
 
         print("Succesfully added config files for {}".format(provider))
         sys.exit(0)
@@ -364,7 +325,6 @@ class QomuiCli(QtCore.QObject):
             print("Connection attempt failed")
             print("Authentication error while trying to connect\nMaybe your account is expired or connection limit is exceeded")
             app.quit()
-
 
         elif reply == "fail1":
             self.kill()
@@ -446,16 +406,16 @@ class AutoCompleter(object):
         return response
 
 
-def main():    
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--connect", help="Connect to server [Name of server]")
     parser.add_argument("-t", "--terminate", action='store_true', help="Disconnect")
     parser.add_argument("-p", "--set-protocol", help="Set port/protocol for [provider]")
     parser.add_argument("-v", "--via", help="Choose server for doublehop [Name of server]")
-    parser.add_argument("-e", "--enable", nargs='*', 
+    parser.add_argument("-e", "--enable", nargs='*',
                         help="Enable [autoconnect] [firewall] [bypass] [ipv6_disable] [alt_dns]"
                         )
-    parser.add_argument("-d", "--disable", nargs='*', 
+    parser.add_argument("-d", "--disable", nargs='*',
                         help="Disable [autoconnect] [firewall] [bypass] [ipv6_disable] [alt_dns]"
                         )
     parser.add_argument("-o", "--show-options", action='store_true', help="Show current configuration")
