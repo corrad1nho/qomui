@@ -321,15 +321,15 @@ class AddServers(QtCore.QThread):
                                     public_key = relay["public_key"]
                                     port = "51820"
                                     self.mullvad_servers[server] = {
-                                                                    "name" : server,
-                                                                    "provider" : "Mullvad",
-                                                                    "city" : city,
-                                                                    "country" : country,
-                                                                    "ip" : ip,
-                                                                    "port" : port,
-                                                                    "public_key" : public_key,
-                                                                    "tunnel" : "WireGuard"
-                                                                    }
+                                                                        "name" : server,
+                                                                        "provider" : "Mullvad",
+                                                                        "city" : city,
+                                                                        "country" : country,
+                                                                        "ip" : ip,
+                                                                        "port" : port,
+                                                                        "public_key" : public_key,
+                                                                        "tunnel" : "WireGuard"
+                                                                        }
 
 
                     private_key = check_output(["wg", "genkey"]).decode("utf-8").split("\n")[0]
@@ -745,16 +745,16 @@ class AddServers(QtCore.QThread):
                     cc = country_check.split(" ")[3].split(",")[0]
                     country = country_translate(cc)
                     custom_servers[name] = {
-                                            "name": name,
-                                            "provider" : self.provider,
-                                            "city" : "",
-                                            "path" : "{}/{}".format(self.provider, f),
-                                            "ip" : ip,
-                                            "country" : country,
-                                            "tunnel" : tunnel,
-                                            "port": port.upper().split("\n")[0],
-                                            "protocol": protocol.upper().split("\n")[0]
-                                            }
+                                                "name": name,
+                                                "provider" : self.provider,
+                                                "city" : "",
+                                                "path" : "{}/{}".format(self.provider, f),
+                                                "ip" : ip,
+                                                "country" : country,
+                                                "tunnel" : tunnel,
+                                                "port": port.upper().split("\n")[0],
+                                                "protocol": protocol.upper().split("\n")[0]
+                                                }
 
                 else:
                     pass

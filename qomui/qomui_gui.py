@@ -726,6 +726,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.savePortButton.clicked.connect(self.override_protocol)
         self.modify_serverBt.clicked.connect(self.modify_server)
         self.updateQomuiBt.clicked.connect(self.update_qomui)
+        self.WaitBar.abort.connect(self.abort_action)
 
     def retranslateUi(self, Form):
         s = ""
@@ -1253,12 +1254,18 @@ class QomuiGui(QtWidgets.QWidget):
                     pass
 
         self.qomui_service.allow_provider_ip(provider)
-        self.down_thread = update.AddServers(username, password, provider, folderpath=folderpath)
+        setattr(self, "import_{}".format(provider), update.AddServers(
+                                                                    username,
+                                                                    password,
+                                                                    provider,
+                                                                    folderpath=folderpath
+                                                                    ))
+
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-        self.down_thread.log.connect(self.log_from_thread)
-        self.down_thread.finished.connect(self.downloaded)
-        self.down_thread.failed.connect(self.import_failed)
-        self.down_thread.start()
+        getattr(self, "import_{}".format(provider)).log.connect(self.log_from_thread)
+        getattr(self, "import_{}".format(provider)).finished.connect(self.downloaded)
+        getattr(self, "import_{}".format(provider)).failed.connect(self.import_failed)
+        getattr(self, "import_{}".format(provider)).start()
         self.update_bar("start", provider)
 
     def log_from_thread(self, log):
@@ -1320,12 +1327,29 @@ class QomuiGui(QtWidgets.QWidget):
         elif text == "start":
             setattr(self, "{}Bar".format(provider), WaitBarWidget(self))
             self.verticalLayout_2.addWidget(getattr(self, "{}Bar".format(provider)))
-            getattr(self, "{}Bar".format(provider)).setText("Importing {}".format(provider))
+            getattr(self, "{}Bar".format(provider)).setText("Importing {}".format(provider), action=provider)
+            getattr(self, "{}Bar".format(provider)).abort.connect(self.abort_action)
 
         elif text == "upgrade":
             setattr(self, "{}Bar".format(provider), WaitBarWidget(self))
             self.verticalLayout_2.addWidget(getattr(self, "{}Bar".format(provider)))
-            getattr(self, "{}Bar".format(provider)).setText("Updating {}".format(provider))
+            getattr(self, "{}Bar".format(provider)).setText("Updating {}".format(provider), action="upgrade")
+            getattr(self, "{}Bar".format(provider)).abort.connect(self.abort_action)
+
+    def abort_action(self, action):
+        if action == "connect":
+            self.kill()
+
+        elif action == "upgrade":
+            pass
+
+        else:
+            self.update_bar("stop", action)
+            self.logger("Importing {} aborted".format(action))
+            getattr(self, "import_{}".format(action)).terminate()
+            getattr(self, "import_{}".format(action)).wait()
+            shutil.rmtree("{}/temp/".format(HOMEDIR))
+            QtWidgets.QApplication.restoreOverrideCursor()
 
     def downloaded(self, content):
         provider = content["provider"]
@@ -1370,7 +1394,7 @@ class QomuiGui(QtWidgets.QWidget):
             json.dump(self.protocol_dict, p)
         self.pop_boxes()
 
-        self.update_bar("stop", None)
+        self.update_bar("stop", provider)
         QtWidgets.QApplication.restoreOverrideCursor()
         txt = "List of available servers updated"
         try:
@@ -1862,7 +1886,7 @@ class QomuiGui(QtWidgets.QWidget):
     def establish_connection(self, server_dict):
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         self.logger.info("Connecting to {}....".format(server_dict["name"]))
-        self.WaitBar.setText("Connecting to {}".format(server_dict["name"]))
+        self.WaitBar.setText("Connecting to {}".format(server_dict["name"]), action="connect")
         self.WaitBar.setVisible(True)
         self.hop_log_monitor = 0
         provider = server_dict["provider"]
@@ -2211,6 +2235,8 @@ class HopWidget(QtWidgets.QWidget):
         self.clear.emit()
 
 class WaitBarWidget(QtWidgets.QWidget):
+    abort = QtCore.pyqtSignal(str)
+
     def __init__ (self, parent=None):
         super(WaitBarWidget, self).__init__(parent)
         self.setupUi(self)
@@ -2229,10 +2255,22 @@ class WaitBarWidget(QtWidgets.QWidget):
         self.waitBar = QtWidgets.QProgressBar(WaitBarWidget)
         self.waitBar.setObjectName(_fromUtf8("waitBar"))
         self.horizontalLayout.addWidget(self.waitBar)
+        self.cancelButton = QtWidgets.QPushButton(WaitBarWidget)
+        self.cancelButton.setObjectName(_fromUtf8("cancelButton"))
+        self.horizontalLayout.addWidget(self.cancelButton)
+
+        self.cancelButton.clicked.connect(self.cancel)
         self.waitBar.setRange(0, 0)
 
-    def setText(self, text):
+    def setText(self, text, action=None):
+        self.action = action
+        self.cancelButton.setText("cancel")
+        if action == "upgrade":
+            self.cancelButton.setVisible(False)
         self.taskLabel.setText(_translate("WaitBarWidget", text, None))
+
+    def cancel(self):
+        self.abort.emit(self.action)
 
 class ActiveWidget(QtWidgets.QWidget):
     disconnect = QtCore.pyqtSignal()
