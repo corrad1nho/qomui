@@ -15,7 +15,7 @@ sndbuf 524288
 rcvbuf 524288
 verb 3
 
-auth-user-pass /usr/share/qomui/certs/mullvad_userpass.txt
+auth-user-pass /usr/share/qomui/certs/Mullvad-auth.txt
 ca /usr/share/qomui/certs/mullvad_ca.crt
 crl-verify /usr/share/qomui/certs/mullvad_crl.pem
 

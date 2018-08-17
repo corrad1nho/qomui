@@ -238,9 +238,13 @@ class QomuiCli(QtCore.QObject):
         print("Please wait....")
 
         self.down_thread = update.AddServers(username, password, provider, folderpath=folderpath)
+        self.down_thread.log.connect(self.log_from_thread)
         self.down_thread.finished.connect(self.downloaded)
         self.down_thread.failed.connect(self.import_failed)
         self.down_thread.start()
+
+    def log_from_thread(self, msg):
+        print(msg[1])
 
     def import_fail(self, info):
         if info == "AuthError":
@@ -257,7 +261,7 @@ class QomuiCli(QtCore.QObject):
         self.qomui_service.block_dns()
         copy = self.qomui_service.copy_rootdir(provider, content["path"])
         if copy == "copied":
-            shutil.rmtree("{}/temp/".format(HOMEDIR))
+            shutil.rmtree("{}/{}/".format(HOMEDIR, provider))
 
         self.server_dict = self.load_json("{}/server.json".format(HOMEDIR))
         self.protocol_dict = self.load_json("{}/protocol.json".format(HOMEDIR))

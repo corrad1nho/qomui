@@ -20,7 +20,7 @@ pull
 fast-io
 key-direction 1
 
-auth-user-pass /usr/share/qomui/certs/proton_userpass.txt
+auth-user-pass /usr/share/qomui/certs/ProtonVPN-auth.txt
 ca /usr/share/qomui/certs/proton_ca.crt
 tls-auth /usr/share/qomui/certs/proton_ta.key
 
