@@ -120,7 +120,7 @@ qomui-cli --help
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. At this stage, Qomui is a beta release at best. So, don't expect it to run flawlessly even though I test every release extensively on different machines. My resources are limited, though. Hence, I'd appreciate any feedback, bug reports and suggestions for new features.
 
 ### Changelog
-version 0.7.0:
+#### version 0.7.0:
 - [new] auto-update for supported providers - EXPERIMENTAL
 - [change] server import method rewritten
 - [change] using libnotify for notifications - QMessageBox as fallback
@@ -141,7 +141,7 @@ version 0.7.0:
 - due to changes in the import method it is necessary and recommended to re-import server configurations - exceptions: Airvpn (auto-update won't work) and manual imports.
 - importing servers via cli is broken: you can either use the gui or an older release. This will be fixed in the next update.
 
-version 0.6.5:
+#### version 0.6.5:
 - [change] automatic restart if background service is running an older version than the gui
 - [change] pending tasks such as connecting to a server can be cancelled now
 - [change] multiple progress bars are now shown for concurrent actions
