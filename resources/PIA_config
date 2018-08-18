@@ -11,7 +11,7 @@ auth sha256
 tls-client
 remote-cert-tls server
 auth-user-pass /usr/share/qomui/certs/PIA-auth.txt
-comp-lzo
+comp-lzo no
 verb 3
 reneg-sec 0
 crl-verify /usr/share/qomui/certs/pia_crl.rsa.4096.pem

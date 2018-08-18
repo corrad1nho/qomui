@@ -1,6 +1,6 @@
 # Qomui <img align="right" src="resources/qomui.png" width=40> 
 
-Written in Python 3.6
+Written in Python 3.7
 
 ### Description
 Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux with some unique features such as provider-independent support for double-hop connections. Qomui supports multiple providers with added convenience when using AirVPN, PIA, ProtonVPN, Windscribe or Mullvad. 
@@ -10,13 +10,14 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - automatic download function for Mullvad, Private Internet Access, Windscribe, ProtonVPN and AirVPN 
 - support for OpenVPN over SSL and SSH for AirVPN and OpenVPN over SSL for Windscribe (Stealth Mode)
 - allows double-hop VPN connections (VPN chains) between different providers
-- Gui written in PyQt including option to minimize application to system tray 
+- gui written in PyQt including option to minimize application to system tray 
 - security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
 - protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
 - allow applications to bypass the VPN tunnel - to watch Netflix for example
 - experimental support for WireGuard
 - command-line interface
+- automatic weekly updates of server configurations for supported providers - experimental
 
 ### Screenshots
 Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to your theme.<br/>
@@ -27,7 +28,7 @@ Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to
 ### Dependencies/Requirements
 - Qomui should work on any GNU/Linux distribution 
 - python (>=3.5)
-- python-pyqt5, python-dbus, and python-dbus.mainloop.pyqt5, python-setuptools, pip 
+- python-pyqt5, python-dbus, and python-dbus.mainloop.pyqt5
 - Additional python packages: psutil, requests, beautifulsoup4, lxml, pexpect
 - openvpn, dnsutils and stunnel
 - geoip and geoip-database (optional: to identify server locations)
@@ -38,11 +39,11 @@ Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to
 
 #### Ubuntu
 
-Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.5/qomui-0.6.5-amd64.deb)
+Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.7.0/qomui-0.7.0-amd64.deb)
 
 #### Fedora
 
-Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.6.5/qomui-0.6.5-1.x86_64.rpm)
+Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.7.0/qomui-0.7.0-1.x86_64.rpm)
 
 #### Arch
 
@@ -56,6 +57,12 @@ yaourt -S qomui
 
 Make sure all dependencies are installed - be aware that depending on your distribution package names may vary!
 
+I recommend downloading and extracting the latest release and installing via:
+```
+sudo python3 setup.py install
+```
+
+If your adventurous:
 ```
 git clone https://github.com/corrad1nho/qomui.git
 cd ./qomui
@@ -65,7 +72,7 @@ sudo python3 setup.py install
 ### Usage
 Qomui contains two components: qomui-gui and qomui-service (and qomui-cli: see below). The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service" - this is not recommended). Be aware that if you choose to activate the firewall and enable qomui-service all internet connectivity will be blocked as long as no OpenVPN/WireGuard connection has been established whether or not the gui is running. Alternatively, the "Edit firewall" dialog in the options tab offers a setting to enable/disable the firewall if you start/quit the gui. You can also add custom iptables rules there. 
 
-Current configurations for AirVPN, Mullvad, ProtonVPN, PIA and Windscribe can be automatically downloaded via the provider tab. For all other providers you can conveniently add a config file folder. Qomui will automatically resolve host names, determine the location of servers (using geoip-database) and save your username and password (in a file readable only by root).
+Current configurations for AirVPN, Mullvad, ProtonVPN, PIA and Windscribe can be automatically downloaded via the provider tab. For all other providers you can conveniently add a config file folder. Qomui will automatically resolve host names, determine the location of servers (using geoip-database) and save your username and password (in a file readable only by root). 
 
 Once you added server configurations, you can browse and filter them in the server tab. Furthermore, you can mark servers as favourites and connect to one of them randomly. To see a list of all favourited servers click on the star in the upper right. 
 
@@ -113,6 +120,27 @@ qomui-cli --help
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. At this stage, Qomui is a beta release at best. So, don't expect it to run flawlessly even though I test every release extensively on different machines. My resources are limited, though. Hence, I'd appreciate any feedback, bug reports and suggestions for new features.
 
 ### Changelog
+version 0.7.0:
+- [new] auto-update for supported providers - EXPERIMENTAL
+- [change] server import method rewritten
+- [change] using libnotify for notifications - QMessageBox as fallback
+- [change] Windscribe naming scheme changed - Windflix servers now recognizable
+- [change] ProtonVPN naming scheme changed to make Free, P2P, Tor & SecureCore servers more visible
+- [change] search bar for filtering servers
+- [change] network connectivity monitoring: relying on sysfs instead of network-manager
+- [change] Qomui does not rely on systemd anymore - although it is still recommended
+- [change] Mullvad certificates are now downloaded from github 
+- [¢hange] PIA: compression disabled in config file - [issue #22](https://github.com/corrad1nho/qomui/issues/22)
+- [bugfix] installing deb-package fails on Debian Stable - dependencies updated
+- [bugfix] restore of original DNS servers more reliable 
+- [bugfix] ordering of servers after latency check more reliable 
+- [bugfix] loop when version discrepancy between qomui-gui and qomui-service detected and qomui-service has not been started via systemctl
+- [bugifx] crash if failing to read/start desktop-file - will be further investigated
+
+##### Additional notes
+- due to changes in the import method it is necessary and recommended to re-import server configurations - exceptions: Airvpn (auto-update won't work) and manual imports.
+- importing servers via cli is broken: you can either use the gui or an older release. This will be fixed in the next update.
+
 version 0.6.5:
 - [change] automatic restart if background service is running an older version than the gui
 - [change] pending tasks such as connecting to a server can be cancelled now
@@ -123,10 +151,3 @@ version 0.6.5:
 - [change] added log levels
 - [change] external ipv6 address displayed (if available)
 - [bugfix] crashes when trying to modify server when none is selected
-
-version 0.6.4:
-- [change] added new firewall options
-- [change] code cleanup
-- [change] WireGuard connections now honor DNS override
-- [bugfix] Proton api url updated
-- [bugfix] added all local ipv4 ranges 

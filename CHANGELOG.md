@@ -1,5 +1,22 @@
 ##Changelog
 
+version 0.7.0:
+- [new] auto-update for supported providers - EXPERIMENTAL
+- [change] server import method rewritten
+- [change] using libnotify for notifications - QMessageBox as fallback
+- [change] Windscribe naming scheme changed - Windflix servers now recognizable
+- [change] ProtonVPN naming scheme changed to make Free, P2P, Tor & SecureCore servers more visible
+- [change] search bar for filtering servers
+- [change] network connectivity monitoring: relying on sysfs instead of network-manager
+- [change] Qomui does not rely on systemd anymore - although it is still recommended
+- [change] Mullvad certificates are now downloaded from github 
+- [¢hange] PIA: compression disabled in config file - [issue #22](https://github.com/corrad1nho/qomui/issues/22) 
+- [bugfix] installing deb-package fails on Debian Stable - dependencies updated
+- [bugfix] restore of original DNS servers more reliable 
+- [bugfix] ordering of servers after latency check more reliable
+- [bugfix] loop when version discrepancy between qomui-gui and qomui-service detected and qomui-service has not been started via systemctl
+- [bugifx] crash if failing to read/start desktop-file - will be further investigated
+
 version 0.6.5:
 - [change] automatic restart if background service is running an older version than the gui
 - [change] pending tasks such as connecting to a server can be cancelled now

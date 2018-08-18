@@ -80,10 +80,15 @@ class QomuiDbus(dbus.service.Object):
     def get_version(self):
         return self.version
 
-    @dbus.service.method(BUS_NAME)
+    @dbus.service.method(BUS_NAME, out_signature='i')
     def restart(self):
-        Popen(["systemctl", "daemon-reload"])
-        Popen(["systemctl", "restart", "qomui"])
+
+        try:
+            Popen(["systemctl", "daemon-reload"])
+            Popen(["systemctl", "restart", "qomui"])
+
+        except CalledProcessError as e:
+            self.logger.error(e)
 
     @dbus.service.method(BUS_NAME, in_signature='s')
     def share_log(self, msg):
@@ -350,9 +355,9 @@ class QomuiDbus(dbus.service.Object):
                     auth_file = "{}/certs/{}-auth.txt".format(ROOTDIR, provider)
 
                     with open(auth_file, "r") as auth:
-                        up = auth.split("\n")
+                        up = auth.read().split("\n")
                         credentials["username"] = up[0]
-                        credentials["password"] = up[0]
+                        credentials["password"] = up[1]
 
                 except FileNotFoundError:
                     self.logger.error("Could not find {} - Aborting update".format(auth_file))
@@ -586,7 +591,7 @@ class QomuiDbus(dbus.service.Object):
         rule = (['-I', 'OUTPUT', '1', '-d', '{}'.format(ip), '-j', 'ACCEPT'])
         self.allow_ip(ip, rule)
 
-        self.logger.info("(ip)tables: created rule for {}".format(ip))
+        self.logger.info("iptables: created rule for {}".format(ip))
 
         try:
             if self.ovpn_dict["tunnel"] == "WireGuard":

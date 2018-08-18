@@ -268,21 +268,20 @@ class AddServers(QtCore.QThread):
 
     def mullvad(self):
         self.mullvad_servers = {}
+        self.password = "m"
         self.log.emit(("info", "Downloading certificates for Mullvad"))
         auth = 0
         with requests.Session() as self.session:
 
             try:
+                certfiles = ["ca.crt", "crl.pem"]
+                git_raw = "https://raw.githubusercontent.com/mullvad/mullvadvpn-app/master/dist-assets/"
 
-                url = "https://mullvad.net/download/latest/source/"
-                src = self.session.get(url, timeout=2)
-                with open("{}/tar".format(self.temp_path), 'wb') as temp_file:
-                    temp_file.write(gzip.decompress(src.content))
-                    tar = tarfile.open("{}/tar".format(self.temp_path))
-                    tar.extractall(path="{}".format(self.temp_path))
+                for c in certfiles:
+                    certificate = self.session.get("{}{}".format(git_raw, c), timeout=2)
 
-                certpath = "{}/{}/src/mullvad/ssl/".format(self.temp_path, tar.getnames()[0])
-                shutil.copytree(certpath, "{}/ssl/".format(self.temp_path))
+                    with open("{}/{}".format(self.temp_path, c), 'w') as cert_file:
+                        cert_file.write(certificate.content.decode("utf-8"))
 
                 page = self.session.get('https://www.mullvad.net/en/servers/', timeout=2)
                 self.log.emit(("info", "Fetching server list for Mullvad"))
@@ -365,7 +364,7 @@ class AddServers(QtCore.QThread):
                                     "AllowedIPs = 0.0.0.0/0, ::/0\n"
                                     ]
 
-                        with open("{}/ssl/mullvad_wg.conf".format(self.temp_path), "w") as wg:
+                        with open("{}/mullvad_wg.conf".format(self.temp_path), "w") as wg:
                             wg_conf.insert(1, "PrivateKey = {}\n".format(private_key))
                             wg_conf.insert(2, "Address = {}\n".format(wg_address))
                             wg.writelines(wg_conf)
@@ -734,7 +733,7 @@ class AddServers(QtCore.QThread):
             self.failed.emit(m)
 
         else:
-            shutil.copytree(self.folderpath, self.temp_path)
+            shutil.copytree(self.folderpath, "{}/copy/".format(self.temp_path))
             self.import_configs()
 
     def import_configs(self):
@@ -745,7 +744,7 @@ class AddServers(QtCore.QThread):
         for f in self.conf_files:
             tunnel = "OpenVPN"
             name = os.path.splitext(f)[0]
-            conf_copy = "{}/{}".format(self.temp_path, f)
+            conf_copy = "{}/copy/{}".format(self.temp_path, f)
             ip_resolved= 0
             protocol_found = 0
 
@@ -890,17 +889,18 @@ class AddServers(QtCore.QThread):
                                     ("Airvpn/ca.crt", "ca.crt"),
                                     ("Airvpn/ta.key", "ta.key"),
                                     ("Airvpn/user.key", "user.key"),
+                                    ("Airvpn/user.crt", "user.crt"),
                                     ("Airvpn/tls-crypt.key", "tls-crypt.key")
                                     ]
 
             self.Mullvad_files =    [
-                                    ("ssl/ca.crt", "mullvad_ca.crt"),
-                                    ("ssl/crl.pem", "mullvad_crl.pem"),
-                                    ("ssl/mullvad_wg.conf", "mullvad_wg.conf")
+                                    ("ca.crt", "mullvad_ca.crt"),
+                                    ("crl.pem", "mullvad_crl.pem"),
+                                    ("mullvad_wg.conf", "mullvad_wg.conf")
                                     ]
 
             self.PIA_files =        [
-                                    ("ip/crl.rsa.4096.pem", "pia_crl.rsa.4096.pem"),
+                                    ("strong/crl.rsa.4096.pem", "pia_crl.rsa.4096.pem"),
                                     ("strong/ca.rsa.4096.crt", "pia_ca.rsa.4096.crt")
                                     ]
 
@@ -926,7 +926,36 @@ class AddServers(QtCore.QThread):
                     self.log.emit(("error", "Copying {} to {} failed: No such file".format(cert, CERTDIR)))
 
         else:
-            shutil.copytree("{}/{}/".format(self.temp_path, provider), "{}/{}/".format(ROOTDIR, provider))
+            path = "{}/copy/".format(self.temp_path)
+            for f in os.listdir(path):
+                f_source = "{}/{}".format(path, f)
+                f_dest = "{}/{}/{}".format(ROOTDIR, provider, f)
+                if os.path.isfile(f_source):
+
+                    try:
+                        shutil.copyfile(f_source, f_dest)
+                        self.log.emit(("debug", "copied {} to {}".format(f, f_dest)))
+
+                    except FileNotFoundError:
+                        if not os.path.exists("{}/{}".format(ROOTDIR, provider)):
+                            os.makedirs("{}/{}".format(ROOTDIR, provider))
+
+                        shutil.copyfile(f_source,f_dest)
+                        self.log.emit(("debug", "copied {} to {}".format(f, f_dest)))
+
+                elif os.path.isdir(f_source):
+
+                    try:
+                        shutil.rmtree(f_dest)
+
+                    except (NotADirectoryError, FileNotFoundError):
+                        pass
+
+                    shutil.copytree(f_source, f_dest)
+                    self.log.emit(("debug", "copied folder {} to {}".format(f, f_dest)))
+
+            #doesn't work if importing existing provider
+            #shutil.copytree("{}/copy/".format(self.temp_path), "{}/{}/".format(ROOTDIR, provider))
 
         for key in [f for f in os.listdir("{}/certs".format(ROOTDIR))]:
             Popen(['chown', 'root', '{}/certs/{}'.format(ROOTDIR, key)])

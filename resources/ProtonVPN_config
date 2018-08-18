@@ -15,7 +15,6 @@ persist-key
 persist-tun
 reneg-sec 0
 remote-cert-tls server
-auth-user-pass
 pull
 fast-io
 key-direction 1
