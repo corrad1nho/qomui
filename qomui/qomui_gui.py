@@ -1108,28 +1108,30 @@ class QomuiGui(QtWidgets.QWidget):
                 self.kill()
                 self.kill_bypass_vpn()
                 last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
-                self.ovpn_dict = last_server_dict["last"]
-
-                if "hop" in last_server_dict.keys():
-                    if last_server_dict["hop"] is not None:
-                        self.hop_server_dict = last_server_dict["hop"]
-                        self.show_hop_widget()
 
                 if self.network_state == 1:
 
-                    try:
-                        if self.ovpn_dict["random"] == "on":
-                            self.choose_random_server()
+                    if "last" in last_server_dict.keys():
+                        self.ovpn_dict = last_server_dict["last"]
 
-                    except KeyError:
-                        self.establish_connection(self.ovpn_dict)
+                        if "hop" in last_server_dict.keys():
+                            if last_server_dict["hop"] is not None:
+                                self.hop_server_dict = last_server_dict["hop"]
+                                self.show_hop_widget()
 
-                    try:
-                        if self.ovpn_dict["favourite"] == "on":
-                            self.favouriteButton.setChecked(True)
+                        try:
+                            if self.ovpn_dict["random"] == "on":
+                                self.choose_random_server()
 
-                    except KeyError:
-                        pass
+                        except KeyError:
+                            self.establish_connection(self.ovpn_dict)
+
+                        try:
+                            if self.ovpn_dict["favourite"] == "on":
+                                self.favouriteButton.setChecked(True)
+
+                        except KeyError:
+                            pass
 
                     if "bypass" in last_server_dict.keys():
                         self.bypass_ovpn_dict = last_server_dict["bypass"]
@@ -1478,7 +1480,6 @@ class QomuiGui(QtWidgets.QWidget):
     def stop_progress_bar(self, bar, server=None):
         if server is not None:
             bar = server
-
         try:
             getattr(self, "{}Bar".format(bar)).setVisible(False)
             self.verticalLayout_2.removeWidget(getattr(self, "{}Bar".format(bar)))
@@ -1492,7 +1493,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.kill()
 
         elif action == "connecting_bypass":
-            self.kill_bypass_vpn()
+            self.disconnect_bypass()
 
         elif action == "upgrade":
             pass
@@ -1570,6 +1571,7 @@ class QomuiGui(QtWidgets.QWidget):
             with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
                 json.dump(self.protocol_dict, p)
 
+            os.remove("{}/{}.json".format(HOMEDIR, msg))
             self.pop_boxes()
 
     def del_single_server(self):
@@ -1663,19 +1665,19 @@ class QomuiGui(QtWidgets.QWidget):
             self.tunnelBox.addItem(provider)
             self.tunnelBox.setItemText(index, provider)
 
-        self.filter_servers(display="all")
+        self.index_list = []
+        self.serverListWidget.clear()
 
-        """
+        for key,val in sorted(self.server_dict.items(), key=lambda s: s[0].upper()):
+            self.index_list.append(key)
+            self.add_server_widget(key, val)
+
         try:
             if self.config_dict["ping"] == 1:
                 self.get_latencies()
 
-            else:
-                self.check_update()
-
         except KeyError:
             pass
-        """
 
     def get_latencies(self):
         try:
@@ -1724,16 +1726,21 @@ class QomuiGui(QtWidgets.QWidget):
         self.randomSeverBt.setVisible(False)
 
         for k, v in self.server_dict.items():
-            index = self.index_list.index(k)
-            search = "{}{}".format(k, v["city"])
 
-            if text.lower() in search.lower():
-                self.serverListWidget.setRowHidden(index, False)
-                getattr(self, k).setHidden(False)
+            try:
+                index = self.index_list.index(k)
+                search = "{}{}".format(k, v["city"])
 
-            else:
-                self.serverListWidget.setRowHidden(index, True)
-                getattr(self, k).setHidden(True)
+                if text.lower() in search.lower():
+                    self.serverListWidget.setRowHidden(index, False)
+                    getattr(self, k).setHidden(False)
+
+                else:
+                    self.serverListWidget.setRowHidden(index, True)
+                    getattr(self, k).setHidden(True)
+
+            except ValueError:
+                pass
 
     def show_favourite_servers(self, state):
         self.countryBox.setCurrentIndex(0)
@@ -1743,20 +1750,24 @@ class QomuiGui(QtWidgets.QWidget):
         if state == True:
             i = 0
 
-            for key, val in self.server_dict.items():
-                index = self.index_list.index(key)
+            try:
+                for key, val in self.server_dict.items():
+                    index = self.index_list.index(key)
 
-                try:
-                    if val["favourite"] == "on":
-                        self.serverListWidget.setRowHidden(index, False)
-                        getattr(self, key).setHidden(False)
-                    else:
+                    try:
+                        if val["favourite"] == "on":
+                            self.serverListWidget.setRowHidden(index, False)
+                            getattr(self, key).setHidden(False)
+                        else:
+                            self.serverListWidget.setRowHidden(index, True)
+                            getattr(self, key).setHidden(True)
+
+                    except KeyError:
                         self.serverListWidget.setRowHidden(index, True)
                         getattr(self, key).setHidden(True)
 
-                except KeyError:
-                    self.serverListWidget.setRowHidden(index, True)
-                    getattr(self, key).setHidden(True)
+            except ValueError:
+                pass
 
         elif state == False:
             self.filter_servers()
@@ -1771,6 +1782,7 @@ class QomuiGui(QtWidgets.QWidget):
         if self.favouriteButton.isChecked() == True:
             self.favouriteButton.setChecked(False)
 
+        """
         if display == "all":
             self.index_list = []
             self.serverListWidget.clear()
@@ -1785,8 +1797,8 @@ class QomuiGui(QtWidgets.QWidget):
 
                 self.index_list.append(key)
                 self.add_server_widget(key, val)
-
-        else:
+        """
+        try:
             for key, val in self.server_dict.items():
                 index = self.index_list.index(key)
 
@@ -1804,6 +1816,9 @@ class QomuiGui(QtWidgets.QWidget):
                 else:
                     self.serverListWidget.setRowHidden(index, True)
                     getattr(self, key).setHidden(True)
+
+        except ValueError:
+            pass
 
     def add_server_widget(self, key, val, insert=None):
         setattr(self, key, ServerWidget())
@@ -2219,19 +2234,23 @@ class QomuiGui(QtWidgets.QWidget):
 
     def disconnect_bypass(self):
         last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
-        with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
+
+        if "bypass" in last_server_dict.keys():
             last_server_dict.pop("bypass")
+
+        with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
             json.dump(last_server_dict, lserver)
             lserver.close()
+
         self.kill_bypass_vpn()
 
     def kill_bypass_vpn(self):
         self.qomui_service.disconnect("bypass")
 
         try:
+            self.stop_progress_bar("connection_bypass", server=self.bypass_ovpn_dict["name"])
             self.BypassActive.setVisible(False)
             self.verticalLayout_2.removeWidget(self.BypassActive)
-            self.stop_progress_bar("connection_bypass", server=self.bypass_ovpn_dict["name"])
 
         except (TypeError, AttributeError):
             pass

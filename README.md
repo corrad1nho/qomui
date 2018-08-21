@@ -15,6 +15,7 @@ Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN Gui for GNU/Linux wit
 - protection against DNS leaks/ipv6 leaks
 - iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
 - allow applications to bypass the VPN tunnel - to watch Netflix for example
+- alternatively: 
 - experimental support for WireGuard
 - command-line interface
 - automatic weekly updates of server configurations for supported providers - experimental
@@ -87,6 +88,8 @@ cgexec -g net_cls:bypass_qomui $yourcommand
 ```
 The idea is taken from [this post on severfault.com](https://serverfault.com/questions/669430/how-to-bypass-openvpn-per-application/761780#761780). Essentially, running an application outside the OpenVPN tunnel works by putting it in a network control group. This allows classifying and identifying network packets from processes in this cgroup in order to route them differently. Be aware that the implementation of this feature is still experimental. 
 
+The bypass feature also allows you to open a second OpenVPN tunnel (this does currently not work with WireGuard). You can choose any of your starred servers from a drop-down menu in the bypass tab. OpenVPN in bypass mode is currently limited to ipv4 to prevent leaks. 
+
 ### WireGuard
 You can add WireGuard config files from any provider as easily as OpenVPN files. WireGuard configs for Mullvad are now downloaded automatically alongside their OpenVPN configs as long as WireGuard is installed. If you choose to manually import WireGuard config files, Qomui will automatically recognize the type of file. As of now, WireGuard will not be installed automatically with DEB and RPM packages. You can find the official installation guidelines for different distributions [here](https://www.wireguard.com/install/).
 
@@ -120,6 +123,19 @@ qomui-cli --help
 Qomui has been my first ever programming experience and a practical challenge for myself to learn a bit of Python. At this stage, Qomui is a beta release at best. So, don't expect it to run flawlessly even though I test every release extensively on different machines. My resources are limited, though. Hence, I'd appreciate any feedback, bug reports and suggestions for new features.
 
 ### Changelog
+
+#### version 0.7.1:
+- [new] secondary vpn tunnel in bypass mode - EXPERIMENTAL
+- [change] download statistics switch to higher units automatically
+- [change] using QThread for OpenVPN/WireGuard process now
+- [change] using alternative url if checking external ip address fails
+- [change] 20 sec timeout for Openvpn connections attempt
+- [bugfix] some temporary files not deleted after importing servers
+- [bugfix] Qomui doesn't recognize when OpenVPN connection attempts fail due to fatal errors
+
+##### Additional notes
+- cli is not working with versions 0.7.0 and 0.7.1
+
 #### version 0.7.0:
 - [new] auto-update for supported providers - EXPERIMENTAL
 - [change] server import method rewritten
@@ -130,25 +146,10 @@ Qomui has been my first ever programming experience and a practical challenge fo
 - [change] network connectivity monitoring: relying on sysfs instead of network-manager
 - [change] Qomui does not rely on systemd anymore - although it is still recommended
 - [change] Mullvad certificates are now downloaded from github 
-- [¢hange] PIA: compression disabled in config file - [issue #22](https://github.com/corrad1nho/qomui/issues/22)
+- [¢hange] PIA: compression disabled in config file - [issue #22](https://github.com/corrad1nho/qomui/issues/22) 
 - [bugfix] installing deb-package fails on Debian Stable - dependencies updated
 - [bugfix] restore of original DNS servers more reliable 
-- [bugfix] ordering of servers after latency check more reliable 
+- [bugfix] ordering of servers after latency check more reliable
 - [bugfix] loop when version discrepancy between qomui-gui and qomui-service detected and qomui-service has not been started via systemctl
 - [bugifx] crash if failing to read/start desktop-file - will be further investigated
 - [removed] simple tray option 
-
-##### Additional notes
-- due to changes in the import method it is necessary and recommended to re-import server configurations - exceptions: Airvpn (auto-update won't work) and manual imports.
-- importing servers via cli is broken: you can either use the gui or an older release. This will be fixed in the next update.
-
-#### version 0.6.5:
-- [change] automatic restart if background service is running an older version than the gui
-- [change] pending tasks such as connecting to a server can be cancelled now
-- [change] multiple progress bars are now shown for concurrent actions
-- [change] string formatting changed to new style
-- [change] dropped pycountry dependency - using simple json instead
-- [change] added more log messages
-- [change] added log levels
-- [change] external ipv6 address displayed (if available)
-- [bugfix] crashes when trying to modify server when none is selected

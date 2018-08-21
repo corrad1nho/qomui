@@ -1,5 +1,14 @@
 ##Changelog
 
+version 0.7.1:
+- [new] secondary vpn tunnel in bypass mode - EXPERIMENTAL
+- [change] download statistics switch to higher units automatically
+- [change] using QThread for OpenVPN/WireGuard process now
+- [change] using alternative url if checking external ip address fails
+- [change] 20 sec timeout for Openvpn connections attempt
+- [bugfix] some temporary files not deleted after importing servers
+- [bugfix] Qomui doesn't recognize when OpenVPN connection attempts fail due to fatal errors
+
 version 0.7.0:
 - [new] auto-update for supported providers - EXPERIMENTAL
 - [change] server import method rewritten

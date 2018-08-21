@@ -3,11 +3,11 @@
 import sys
 import os
 import time
-import threading
 import shutil
 import logging
 import logging.handlers
 import json
+import threading
 import signal
 
 from datetime import datetime, date
@@ -231,7 +231,7 @@ class QomuiDbus(dbus.service.Object):
                 try:
                     wg_down = Popen(["wg-quick", "down", "{}/wg_qomui.conf".format(ROOTDIR)], stdout=PIPE, stderr=STDOUT)
                     for line in wg_down.stdout:
-                        logging.info("WireGuard: " + line.decode("utf-8").replace("\n", ""))
+                        self.logger.info("WireGuard: " + line.decode("utf-8").replace("\n", ""))
 
                 except CalledProcessError:
                     pass
@@ -679,6 +679,8 @@ class ConnectionThread(QtCore.QThread):
 
         if "bypass" in self.server_dict.keys():
             path = "{}/bypass.ovpn".format(ROOTDIR)
+            time.sleep(2)
+
         else:
             path = "{}/temp.ovpn".format(ROOTDIR)
 
@@ -700,12 +702,12 @@ class ConnectionThread(QtCore.QThread):
                 self.write_config(self.server_dict)
                 self.ssl_thread = threading.Thread(target=self.ssl, args=(ip,))
                 self.ssl_thread.start()
-                logging.info("Started Stunnel process in new thread")
+                self.log.emit(("info", "Started Stunnel process in new thread"))
             elif protocol == "SSH":
                 self.write_config(self.server_dict)
                 self.ssh_thread = threading.Thread(target=self.ssh, args=(ip,port,))
                 self.ssh_thread.start()
-                logging.info("Started SSH process in new thread")
+                self.log.emit(("info", "Started SSH process in new thread"))
                 time.sleep(2)
             else:
                 self.write_config(self.server_dict)
@@ -732,7 +734,7 @@ class ConnectionThread(QtCore.QThread):
                 self.write_config(self.server_dict)
                 self.ssl_thread = threading.Thread(target=self.ssl, args=(ip,))
                 self.ssl_thread.start()
-                logging.info("Started Stunnel process in new thread")
+                self.log.emit(("info", "Started Stunnel process in new thread"))
 
             self.write_config(self.server_dict)
 
@@ -854,7 +856,7 @@ class ConnectionThread(QtCore.QThread):
 
             ovpn_edit.close()
 
-        logging.debug("Temporary config file(s) for requested server written")
+        self.log.emit(("debug", "Temporary config file(s) for requested server written"))
 
 
     def wg(self, wg_file):
@@ -966,10 +968,12 @@ class ConnectionThread(QtCore.QThread):
         self.log.emit(("debug", "OpenVPN pid: {}".format(ovpn_exe.pid)))
         self.pid.emit((ovpn_exe.pid, "OpenVPN{}".format(add)))
         line = ovpn_exe.stdout.readline()
+        time_start = time.time()
 
         while line.find("SIGTERM[hard,] received, process exiting") == -1:
+            time_measure = time.time()
             line_format = ("OpenVPN:" + line.replace('{}'.format(time.asctime()), '').replace('\n', ''))
-            logging.info(line_format)
+            self.log.emit(("info", line_format))
 
             if line.find("Initialization Sequence Completed") != -1:
                 self.connect_status = 1
@@ -1001,11 +1005,11 @@ class ConnectionThread(QtCore.QThread):
 
             elif line.find("Restart pause, 10 second(s)") != -1:
                 self.status.emit("fail{}".format(add))
-                self.log.emit.info("Connection attempt failed")
+                self.log.emit(("info" ,"Connection attempt failed"))
 
             elif line.find('SIGTERM[soft,auth-failure]') != -1:
                 self.status.emit("fail_auth{}".format(add))
-                self.log.emit.info("Authentication error while trying to connect")
+                self.log.emit(("info", "Authentication error while trying to connect"))
 
             elif line.find('write UDP: Operation not permitted') != -1:
                 ips = []
@@ -1023,8 +1027,16 @@ class ConnectionThread(QtCore.QThread):
                 for ip in ips:
                     firewall.allow_dest_ip(ip, "-I")
 
+            elif line.find("Exiting due to fatal error") != -1:
+                self.status.emit("fail{}".format(add))
+                self.log.emit(("info", "Connection attempt failed due to fatal error"))
+
             elif line == '':
                 break
+
+            elif time_measure - time_start >= 20:
+                self.status.emit("fail{}".format(add))
+                self.log.emit(("info", "Connection attempt timed out"))
 
             line = ovpn_exe.stdout.readline()
 
@@ -1054,7 +1066,7 @@ class ConnectionThread(QtCore.QThread):
         line = ssl_exe.stdout.readline()
 
         while line.find('SIGINT') == -1:
-            logging.info("Stunnel: " + line.replace('\n', ''))
+            self.log.emit(("info", "Stunnel: " + line.replace('\n', '')))
             if line == '':
                 break
 
@@ -1075,14 +1087,14 @@ class ConnectionThread(QtCore.QThread):
 
         if i == 0:
             ssh_exe.sendline('yes')
-            logging.info("SSH: Accepted SHA fingerprint from {}".format(ip))
+            self.log.emit(("info", "SSH: Accepted SHA fingerprint from {}".format(ip)))
 
         before = ssh_exe.before.decode("utf-8")
         after = ssh_exe.after.decode("utf-8")
         full = (before + after)
 
         for line in full.split("\n"):
-            logging.info("SSH: " + line.replace("\r", ""))
+            self.log.emit(("info", "SSH: " + line.replace("\r", "")))
 
         self.log.emit(("info", "SSH: Successfully opened SSH tunnel to {}".format(ip)))
         ssh_exe.wait()
