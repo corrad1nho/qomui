@@ -977,11 +977,11 @@ class QomuiGui(QtWidgets.QWidget):
                 self.updateQomuiBt.setVisible(True)
                 self.newVersionLabel.setVisible(True)
 
-            self.notify(
-                        'Qomui: Update available',
-                        'Download version {} via "About" tab'.format(self.release),
-                        icon="Information"
-                        )
+                self.notify(
+                            'Qomui: Update available',
+                            'Download version {} via "About" tab'.format(self.release),
+                            icon="Information"
+                            )
 
         except ValueError:
             pass
