@@ -2862,7 +2862,7 @@ class ActiveWidget(QtWidgets.QWidget):
 
     def show_ip(self, ips):
         if ips[0] is None:
-            self.ipExtLabel.setText("IP: {}".format(ips[1]))
+            self.ipExtLabel.setText("")
 
         elif ips[1] is None:
             self.ipExtLabel.setText("IP: {}".format(ips[0]))
@@ -2915,6 +2915,8 @@ class TunnelMon(QtCore.QThread):
         connected = True
         check_url = "https://ipv4.ipleak.net/json"
         check_url_6 = "https://ipv6.ipleak.net/json"
+        check_url_alt = "https://ipv4.icanhazip.com/"
+        check_url_alt_6 = "https://ipv6.icanhazip.com/"
 
         try:
 
@@ -2923,18 +2925,28 @@ class TunnelMon(QtCore.QThread):
                 ip = json.loads(query)["ip"]
 
             except (KeyError, requests.exceptions.RequestException):
-                self.log.emit(("info", "Could not determine external ipv4 address"))
-                ip = None
+
+                try:
+                    ip = requests.get(check_url_alt, timeout=2).content.decode("utf-8").replace("\n", "")
+
+                except requests.exceptions.RequestException:
+                    self.log.emit(("info", "Could not determine external ipv4 address"))
+                    ip = None
 
             try:
                 query = requests.get(check_url_6, timeout=2).content.decode("utf-8")
                 ip_6 = json.loads(query)["ip"]
 
-            except (KeyError, requests.exceptions.RequestException):
-                self.log.emit(("info", "Could not determine external ipv6 address"))
-                ip_6 = None
+            except requests.exceptions.RequestException:
 
-            self.log.emit(("info", "External IP = {} - {}".format(ip, ip_6)))
+                try:
+                    ip_6 = requests.get(check_url_alt_6, timeout=2).content.decode("utf-8").replace("\n", "")
+
+                except requests.exceptions.RequestException:
+                    self.log.emit(("info", "Could not determine external ipv6 address"))
+                    ip_6 = None
+
+            self.log.emit(("info", "External ip = {} - {}".format(ip, ip_6)))
             self.ip.emit((ip, ip_6))
 
         except:

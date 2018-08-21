@@ -889,14 +889,13 @@ class QomuiDbus(dbus.service.Object):
             if line.find("Initialization Sequence Completed") != -1:
                 self.connect_status = 1
                 if self.tun_bypass is not None:
+                    self.configure_dnsmasq()
                     bypass.create_cgroup(
                         self.ug["user"],
                         self.ug["group"],
                         self.tun_bypass,
                         default_int=self.interface
                         )
-
-                    self.configure_dnsmasq()
 
                 self.reply("connected{}".format(add))
                 self.logger.info("Successfully connected to {}".format(name))
@@ -963,8 +962,6 @@ class QomuiDbus(dbus.service.Object):
         if add == "_bypass":
             setattr(self, "dns{}".format(add), self.config["alt_dns1"])
             setattr(self, "dns{}_2".format(add), self.config["alt_dns2"])
-            firewall.cgroup_vpn_firewall(0, self.interface)
-            bypass.set_bypass_vpn(self.interface, "-A", self.tun_bypass, "-D")
             setattr(self, "tun{}".format(add), None)
             self.configure_dnsmasq()
 
