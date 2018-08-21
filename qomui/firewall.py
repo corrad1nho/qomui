@@ -148,6 +148,18 @@ def save_existing_rules_6(fw_rules):
                 saved_rules_6.append(rule)
             match = 0
 
+def allow_dest_ip(ip, action):
+    rule = [action, 'OUTPUT', '-d', ip, '-j', 'ACCEPT']
+
+    try:
+        if len(ip.split(".")) == 4:
+            add_rule(rule)
+
+        elif len(ip.split(":")) >= 4:
+            add_rule_6(rule)
+    except:
+        pass
+
 def get_config():
     try:
         with open("{}/firewall.json".format(ROOTDIR), "r") as f:

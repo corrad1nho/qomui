@@ -66,6 +66,7 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None)
             firewall.add_rule_6(rule)
 
     try:
+        check_call(["ip", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
         if interface == default_int:
             check_call(["ip", "route", "flush", "table", "bypass_qomui"])
             check_call(["ip", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
@@ -76,9 +77,9 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None)
         logging.error("Bypass: Setting ipv4 route 'default via {} dev {}'".format(gw, interface))
 
     try:
+        check_call(["ip", "-6", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
         if interface == default_int:
             check_call(["ip", "-6", "route", "flush", "table", "bypass_qomui"])
-            check_call(["ip", "-6", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
             check_call(["ip", "-6", "route", "add", "default", "via",
                         "{}".format(gw_6), "dev", "{}".format(interface), "table", "bypass_qomui"])
             logging.debug("Bypass: Set ipv6 route 'default via {} dev {}'".format(gw_6, interface))

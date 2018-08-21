@@ -41,7 +41,6 @@ def dnsmasq(interface, port, server_1, server_2, pid):
     try:
         Popen(dnsmasq_cmd)
         logging.debug("dnsmasq: {}".format(dnsmasq_cmd))
-        set_dns("127.0.0.1")
 
     except CalledProcessError:
         logging.error("dnsmasq: {} failed".format(dnsmasq_cmd))
@@ -57,15 +56,13 @@ def dns_request_exception(action, dns_1, dns_2, port):
         logging.info("iptables: removing exception for DNS requests")
 
     for p in protocols:
-        for server in [dns_1, dns_2]:
-            if server is not None:
-                rules.append([action, 'OUTPUT', '1', '-p', p, '-d', server, '--dport', port, '-j', 'ACCEPT'])
-                rules.append([action, 'INPUT', '1', '-p', p, '-d', server, '--sport', port, '-j', 'ACCEPT'])
+        rules.append([action, 'OUTPUT', '1', '-p', p, '--dport', port, '-j', 'ACCEPT'])
+        rules.append([action, 'INPUT', '1', '-p', p, '--sport', port, '-j', 'ACCEPT'])
 
     for rule in rules:
         firewall.add_rule(rule)
         firewall.add_rule_6(rule)
 
-    set_dns(dns_1, server_2=dns_2)
+    #set_dns(dns_1, server_2=dns_2)
 
 

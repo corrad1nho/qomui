@@ -12,7 +12,7 @@ import time
 import random
 import logging
 from datetime import datetime, date
-from subprocess import CalledProcessError, check_call
+from subprocess import CalledProcessError, check_call, check_output
 from PyQt5 import QtCore, QtGui, Qt, QtWidgets
 from dbus.mainloop.pyqt5 import DBusQtMainLoop
 import psutil
@@ -197,16 +197,16 @@ class QomuiGui(QtWidgets.QWidget):
                                       600, 750
                                       ))
 
-        self.net_mon_thread = NetMon()
-        self.net_mon_thread.log.connect(self.log_from_thread)
-        self.net_mon_thread.net_state_change.connect(self.network_change)
-        self.net_mon_thread.start()
-
         self.qomui_service.disconnect("main")
         self.qomui_service.disconnect("bypass")
         self.qomui_service.save_default_dns()
         self.load_saved_files()
         self.systemtray()
+
+        self.net_mon_thread = NetMon()
+        self.net_mon_thread.log.connect(self.log_from_thread)
+        self.net_mon_thread.net_state_change.connect(self.network_change)
+        self.net_mon_thread.start()
 
     def receive_log(self, msg):
         self.logText.appendPlainText(msg)
@@ -598,6 +598,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout_11.addWidget(self.bypassVpnBox)
         self.bypassVpnButton = QtWidgets.QPushButton(self.bypassTab)
         self.bypassVpnButton.setObjectName(_fromUtf8("bypassVpnButton"))
+        self.bypassVpnButton.setMaximumWidth(120)
         self.horizontalLayout_11.addWidget(self.bypassVpnButton)
         self.verticalLayout_8.addLayout(self.horizontalLayout_11)
         self.bypassAppList = QtWidgets.QListWidget(self.bypassTab)
@@ -856,14 +857,12 @@ class QomuiGui(QtWidgets.QWidget):
                                           s.join(text.replace("    ", "")),
                                           None))
 
-        text = 'To use an application outside the VPN tunnel, \
-                you can simply add a program to the list below \
-                and launch it from there. Alternatively, you can \
-                run commands from a console by prepending \
-                "cgexec -g net_cls:bypass_qomui $yourcommand". \
-                Be aware that some applications including Firefox \
-                will not launch a second instance in bypass mode \
-                if they are already running.'
+        text = 'Add and start applications you want to bypass the VPN tunnel \
+                from the list below. The same can be achieved via console by \
+                prepending "cgexec -g net_cls:bypass_qomui $yourcommand". \
+                Be aware that some applications such as Firefox will not launch \
+                a second instance. Optionally, you can choose a starred server \
+                to start a second OpenVPN session for bypass applications below.'
 
         self.bypassInfoLabel.setText(_translate("Form",
                                           s.join(text.replace("    ", "")),
@@ -1107,12 +1106,14 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             if self.config_dict["autoconnect"] == 1:
                 self.kill()
+                self.kill_bypass_vpn()
                 last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
                 self.ovpn_dict = last_server_dict["last"]
-                self.hop_server_dict = last_server_dict["hop"]
 
-                if self.hop_server_dict is not None:
-                    self.show_hop_widget()
+                if "hop" in last_server_dict.keys():
+                    if last_server_dict["hop"] is not None:
+                        self.hop_server_dict = last_server_dict["hop"]
+                        self.show_hop_widget()
 
                 if self.network_state == 1:
 
@@ -1129,6 +1130,10 @@ class QomuiGui(QtWidgets.QWidget):
 
                     except KeyError:
                         pass
+
+                    if "bypass" in last_server_dict.keys():
+                        self.bypass_ovpn_dict = last_server_dict["bypass"]
+                        self.establish_connection(self.bypass_ovpn_dict, bar="_bypass")
 
         except KeyError:
             pass
@@ -1213,7 +1218,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.setOptiontab(self.config_dict)
         self.pop_boxes(country='All countries')
         self.pop_bypassAppList()
-        self.connect_last_server()
+        #self.connect_last_server()
 
     def setOptiontab(self, config):
 
@@ -1304,12 +1309,10 @@ class QomuiGui(QtWidgets.QWidget):
             self.logger.info("Detected new network connection")
             self.qomui_service.save_default_dns()
             self.get_latencies()
-
-            if self.ovpn_dict is not None:
-                self.kill()
-                self.kill_bypass_vpn()
-                self.establish_connection(self.ovpn_dict)
-                self.qomui_service.bypass(utils.get_user_group())
+            self.kill()
+            self.kill_bypass_vpn()
+            self.qomui_service.bypass(utils.get_user_group())
+            self.connect_last_server()
 
         elif self.network_state == 0:
             self.logger.info("Lost network connection - VPN tunnel terminated")
@@ -2001,7 +2004,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.server_chosen(server, bypass=1)
 
     def server_chosen(self, server, random=None, bypass=None):
-
         try:
             current_dict = self.server_dict[server].copy()
 
@@ -2015,12 +2017,6 @@ class QomuiGui(QtWidgets.QWidget):
                         self.notify(
                                     "Qomui",
                                     "WireGuard is currently not supported for secondary connections",
-                                    icon="Info")
-
-                    elif self.bypass_ovpn_dict["name"] == self.ovpn_dict["name"]:
-                        self.notify(
-                                    "Qomui",
-                                    "Please choose another server",
                                     icon="Info")
 
                     else:
@@ -2084,8 +2080,8 @@ class QomuiGui(QtWidgets.QWidget):
                 self.tun_hop = self.qomui_service.return_tun_device("tun_hop")
                 self.hop_log_monitor = 1
 
+            last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
             with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
-                last_server_dict = {}
                 last_server_dict["last"] = self.ovpn_dict
                 last_server_dict["hop"] = self.hop_server_dict
                 json.dump(last_server_dict, lserver)
@@ -2098,6 +2094,12 @@ class QomuiGui(QtWidgets.QWidget):
             self.stop_progress_bar("connection", server=self.bypass_ovpn_dict["name"])
             self.show_active_connection(self.bypass_ovpn_dict, tun="tun_bypass", widget="BypassActive")
             QtWidgets.QApplication.restoreOverrideCursor()
+
+            last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
+            with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
+                last_server_dict["bypass"] = self.bypass_ovpn_dict
+                json.dump(last_server_dict, lserver)
+                lserver.close()
 
         elif reply == "fail":
             self.kill()
@@ -2150,7 +2152,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.tray.setToolTip("Connected to {}".format(server_dict["name"]))
             self.gridLayout.addWidget(getattr(self, widget), 0, 0, 1, 3)
             getattr(self, widget).setVisible(True)
-            getattr(self, widget).setText(server_dict, hop_dict, tun, tun_hop)
+            getattr(self, widget).setText(server_dict, hop_dict, tun, tun_hop=tun_hop, bypass=None)
             getattr(self, widget).disconnect.connect(self.kill)
             getattr(self, widget).reconnect.connect(self.reconnect)
             getattr(self, widget).check_update.connect(self.update_check)
@@ -2159,8 +2161,8 @@ class QomuiGui(QtWidgets.QWidget):
             self.BypassActive = ActiveWidget("Secondary Connection")
             self.verticalLayout_2.addWidget(self.BypassActive)
             getattr(self, widget).setVisible(True)
-            getattr(self, widget).setText(server_dict, hop_dict, tun, tun_hop)
-            getattr(self, widget).disconnect.connect(self.kill_bypass_vpn)
+            getattr(self, widget).setText(server_dict, hop_dict, tun, tun_hop=tun_hop, bypass="1")
+            getattr(self, widget).disconnect.connect(self.disconnect_bypass)
             #getattr(self, widget).reconnect.connect(self.reconnect_bypass_vpn)
 
     def update_check(self):
@@ -2215,21 +2217,29 @@ class QomuiGui(QtWidgets.QWidget):
         except (KeyError, AttributeError):
             pass
 
+    def disconnect_bypass(self):
+        last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
+        with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
+            last_server_dict.pop("bypass")
+            json.dump(last_server_dict, lserver)
+            lserver.close()
+        self.kill_bypass_vpn()
+
     def kill_bypass_vpn(self):
         self.qomui_service.disconnect("bypass")
 
         try:
             self.BypassActive.setVisible(False)
             self.verticalLayout_2.removeWidget(self.BypassActive)
-            self.stop_progress_bar("connection", server=self.bypass_ovpn_dict["name"])
+            self.stop_progress_bar("connection_bypass", server=self.bypass_ovpn_dict["name"])
 
         except (TypeError, AttributeError):
             pass
 
-    def establish_connection(self, server_dict, bar=None):
+    def establish_connection(self, server_dict, bar=""):
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         self.logger.info("Connecting to {}....".format(server_dict["name"]))
-        self.start_progress_bar("connecting".format(bar), server=server_dict["name"])
+        self.start_progress_bar("connecting{}".format(bar), server=server_dict["name"])
         self.hop_log_monitor = 0
 
         try:
@@ -2427,22 +2437,21 @@ class NetMon(QtCore.QThread):
 
     def run(self):
         net_iface_dir = "/sys/class/net/"
-        current_state = 0
+        net_check = 0
 
         while True:
-            prior = current_state
-            current_state = 0
+            prior = net_check
+            net_check = 0
 
             try:
                 for iface in os.listdir(net_iface_dir):
                     with open("{}{}/operstate".format(net_iface_dir, iface), "r") as n:
 
                         if n.read() == "up\n":
-                            current_state = 1
+                            net_check = 1
 
-                if prior != current_state:
-                    print(iface)
-                    self.net_state_change.emit(current_state)
+                if prior != net_check:
+                    self.net_state_change.emit(net_check)
 
                 time.sleep(2)
 
@@ -2712,6 +2721,7 @@ class ActiveWidget(QtWidgets.QWidget):
         super(ActiveWidget, self).__init__(parent)
         self.setupUi(self)
         self.text = text
+        self.bypass = None
 
     def setupUi(self, ConnectionWidget):
         ConnectionWidget.setObjectName(_fromUtf8("ConnectionWidget"))
@@ -2804,9 +2814,10 @@ class ActiveWidget(QtWidgets.QWidget):
         self.uploadLabel.setText(_translate("ConnectionWidget", "Upload:", None))
         self.timeLabel.setText(_translate("ConnectionWidget", "Time:", None))
 
-    def setText(self, server_dict, hop_dict, tun, tun_hop=None):
+    def setText(self, server_dict, hop_dict, tun, tun_hop=None, bypass=None):
         self.tun = tun
         self.tun_hop = tun_hop
+        self.bypass = bypass
         self.statusLabel.setText(self.text)
         city = self.city_port_label(server_dict)
         self.ServerWidget.setText(server_dict["name"], server_dict["provider"],
@@ -2825,7 +2836,7 @@ class ActiveWidget(QtWidgets.QWidget):
             self.hopActiveLabel.setVisible(False)
 
         self.ServerWidget.hide_button(0)
-        self.calcThread = TunnelMon(self.tun, self.tun_hop)
+        self.calcThread = TunnelMon(self.tun, self.bypass, tun_hop=self.tun_hop)
         self.calcThread.stat.connect(self.show_stats)
         self.calcThread.ip.connect(self.show_ip)
         self.calcThread.log.connect(self.log_from_thread)
@@ -2881,8 +2892,39 @@ class ActiveWidget(QtWidgets.QWidget):
         DLacc = update[1]
         ULrate = update[2]
         ULacc = update[3]
-        self.upStatLabel.setText("{} kB/s - {} mb".format(round(ULrate, 1), round(ULacc, 1)))
-        self.downStatLabel.setText("{} kB/s - {} mb".format(round(DLrate, 1), round(DLacc, 1)))
+        unit_dl = "kB/s"
+        unit_ul = "kB/s"
+        unit_acc_up = "MB"
+        unit_acc_down = "MB"
+
+        if ULrate / 1024 >= 1:
+            ULrate = ULrate / 1024
+            unit_ul = "MB/s"
+
+        if DLrate / 1024 >= 1:
+            DLrate = DLrate / 1024
+            unit_dl = "MB/s"
+
+        if DLacc / 1024 >= 1:
+            DLacc = DLacc / 1024
+            unit_acc_down = "GB"
+
+        if ULacc / 1024 >= 1:
+            ULacc = ULacc / 1024
+            unit_acc_up = "GB"
+
+        self.upStatLabel.setText("{} {}- {} {}".format(
+                                                        round(ULrate, 1),
+                                                        unit_ul,
+                                                        round(ULacc, 1),
+                                                        unit_acc_up)
+                                                        )
+        self.downStatLabel.setText("{} {} - {} {}".format(
+                                                        round(DLrate, 1),
+                                                        unit_dl,
+                                                        round(DLacc, 1),
+                                                        unit_acc_down)
+                                                        )
 
     def signal(self):
         self.disconnect.emit()
@@ -2906,9 +2948,10 @@ class TunnelMon(QtCore.QThread):
     lost = QtCore.pyqtSignal()
     log = QtCore.pyqtSignal(tuple)
 
-    def __init__(self, tun, tun_hop=None):
+    def __init__(self, tun, bypass, tun_hop=None):
         QtCore.QThread.__init__(self)
         self.tun = tun
+        self.bypass = bypass
         self.tun_hop = tun_hop
 
     def run(self):
@@ -2918,29 +2961,29 @@ class TunnelMon(QtCore.QThread):
         check_url_alt = "https://ipv4.icanhazip.com/"
         check_url_alt_6 = "https://ipv6.icanhazip.com/"
 
-        try:
+        if self.bypass is None:
 
             try:
-                query = requests.get(check_url, timeout=2).content.decode("utf-8")
+                query = requests.get(check_url, timeout=1).content.decode("utf-8")
                 ip = json.loads(query)["ip"]
 
-            except (KeyError, requests.exceptions.RequestException):
+            except (KeyError, requests.exceptions.RequestException, json.decoder.JSONDecodeError):
 
                 try:
-                    ip = requests.get(check_url_alt, timeout=2).content.decode("utf-8").replace("\n", "")
+                    ip = requests.get(check_url_alt, timeout=1).content.decode("utf-8").replace("\n", "")
 
                 except requests.exceptions.RequestException:
                     self.log.emit(("info", "Could not determine external ipv4 address"))
                     ip = None
 
             try:
-                query = requests.get(check_url_6, timeout=2).content.decode("utf-8")
+                query = requests.get(check_url_6, timeout=1).content.decode("utf-8")
                 ip_6 = json.loads(query)["ip"]
 
-            except requests.exceptions.RequestException:
+            except (KeyError, requests.exceptions.RequestException, json.decoder.JSONDecodeError):
 
                 try:
-                    ip_6 = requests.get(check_url_alt_6, timeout=2).content.decode("utf-8").replace("\n", "")
+                    ip_6 = requests.get(check_url_alt_6, timeout=1).content.decode("utf-8").replace("\n", "")
 
                 except requests.exceptions.RequestException:
                     self.log.emit(("info", "Could not determine external ipv6 address"))
@@ -2948,9 +2991,6 @@ class TunnelMon(QtCore.QThread):
 
             self.log.emit(("info", "External ip = {} - {}".format(ip, ip_6)))
             self.ip.emit((ip, ip_6))
-
-        except:
-            self.log.emit(("error", "Could not determine external ip address"))
 
         t0 = time.time()
         accum = (0, 0)
