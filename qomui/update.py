@@ -727,7 +727,7 @@ class AddServers(QtCore.QThread):
             self.log.emit(("error", "No config files found in {}".format(self.folderpath)))
 
         elif self.sanity_check(self.folderpath) >= 10:
-            self.log.emit(("Warning", "{} seems to contain many unrelated files - aborting".format(self.folderpath)))
+            self.log.emit(("error", "{} seems to contain many unrelated files - aborting".format(self.folderpath)))
             m = "Import Error&No config files found or folder seems\nto contain many unrelated files&{}".format(self.provider)
             self.remove_temp_dir(self.provider)
             self.failed.emit(m)

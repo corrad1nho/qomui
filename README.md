@@ -136,6 +136,7 @@ Qomui has been my first ever programming experience and a practical challenge fo
 - [bugfix] ordering of servers after latency check more reliable 
 - [bugfix] loop when version discrepancy between qomui-gui and qomui-service detected and qomui-service has not been started via systemctl
 - [bugifx] crash if failing to read/start desktop-file - will be further investigated
+- [removed] simple tray option 
 
 ##### Additional notes
 - due to changes in the import method it is necessary and recommended to re-import server configurations - exceptions: Airvpn (auto-update won't work) and manual imports.

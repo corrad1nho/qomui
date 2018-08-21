@@ -26,6 +26,8 @@ data_files = [
                                 'resources/qomui.png',
                                 'resources/hop.sh',
                                 'resources/hop_down.sh',
+                                'resources/bypass_up.sh',
+                                'resources/bypass_route.sh',
                                 'VERSION']
                             ),
         ('/usr/share/qomui/flags/', glob.glob('resources/flags/*'))

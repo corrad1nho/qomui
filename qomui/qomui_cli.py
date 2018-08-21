@@ -40,6 +40,7 @@ class QomuiCli(QtCore.QObject):
             self.qomui_service = dbus.Interface(self.qomui_dbus, 'org.qomui.service')
             self.qomui_service.connect_to_signal("reply", self.openvpn_log_monitor)
             self.qomui_service.connect_to_signal("conn_info", self.openvpn_log_print)
+            self.qomui_service.connect_to_signal("imported", self.downloaded)
 
         except dbus.exceptions.DBusException:
             print("Error: qomui-service is not available")
@@ -59,6 +60,7 @@ class QomuiCli(QtCore.QObject):
         if args["set_protocol"] is not None:
             protocol_dict = self.load_json("{}/protocol.json".format(HOMEDIR))
             provider = args["set_protocol"]
+
             try:
                 for k,v in protocol_dict[provider].items():
                     if k != "selected":
@@ -72,8 +74,10 @@ class QomuiCli(QtCore.QObject):
 
                 if prot_chosen in protocol_dict[provider].keys():
                     protocol_dict[provider]["selected"] = prot_chosen
+
                     with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
                         json.dump(protocol_dict, p)
+
                     print("Port/Protocol for {} successfully changed".format(provider))
 
                 else:
@@ -92,6 +96,7 @@ class QomuiCli(QtCore.QObject):
             if args["via"] is not None:
                 self.hop_active = 1
                 hop_server = args["via"]
+
                 if hop_server in keys:
                     self.set_hop(hop_server)
 
@@ -226,7 +231,7 @@ class QomuiCli(QtCore.QObject):
         print("Please enter your credentials")
         if provider == "Mullvad":
             username = input("Enter account number:\n")
-            password = "None"
+            password = "m"
 
         else:
             username = input("Enter username:\n")
@@ -237,11 +242,15 @@ class QomuiCli(QtCore.QObject):
         self.qomui_service.allow_provider_ip(provider)
         print("Please wait....")
 
-        self.down_thread = update.AddServers(username, password, provider, folderpath=folderpath)
-        self.down_thread.log.connect(self.log_from_thread)
-        self.down_thread.finished.connect(self.downloaded)
-        self.down_thread.failed.connect(self.import_failed)
-        self.down_thread.start()
+        credentials = {
+                        "provider" : provider,
+                        "username" : username,
+                        "password" : password,
+                        "folderpath" : folderpath,
+                        "homedir" : HOMEDIR
+                        }
+
+        self.qomui_service.import_thread(credentials)
 
     def log_from_thread(self, msg):
         print(msg[1])

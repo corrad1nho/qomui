@@ -160,3 +160,7 @@ def get_config():
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
             logging.debug("Failed to load firewall configuration")
             return None
+
+
+
+

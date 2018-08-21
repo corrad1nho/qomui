@@ -16,6 +16,7 @@ version 0.7.0:
 - [bugfix] ordering of servers after latency check more reliable
 - [bugfix] loop when version discrepancy between qomui-gui and qomui-service detected and qomui-service has not been started via systemctl
 - [bugifx] crash if failing to read/start desktop-file - will be further investigated
+- [removed] simple tray option 
 
 version 0.6.5:
 - [change] automatic restart if background service is running an older version than the gui
