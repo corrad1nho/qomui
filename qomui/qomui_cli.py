@@ -239,14 +239,14 @@ class QomuiCli(QtCore.QObject):
 
         if not os.path.exists("{}/temp".format(HOMEDIR)):
             os.makedirs("{}/temp".format(HOMEDIR))
-        self.qomui_service.allow_provider_ip(provider)
+
         print("Please wait....")
 
         credentials = {
                         "provider" : provider,
                         "username" : username,
                         "password" : password,
-                        "folderpath" : folderpath,
+                        "folderpath" : path,
                         "homedir" : HOMEDIR
                         }
 
@@ -255,68 +255,69 @@ class QomuiCli(QtCore.QObject):
     def log_from_thread(self, msg):
         print(msg[1])
 
-    def import_fail(self, info):
-        if info == "AuthError":
-            print("Authentication failed: Perhaps the credentials you entered are wrong")
-        elif info == "nothing":
-            print("Import Error: No config files found or folder seems to contain many unrelated files")
+    def downloaded(self, msg):
+        split = msg.split("&")
+        if len(split) >= 2:
+            print(split[0])
+            print(split[1])
+            print("Configuration of {} could not be imported".format(split[2]))
+            app.quit()
+
         else:
-            print("Import Failed: {}".format(info))
+            self.server_dict = self.load_json("{}/server.json".format(HOMEDIR))
+            self.protocol_dict = self.load_json("{}/protocol.json".format(HOMEDIR))
+            with open("{}/{}.json".format(HOMEDIR, msg), "r") as p:
+                content = json.load(p)
 
-        sys.exit(1)
+            provider = content["provider"]
+            for k, v in content["server"].items():
 
-    def downloaded(self, content):
-        provider = content["provider"]
-        self.qomui_service.block_dns()
-        copy = self.qomui_service.copy_rootdir(provider, content["path"])
-        if copy == "copied":
-            shutil.rmtree("{}/{}/".format(HOMEDIR, provider))
+                try:
+                    if self.server_dict[k]["favourite"] == "on":
+                        content["server"][k]["favourite"] = "on"
 
-        self.server_dict = self.load_json("{}/server.json".format(HOMEDIR))
-        self.protocol_dict = self.load_json("{}/protocol.json".format(HOMEDIR))
+                except KeyError:
+                    pass
 
-        find_favourites = []
-        for k, v in content["server"].items():
+            if provider in SUPPORTED_PROVIDERS:
+                del_list = []
+
+                for k, v in self.server_dict.items():
+                    if v["provider"] == provider:
+                        del_list.append(k)
+
+                for k in del_list:
+                    self.server_dict.pop(k)
+
+            self.server_dict.update(content["server"])
+
             try:
-                if self.server_dict[k]["favourite"] == "on":
-                    content["server"][k]["favourite"] = "on"
+                if 'selected' in self.protocol_dict[provider].keys():
+                    content["protocol"]["selected"] = self.protocol_dict[provider]["selected"]
+                else:
+                    content["protocol"]["selected"] = "protocol_1"
+
             except KeyError:
                 pass
 
-        if provider in SUPPORTED_PROVIDERS:
-            del_list = []
-            for k, v in self.server_dict.items():
-                if v["provider"] == provider:
-                    del_list.append(k)
-            for k in del_list:
-                self.server_dict.pop(k)
+            try:
+                self.protocol_dict[provider] = (content["protocol"])
 
-        self.server_dict.update(content["server"])
+            except KeyError:
+                pass
 
-        try:
-            if 'selected' in self.protocol_dict[provider].keys():
-                content["protocol"]["selected"] = self.protocol_dict[provider]["selected"]
-            else:
-                content["protocol"]["selected"] = "protocol_1"
-        except KeyError:
-            pass
+            with open ("{}/server.json".format(HOMEDIR), "w") as s:
+                json.dump(self.server_dict, s)
 
-        try:
-            self.protocol_dict[provider] = (content["protocol"])
-        except KeyError:
-            pass
+            with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
+                json.dump(self.protocol_dict, p)
 
-        with open ("{}/server.json".format(HOMEDIR), "w") as s:
-            json.dump(self.server_dict, s)
-
-        with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
-            json.dump(self.protocol_dict, p)
-
-        print("Succesfully added config files for {}".format(provider))
-        sys.exit(0)
+            os.remove("{}/{}.json".format(HOMEDIR, msg))
+            print("Succesfully added config files for {}".format(provider))
+            app.quit()
 
     def kill(self):
-        self.qomui_service.disconnect()
+        self.qomui_service.disconnect("main")
 
     def show_config(self, config):
         print("Current configuration:")
@@ -326,20 +327,14 @@ class QomuiCli(QtCore.QObject):
         sys.exit(0)
 
     def openvpn_log_monitor(self, reply):
-        if reply == "success":
+        if reply == "connection_established":
             if self.hop_active == 1:
                 self.hop_active = 0
             else:
                 print("Connection to {} successful".format(self.ovpn_dict["name"]))
                 app.quit()
 
-        elif reply == "fail2":
-            self.kill()
-            print("Connection attempt failed")
-            print("Authentication error while trying to connect\nMaybe your account is expired or connection limit is exceeded")
-            app.quit()
-
-        elif reply == "fail1":
+        elif reply == "conn_attempt_failed":
             self.kill()
             print("Connection attempt failed")
             print("Application was unable to connect to server\nSee log for further information")

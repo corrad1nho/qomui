@@ -477,6 +477,11 @@ class QomuiDbus(dbus.service.Object):
             default_gateway_6 = "None"
             default_interface_6 = "None"
 
+        self.logger.debug("Network interface - ipv4: {}".format(default_interface_4))
+        self.logger.debug("Default gateway - ipv4: {}".format(default_gateway_4))
+        self.logger.debug("Network interface - ipv6: {}".format(default_interface_6))
+        self.logger.debug("Default gateway - ipv6: {}".format(default_gateway_6))
+
         return {
             "gateway" : default_gateway_4,
             "gateway_6" : default_gateway_6,
@@ -913,7 +918,7 @@ class ConnectionThread(QtCore.QThread):
                     self.log.emit(("warning", "Could not reset packet classification for bypass table"))
 
             self.bypass.emit()
-            self.status.emit("connected")
+            self.status.emit("connection_established")
 
         except (CalledProcessError, FileNotFoundError):
             self.status.emit("fail")
@@ -968,7 +973,7 @@ class ConnectionThread(QtCore.QThread):
         self.log.emit(("debug", "OpenVPN pid: {}".format(ovpn_exe.pid)))
         self.pid.emit((ovpn_exe.pid, "OpenVPN{}".format(add)))
         line = ovpn_exe.stdout.readline()
-        time_start = time.time()
+        self.status.emit("starting_timer{}".format(add))
 
         while line.find("SIGTERM[hard,] received, process exiting") == -1:
             time_measure = time.time()
@@ -978,7 +983,7 @@ class ConnectionThread(QtCore.QThread):
             if line.find("Initialization Sequence Completed") != -1:
                 self.connect_status = 1
                 self.bypass.emit()
-                self.status.emit("connected{}".format(add))
+                self.status.emit("connection_established{}".format(add))
                 self.log.emit(("info", "Successfully connected to {}".format(name)))
 
             elif line.find('TUN/TAP device') != -1:
@@ -1004,11 +1009,11 @@ class ConnectionThread(QtCore.QThread):
                 self.dnsserver.emit((add, getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add))))
 
             elif line.find("Restart pause, 10 second(s)") != -1:
-                self.status.emit("fail{}".format(add))
+                self.status.emit("conn_attempt_failed{}".format(add))
                 self.log.emit(("info" ,"Connection attempt failed"))
 
-            elif line.find('SIGTERM[soft,auth-failure]') != -1:
-                self.status.emit("fail_auth{}".format(add))
+            elif line.find('SIGTERM[soft,auth-failure]') != -1 and self.connection_status != 1:
+                self.status.emit("conn_attempt_failed{}".format(add))
                 self.log.emit(("info", "Authentication error while trying to connect"))
 
             elif line.find('write UDP: Operation not permitted') != -1:
@@ -1028,21 +1033,17 @@ class ConnectionThread(QtCore.QThread):
                     firewall.allow_dest_ip(ip, "-I")
 
             elif line.find("Exiting due to fatal error") != -1:
-                self.status.emit("fail{}".format(add))
+                self.status.emit("conn_attempt_failed{}".format(add))
                 self.log.emit(("info", "Connection attempt failed due to fatal error"))
 
             elif line == '':
                 break
 
-            elif time_measure - time_start >= 20:
-                self.status.emit("fail{}".format(add))
-                self.log.emit(("info", "Connection attempt timed out"))
-
             line = ovpn_exe.stdout.readline()
 
         self.log.emit(("info", "OpenVPN:" + line.replace('{}'.format(time.asctime()), '').replace('\n', '')))
         ovpn_exe.stdout.close()
-        self.status.emit("killed{}".format(add))
+        self.status.emit("tunnel_terminated{}".format(add))
         self.log.emit(("info", "OpenVPN - process killed"))
         firewall.allow_dest_ip(last_ip, "-D")
 
