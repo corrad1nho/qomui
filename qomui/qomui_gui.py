@@ -98,7 +98,6 @@ class favouriteButton(QtWidgets.QAbstractButton):
 
 class QomuiGui(QtWidgets.QWidget):
     network_state = 0
-    status = "inactive"
     server_dict = {}
     protocol_dict = {}
     country_list = ["All countries"]
@@ -2086,7 +2085,6 @@ class QomuiGui(QtWidgets.QWidget):
         with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
             last_server_dict["last"] = self.ovpn_dict
             last_server_dict["hop"] = self.hop_server_dict
-            print(last_server_dict)
             json.dump(last_server_dict, lserver)
             lserver.close()
 
@@ -2236,9 +2234,8 @@ class QomuiGui(QtWidgets.QWidget):
                 self.logger.debug("Update timestamp for {} not found".format(provider))
 
     def reconnect(self):
-        if self.status == "active":
-            self.status = "inactive"
-            self.kill()
+        if self.tunnel_active == 1:
+            self.tunnel_active = 0
             self.connect_last_server()
 
     def kill(self):

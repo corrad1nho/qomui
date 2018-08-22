@@ -1,5 +1,12 @@
 ##Changelog
 
+version 0.7.2:
+- [change] cli supports new import and connection methods
+- [bugfix] timer for connection attempts may close active OpenVPN tunnel
+- [bugfix] multiple widgets shown if bypass VPN reconnects
+- [bugfix] wait cursor doesn't always reset
+- [bugfix] Openvpn not reconnecting when process dies unexpectedly
+
 version 0.7.1:
 - [new] secondary vpn tunnel in bypass mode - EXPERIMENTAL
 - [change] download statistics switch to higher units automatically
