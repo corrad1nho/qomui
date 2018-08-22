@@ -1,7 +1,5 @@
 # Qomui <img align="right" src="resources/qomui.png" width=40> 
 
-Written in Python 3.7
-
 ### Description
 Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN/WireGuard gui for GNU/Linux with some unique features such as provider-independent support for double-hop connections. Qomui supports multiple providers with added convenience when using AirVPN, PIA, ProtonVPN, Windscribe or Mullvad. 
 
@@ -37,7 +35,7 @@ Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to
 
 ### Installation
 
-#### Ubuntu
+#### Debian/Ubuntu
 
 Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.7.2/qomui-0.7.2-amd64.deb)
 
