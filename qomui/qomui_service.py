@@ -899,6 +899,9 @@ class ConnectionThread(QtCore.QThread):
                         except IndexError:
                             self.dns_2 = None
 
+                dns_manager.set_dns(self.dns, self.dns_2)
+                self.dnsserver.emit(("", self.dns, self.dns_2))
+
             #Necessary, otherwise bypass mode breaks
             if self.config["bypass"] == 1:
 
