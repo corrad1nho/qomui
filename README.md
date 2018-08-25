@@ -80,7 +80,7 @@ It is highly recommended to activate the firewall to prevent against ipv6 and DN
 ### Double-Hop
 To create a "double-hop" simply choose a first server via the "hop"-button before connecting to the second one. You can mix connections to different providers. However, the double-hop feature does not support OpenVPN over SSL/SSH and WireGuard. Also be aware that depending on your choice of servers this feature may drastically reduce the speed of your internet connection and increase your ping. In any case, you will likely have to sacrifice some bandwith. In my opinion, the added benefits of increased privacy, being able to use different providers as entry and exit node and making it more difficult to be tracked are worth it, though. This feature was inspired by suggestions to simply run a second instance of OpenVPN in a virtual machine to create a double-hop. If that is possible, it should be possible to do the same by manipulating the routing table without the need to fire up a VM. Invaluable resources on the topic were [this discussion on the Openvpn forum](https://forums.openvpn.net/viewtopic.php?f=15&t=7483) and [this github repository](https://github.com/TomAshley303/VPN-Chain). 
 
-### Bypass OpenVPN
+### Bypass
 Qomui includes the option to allow applications such as web browsers to bypass an existing OpenVPN tunnel. This feature is fully compatible with Qomui's firewall activated and double-hop connections. When activated, you can either add and launch applications via the respective tab or via console by issuing your command the following way:
 
 ```
@@ -90,7 +90,7 @@ The idea is taken from [this post on severfault.com](https://serverfault.com/que
 
 The bypass feature also allows you to open a second OpenVPN tunnel (this does currently not work with WireGuard). You can choose any starred servers from a drop-down menu in the bypass tab. Furthermore, it is possible to connect to a server only via bypass, thereby allowing you to use your VPN only for selected applications. OpenVPN in bypass mode is currently limited to ipv4 to prevent leaks. 
 
-**Limitation:** Opening two OpenVPN tunnels using servers from the same provider only works if your provider supports two concurrent connections on different subnets. Airvpn, Windscribe and PIA allow that, Mullvad and ProtonVPN don't. I haven't yet found a way to force this from the client. 
+**Limitation:** Opening two OpenVPN tunnels using servers from the same provider only works if your provider supports two concurrent connections on different subnets. Airvpn, Windscribe and PIA allow that, Mullvad and ProtonVPN don't. I haven't yet found a way to force this from the client apart from using a different port or protocol on the second connection. 
 
 ### WireGuard
 You can add WireGuard config files from any provider as easily as OpenVPN files. WireGuard configs for Mullvad are now downloaded automatically alongside their OpenVPN configs as long as WireGuard is installed. If you choose to manually import WireGuard config files, Qomui will automatically recognize the type of file. As of now, WireGuard will not be installed automatically with DEB and RPM packages. You can find the official installation guidelines for different distributions [here](https://www.wireguard.com/install/).
