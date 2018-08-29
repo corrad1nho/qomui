@@ -1178,6 +1178,13 @@ class QomuiGui(QtWidgets.QWidget):
         except KeyError:
             pass
 
+        try:
+            if self.config_dict["bypass"] == 1:
+                self.bypassTabBt.setVisible(True)
+
+        except KeyError:
+            pass
+
         self.setOptiontab(self.config_dict)
         self.pop_boxes(country='All countries')
         self.pop_bypassAppList()

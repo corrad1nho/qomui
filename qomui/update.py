@@ -820,7 +820,7 @@ class AddServers(QtCore.QThread):
                                 failed_list.append(server)
 
                 if protocol_found == 0:
-                    modify.insert(0, "proto {}".format(protocol.lower)())
+                    modify.insert(0, "proto {}".format(protocol.lower()))
 
                 config.close()
 
