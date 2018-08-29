@@ -1,4 +1,4 @@
-##Changelog
+## Changelog
 
 version 0.7.3:
 - [change] firewall is reloaded on gui startup 

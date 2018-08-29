@@ -126,21 +126,20 @@ Qomui has been my first ever programming experience and a practical challenge fo
 
 ### Changelog
 
+#### version 0.7.3:
+- [change] firewall is reloaded on gui startup 
+- [change] checking for presence of other firewall services such as ufw when configuring firewall
+- [change] selection box for protocols adjusts size 
+- [bugfix] previous iptables rules are now properly saved/restored
+- [bugfix] sometimes external is displayed twice
+- [bugfix] Qomui crashes when adding folder and provider not specified
+- [bugfix] WireGuard dns-servers not set correctly when second tunnel in bypass active
+- [bugfix] manually imported WireGuard configs are not added to server list - [issue #24](https://github.com/corrad1nho/qomui/issues/24)
+- [bugfix] potential permission error for temporary files created during importing configs
+
 #### version 0.7.2:
 - [change] cli supports new import and connection methods
-- [bugfix] timer for connection attempts closes active OpenVPN tunnel
+- [bugfix] timer for connection attempts may close active OpenVPN tunnel
 - [bugfix] multiple widgets shown if bypass VPN reconnects
 - [bugfix] wait cursor doesn't always reset
 - [bugfix] Openvpn not reconnecting when process dies unexpectedly
-
-#### version 0.7.1:
-- [new] secondary vpn tunnel in bypass mode - EXPERIMENTAL
-- [change] download statistics switch to higher units automatically
-- [change] using QThread for OpenVPN/WireGuard process now
-- [change] using alternative url if checking external ip address fails
-- [change] 20 sec timeout for Openvpn connections attempt
-- [bugfix] some temporary files not deleted after importing servers
-- [bugfix] Qomui doesn't recognize when OpenVPN connection attempts fail due to fatal errors
-
-##### Additional notes
-- cli is not working with versions 0.7.0 and 0.7.1

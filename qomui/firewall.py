@@ -212,7 +212,7 @@ def restore_iptables():
     restore = Popen(["iptables-restore"], stdin=infile, stderr=PIPE)
     save.wait()
 
-    if save.stderr:
+    if restore.stderr:
         logging.debug("Failed to restore iptables rules")
 
     else:
