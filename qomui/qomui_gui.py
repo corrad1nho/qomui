@@ -1368,9 +1368,9 @@ class QomuiGui(QtWidgets.QWidget):
                     folderpath = QtCore.QFileInfo(dialog[0]).absolutePath()
 
                 except TypeError:
-                    pass
+                    folderpath = ""
 
-        if folderpath != "":
+        if folderpath != "" and provider != "":
             credentials = {
                             "provider" : provider,
                             "username" : username,
