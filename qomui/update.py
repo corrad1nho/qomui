@@ -12,6 +12,7 @@ import io
 import logging
 import shutil
 import uuid
+
 from PyQt5 import QtCore
 from bs4 import BeautifulSoup
 from subprocess import PIPE, Popen, check_output, CalledProcessError, run
@@ -745,7 +746,7 @@ class AddServers(QtCore.QThread):
             tunnel = "OpenVPN"
             name = os.path.splitext(f)[0]
             conf_copy = "{}/copy/{}".format(self.temp_path, f)
-            ip_resolved= 0
+            ip = 0
             protocol_found = 0
 
             with open(conf_copy, "r") as config:
@@ -753,7 +754,7 @@ class AddServers(QtCore.QThread):
 
                 for index, line in enumerate(modify):
                     if line.startswith("remote "):
-                        if ip_resolved == 0:
+                        if ip == 0:
 
                             try:
                                 protocol = line.split(" ")[3]
@@ -767,14 +768,14 @@ class AddServers(QtCore.QThread):
 
                             if result is not None:
                                 ip = result.group()
-                                ip_resolved = 1
 
                             else:
                                 server = line.split(" ")[1]
                                 ip = resolve(server)
+
                                 if ip != "Failed to resolve":
                                     modify[index] = "remote {} {}\n".format(ip, port)
-                                    ip_resolved = 1
+
                                 else:
                                     self.log.emit(("warning", "Failed to resolve {}".format(server)))
                                     failed_list.append(server)
@@ -799,23 +800,24 @@ class AddServers(QtCore.QThread):
                     #WireGuard
                     elif line.startswith("Endpoint ="):
                         tunnel = "WireGuard"
+                        protocol_found = 1
                         ip_port = line.split(" = ")[1]
                         ipsearch = re.compile('\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
                         result = ipsearch.search(line)
                         port = ip_port.split(":")[1]
                         server = ip_port.split(":")[0]
                         protocol = "UDP"
+
                         if result is not None:
                             ip = result.group()
+
                         else:
                             ip = resolve(server)
                             if ip != "Failed to resolve":
                                 modify[index] = "Endpoint = {}:{}\n".format(ip, port)
-                                ip_resolved= 1
+
                             else:
                                 failed_list.append(server)
-
-                        protocol_found = 1
 
                 if protocol_found == 0:
                     modify.insert(0, "proto {}".format(protocol.lower)())
@@ -826,7 +828,7 @@ class AddServers(QtCore.QThread):
                     file_edit.writelines(modify)
                     file_edit.close()
 
-                if ip_resolved != 0:
+                if ip != 0:
 
                     country_check = check_output(["geoiplookup", "{}".format(ip)]).decode("utf-8")
                     cc = country_check.split(" ")[3].split(",")[0]

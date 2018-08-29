@@ -2,7 +2,8 @@ import json
 import shlex
 import os
 import logging
-from subprocess import check_call, check_output, CalledProcessError
+from subprocess import check_call, check_output, CalledProcessError, Popen, PIPE, STDOUT
+from PyQt5 import QtCore, QtGui, Qt, QtWidgets
 from collections import Counter
 
 ROOTDIR = "/usr/share/qomui"
@@ -172,6 +173,50 @@ def get_config():
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
             logging.debug("Failed to load firewall configuration")
             return None
+
+def check_firewall_services():
+    firewall_services = ["ufw", "firewalld", "qomui"]
+    detected_firewall = []
+
+    for fw in firewall_services:
+
+        try:
+            result = check_output(["systemctl", "is-enabled", fw], stderr=devnull).decode("utf-8")
+
+            if result == "enabled\n":
+                detected_firewall.append(fw)
+                logging.warning("Detected enable firewall service: {}".format(fw))
+
+            else:
+                logging.debug("{}.service is not enabled".format(fw))
+
+        except (FileNotFoundError, CalledProcessError) as e:
+            logging.debug("{}.service does either not exist or is not enabled".format(fw))
+
+    return detected_firewall
+
+def save_iptables():
+    outfile = open("{}/iptables_before.rules".format(ROOTDIR), "w")
+    save = Popen(["iptables-save"], stdout=outfile, stderr=PIPE)
+    save.wait()
+    outfile.flush()
+
+    if save.stderr:
+        logging.debug("Failed to save current iptables rules")
+
+    else:
+        logging.debug("Saved iptables rule")
+
+def restore_iptables():
+    infile = open("{}/iptables_before.rules".format(ROOTDIR), "r")
+    restore = Popen(["iptables-restore"], stdin=infile, stderr=PIPE)
+    save.wait()
+
+    if save.stderr:
+        logging.debug("Failed to restore iptables rules")
+
+    else:
+        logging.debug("restored previous iptables rules")
 
 
 

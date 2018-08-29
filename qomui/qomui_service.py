@@ -9,8 +9,8 @@ import logging.handlers
 import json
 import threading
 import signal
+from datetime import date, datetime
 
-from datetime import datetime, date
 from subprocess import Popen, PIPE, check_output, check_call, CalledProcessError, STDOUT
 
 import pexpect
@@ -67,6 +67,7 @@ class QomuiDbus(dbus.service.Object):
         self.logger.setLevel(logging.DEBUG)
         self.logger.info("Dbus-service successfully initialized")
         self.check_version()
+        firewall.save_iptables()
         self.load_firewall(0)
 
     def check_version(self):
@@ -178,14 +179,20 @@ class QomuiDbus(dbus.service.Object):
 
         try:
             if activate == 1:
+                firewall.save_iptables()
                 firewall.apply_rules(self.config["firewall"], block_lan=block_lan, preserve=preserve)
+
             elif activate == 2:
                 if self.config["fw_gui_only"] == 1:
-                    firewall.apply_rules(0, block_lan=block_lan, preserve=1)
+                    firewall.restore_iptables()
+                    firewall.apply_rules(0, block_lan=0, preserve=preserve_rules)
+
                     try:
                         bypass.delete_cgroup(self.default_interface_4, self.default_interface_6)
+
                     except AttributeError:
                         pass
+
             self.disable_ipv6(self.config["ipv6_disable"])
 
         except KeyError:
@@ -373,13 +380,14 @@ class QomuiDbus(dbus.service.Object):
         provider = content["provider"]
         dns_manager.dns_request_exception("-D", self.config["alt_dns1"], self.config["alt_dns2"], "53")
 
-        with open('{}/{}.json'.format(self.homedir, provider), 'w') as p:
-            json.dump(content, p)
-
         if provider in SUPPORTED_PROVIDERS:
             with open('{}/config.json'.format(ROOTDIR), 'w') as save_config:
                 self.config["{}_last".format(provider)] = str(datetime.utcnow())
                 json.dump(self.config, save_config)
+
+        with open('{}/{}.json'.format(self.homedir, provider), 'w') as p:
+            Popen(['chmod', '0666', '{}/{}.json'.format(self.homedir, provider)])
+            json.dump(content, p)
 
         self.imported(provider)
 
@@ -522,6 +530,7 @@ class QomuiDbus(dbus.service.Object):
             dns_manager.set_dns(self.dns, self.dns_2)
 
         if self.config["bypass"] == 1:
+            #self.dns_2_bypass = "10.88.2.1"
             dns_manager.dnsmasq(
                                 dev_bypass,
                                 "5354",
@@ -824,6 +833,9 @@ class ConnectionThread(QtCore.QThread):
                     #config.append("route-noexec\n")
                     config.append("script-security 2\n")
                     config.append("route-up /usr/share/qomui/bypass_up.sh\n")
+                    #config.append("client-nat snat 10.88.2.2 255.255.255.255 10.8.0.30\n")
+                    #config.append("client-nat dnat 10.88.2.1 255.255.255.255 10.8.0.1\n")
+                    #config.append("ifconfig 10.88.2.2 10.88.2.1\n")
 
             for line, value in enumerate(config):
                 if value.startswith("proto ") is True:
@@ -996,7 +1008,7 @@ class ConnectionThread(QtCore.QThread):
             elif line.find('PUSH: Received control message:') != -1:
                 dns_option_1 = line_format.find('dhcp-option')
 
-                if dns_option_1 != -1:
+                if dns_option_1 != -1 and self.config["alt_dns"] == 0:
                     option = line_format[dns_option_1:].split(",")[0]
                     setattr(self, "dns{}".format(add), option.split(" ")[2])
                     dns_option_2 = line_format.find('dhcp-option', dns_option_1+20)
