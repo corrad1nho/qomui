@@ -86,12 +86,6 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None)
     except CalledProcessError:
         logging.error("Bypass: Setting ipv6 route 'default via {} dev {}' failed".format(gw, interface))
 
-    try:
-        check_call(["cgcreate", "-t", "{}:{}".format(user, group), "-a" "{}:{}".format(user, group), "-g", "net_cls:bypass_qomui"])
-        logging.debug("Bypass: Configured cgroup access for {}".format(user))
-    except CalledProcessError:
-        logging.error("Creating cgroup failed")
-
     with open("/proc/sys/net/ipv4/conf/all/rp_filter", 'w') as rp_edit_all:
         rp_edit_all.write("2")
 
@@ -99,7 +93,13 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None)
         rp_edit_int.write("2")
         logging.debug("Disabled reverse path filtering for {}".format(interface))
 
-    logging.info("Successfully created cgroup for {}".format(interface))
+    try:
+        check_call(["cgcreate", "-t", "{}:{}".format(user, group), "-a" "{}:{}".format(user, group), "-g", "net_cls:bypass_qomui"])
+        logging.debug("Bypass: Configured cgroup access for {}".format(user))
+        logging.info("Successfully created cgroup for {}".format(interface))
+
+    except (CalledProcessError, FileNotFoundError) as e:
+        logging.error("Creating cgroup failed - is libcgroup installed?")
 
 def delete_cgroup(interface):
 

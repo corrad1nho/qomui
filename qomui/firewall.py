@@ -175,7 +175,7 @@ def get_config():
             return None
 
 def check_firewall_services():
-    firewall_services = ["ufw", "firewalld", "qomui"]
+    firewall_services = ["ufw", "firewalld"]
     detected_firewall = []
 
     for fw in firewall_services:
