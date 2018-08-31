@@ -1231,7 +1231,8 @@ class QomuiGui(QtWidgets.QWidget):
         if self.network_state == 1:
             self.logger.info("Detected new network connection")
             self.qomui_service.save_default_dns()
-            self.get_latencies()
+            if self.config_dict["ping"] == 1:
+                self.get_latencies()
             self.kill()
             self.disconnect_bypass()
             self.qomui_service.bypass(utils.get_user_group())
