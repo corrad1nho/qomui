@@ -35,37 +35,8 @@ Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to
 
 ### Installation
 
-#### Debian/Ubuntu
-
-Download and install [DEB-Package](https://github.com/corrad1nho/qomui/releases/download/v0.7.3/qomui-0.7.3-amd64.deb)
-
-#### Fedora
-
-Download and install [RPM-Package](https://github.com/corrad1nho/qomui/releases/download/v0.7.3/qomui-0.7.3-1.x86_64.rpm)
-
-#### Arch
-
-Qomui is available on the AUR:
-
-```
-yaourt -S qomui
-```
-
-#### Source
-
-Make sure all dependencies are installed - be aware that depending on your distribution package names may vary!
-
-I recommend downloading and extracting the latest release and installing via:
-```
-sudo python3 setup.py install
-```
-
-If your adventurous:
-```
-git clone https://github.com/corrad1nho/qomui.git
-cd ./qomui
-sudo python3 setup.py install
-```
+Packages for Fedora, Debian, Ubuntu & OpenSuse are available [here](https://software.opensuse.org//download.html?project=home%3Acorrad1nho&package=qomui)
+Arch Linux users can download Qomui from the AUR. 
 
 ### General usage
 Qomui contains two components: qomui-gui and qomui-service (and qomui-cli: see below). The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service" - this is not recommended). 

@@ -1427,6 +1427,8 @@ class QomuiGui(QtWidgets.QWidget):
             self.notify(split[0], split[1], icon="Error")
 
         else:
+            self.config_dict = self.load_json("{}/config.json".format(ROOTDIR))
+
             with open("{}/{}.json".format(HOMEDIR, msg), "r") as p:
                 content = json.load(p)
 
