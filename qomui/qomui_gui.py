@@ -1378,6 +1378,14 @@ class QomuiGui(QtWidgets.QWidget):
             text = "Importing {}".format(bar)
 
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+
+        try:
+            getattr(self, "{}Bar".format(bar))
+            self.stop_progress_bar(bar)
+
+        except AttributeError:
+            pass
+
         setattr(self, "{}Bar".format(bar), widgets.ProgressBarWidget())
         self.verticalLayout_2.addWidget(getattr(self, "{}Bar".format(bar)))
         getattr(self, "{}Bar".format(bar)).setText(text, action=action)
