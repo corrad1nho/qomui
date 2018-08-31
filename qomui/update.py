@@ -66,6 +66,9 @@ class AddServers(QtCore.QThread):
         else:
             os.makedirs("{}/{}".format(TEMPDIR, self.provider))
 
+        if not os.path.exists(CERTDIR):
+            os.makedirs(CERTDIR)
+
         if self.provider in SUPPORTED_PROVIDERS:
             getattr(self, self.provider.lower())()
 
