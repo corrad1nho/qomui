@@ -36,7 +36,7 @@ Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to
 ### Installation
 
 - Arch Linux users can download Qomui from the AUR. 
-- Packages for Fedora, Debian, Ubuntu & OpenSuse are available [here](https://software.opensuse.org//download.html?project=home%3Acorrad1nho&package=qomui)
+- Packages for Fedora, Debian, Ubuntu & OpenSuse are available [here](https://software.opensuse.org//download.html?project=home%3Acorrad1nho&package=qomui).
 
 ### General usage
 Qomui contains two components: qomui-gui and qomui-service (and qomui-cli: see below). The latter exposes methods via D-Bus and can be controlled via systemd (alternatively you can start it with "sudo qomui-service" - this is not recommended). 
