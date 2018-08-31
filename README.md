@@ -97,20 +97,23 @@ Qomui has been my first ever programming experience and a practical challenge fo
 
 ### Changelog
 
+#### version 0.7.4:
+- [change] source and binary packages now provided by [OpenSuse Build Service](https://build.opensuse.org/)
+- [change] added support for OpenSuse Leap 15 and OpenSuse Tumbleweed
+- [change] split Qomui into more modules and started commenting code
+- [bugfix] bypass tab not shown even though it is active
+- [bugfix] progress bar shown twice for the same action
+- [bugfix] manually adding config files fails if "proto" line not present
+- [bugfix] import may fail if directory for certificates/keys does not exist
+- [bugifx] timestamp not updated after auto-updating servers 
+
 #### version 0.7.3:
 - [change] firewall is reloaded on gui startup 
 - [change] checking for presence of other firewall services such as ufw when configuring firewall
 - [change] selection box for protocols adjusts size 
 - [bugfix] previous iptables rules are now properly saved/restored
-- [bugfix] sometimes external is displayed twice
+- [bugfix] sometimes external ip is displayed twice
 - [bugfix] Qomui crashes when adding folder and provider not specified
 - [bugfix] WireGuard dns-servers not set correctly when second tunnel in bypass active
 - [bugfix] manually imported WireGuard configs are not added to server list - [issue #24](https://github.com/corrad1nho/qomui/issues/24)
 - [bugfix] potential permission error for temporary files created during importing configs
-
-#### version 0.7.2:
-- [change] cli supports new import and connection methods
-- [bugfix] timer for connection attempts may close active OpenVPN tunnel
-- [bugfix] multiple widgets shown if bypass VPN reconnects
-- [bugfix] wait cursor doesn't always reset
-- [bugfix] Openvpn not reconnecting when process dies unexpectedly

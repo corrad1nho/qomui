@@ -6,7 +6,6 @@ import glob
 import os
 
 VERSION = "0.7.4"
-
 data_files = [
         ('/usr/share/qomui', ['resources/countries.json']),
         ('/usr/share/applications/', ['resources/qomui.desktop']),
