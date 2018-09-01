@@ -1,0 +1,5 @@
+[D-BUS Service]
+Name=org.qomui.service
+Exec=/bin/false
+User=root
+SystemdService=qomui.service

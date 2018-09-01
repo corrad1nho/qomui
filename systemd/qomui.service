@@ -9,3 +9,4 @@ BusName=org.qomui.service
 
 [Install]
 WantedBy=multi-user.target
+Alias=dbus-org.qomui.service

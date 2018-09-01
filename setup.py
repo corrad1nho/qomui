@@ -9,8 +9,9 @@ VERSION = "0.7.4"
 data_files = [
         ('/usr/share/qomui', ['resources/countries.json']),
         ('/usr/share/applications/', ['resources/qomui.desktop']),
-        ('/usr/lib/systemd/system/', ['resources/qomui.service']),
-        ('/etc/dbus-1/system.d/', ['resources/org.qomui.service.conf']),
+        ('/lib/systemd/system/', ['systemd/qomui.service']),
+        ('/usr/share/dbus-1/system.d/', ['systemd/org.qomui.service.conf']),
+        ('/usr/share/dbus-1/system-services/', ['systemd/org.qomui.service']),
         ('/usr/share/icons/hicolor/scalable/apps/', ['resources/qomui.svg',
                                                      'resources/qomui_off.svg']),
         ('/usr/share/qomui/', [
