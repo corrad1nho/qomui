@@ -4,6 +4,7 @@
 import os
 import time
 import threading
+import shutil
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError, check_call
 import pexpect
 from PyQt5 import QtCore
