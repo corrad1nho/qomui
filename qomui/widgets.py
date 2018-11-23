@@ -578,7 +578,7 @@ class TunnelMon(QtCore.QThread):
                     ip = None
 
             try:
-                requests.get(check_url_6, timeout=1).content.decode("utf-8")
+                query = requests.get(check_url_6, timeout=1).content.decode("utf-8")
                 ip_6 = json.loads(query)["ip"]
 
             except (KeyError, requests.exceptions.RequestException, json.decoder.JSONDecodeError):
@@ -1002,6 +1002,11 @@ class ModifyServer(QtWidgets.QDialog):
         else:
             config = "{}/{}".format(ROOTDIR, self.server_info["path"])
 
+        splt = os.path.splitext(config)
+        mod = "{}_MOD.{}".format(splt[0], splt[1])
+        if os.path.exists(mod):
+            config = mod
+
         with open (config, "r") as config_edit:
             self.old_config = config_edit.readlines()
             for line in self.old_config:
@@ -1066,5 +1071,6 @@ class ModifyServer(QtWidgets.QDialog):
                        "config_change" : new_config,
                        "index" : remote_index, "apply_all" : change_all
                        }
+
         self.modified.emit(change_dict)
         self.hide()

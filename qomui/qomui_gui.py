@@ -17,7 +17,7 @@ from dbus.mainloop.pyqt5 import DBusQtMainLoop
 import bisect
 import signal
 
-from qomui import update, latency, utils, firewall, widgets
+from qomui import update, latency, utils, firewall, widgets, profiles
 
 
 try:
@@ -41,7 +41,8 @@ SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 JSON_FILE_LIST = [("config_dict", "{}/config.json".format(ROOTDIR)),
                   ("server_dict", "{}/server.json".format(HOMEDIR)),
                   ("protocol_dict", "{}/protocol.json".format(HOMEDIR)),
-                  ("bypass_dict", "{}/bypass_apps.json".format(HOMEDIR))
+                  ("bypass_dict", "{}/bypass_apps.json".format(HOMEDIR)),
+                  ("profile_dict", "{}/profile.json".format(HOMEDIR))
                   ]
 
 class DbusLogHandler(logging.Handler):
@@ -61,6 +62,7 @@ class QomuiGui(QtWidgets.QWidget):
     network_state = 0
     server_dict = {}
     protocol_dict = {}
+    profile_dict = {}
     country_list = ["All countries"]
     provider_list = ["All providers"]
     firewall_rules_changed = False
@@ -187,6 +189,13 @@ class QomuiGui(QtWidgets.QWidget):
         self.tabButtonGroup.addButton(self.serverTabBt)
         self.serverTabBt.setObjectName(_fromUtf8("serverTabBt"))
         self.verticalLayout_3.addWidget(self.serverTabBt)
+        self.profileTabBt = QtWidgets.QCommandLinkButton(Form)
+        self.profileTabBt.setMinimumSize(QtCore.QSize(100, 0))
+        self.profileTabBt.setMaximumSize(QtCore.QSize(100, 100))
+        self.profileTabBt.setCheckable(True)
+        self.tabButtonGroup.addButton(self.profileTabBt)
+        self.profileTabBt.setObjectName(_fromUtf8("profileTabBt"))
+        self.verticalLayout_3.addWidget(self.profileTabBt)
         self.providerTabBt = QtWidgets.QCommandLinkButton(Form)
         self.providerTabBt.setMinimumSize(QtCore.QSize(100, 0))
         self.providerTabBt.setMaximumSize(QtCore.QSize(100, 100))
@@ -279,6 +288,33 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout.addWidget(self.delServerBt)
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.tabWidget.addWidget(self.serverTab)
+
+
+        self.profileTab = QtWidgets.QWidget()
+        self.profileTab.setObjectName(_fromUtf8("profileTab"))
+
+        self.verticalLayout50 = QtWidgets.QVBoxLayout(self.profileTab)
+        self.verticalLayout50.setObjectName("verticalLayout50")
+        self.scrollProfiles = QtWidgets.QScrollArea(self.profileTab)
+        self.scrollProfiles.setWidgetResizable(True)
+        self.scrollProfiles.setObjectName("scrollProfiles")
+        self.scrollProfilesContents= QtWidgets.QWidget()
+        self.scrollProfilesContents.setGeometry(QtCore.QRect(0, 0, 603, 591))
+        self.scrollProfilesContents.setObjectName("scrollProfilesContents")
+        self.verticalLayout_58 = QtWidgets.QVBoxLayout(self.scrollProfilesContents)
+        self.scrollProfiles.setWidget(self.scrollProfilesContents)
+        self.verticalLayout50.addWidget(self.scrollProfiles)
+        self.horizontalLayout50 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout50.setObjectName("horizontalLayout50")
+        spacerItem = QtWidgets.QSpacerItem(368, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout50.addItem(spacerItem)
+        self.addProfileBt = QtWidgets.QPushButton(self.profileTab)
+        self.addProfileBt.setObjectName("addProfileBt")
+        self.horizontalLayout50.addWidget(self.addProfileBt)
+        self.verticalLayout50.addLayout(self.horizontalLayout50)
+        self.tabWidget.addWidget(self.profileTab)
+
+
         self.logTab = QtWidgets.QWidget()
         self.logTab.setObjectName(_fromUtf8("logTab"))
         self.gridLayout_2 = QtWidgets.QGridLayout(self.logTab)
@@ -290,10 +326,13 @@ class QomuiGui(QtWidgets.QWidget):
         self.logBox.setObjectName(_fromUtf8("logBox"))
         self.gridLayout_2.addWidget(self.logBox, 1, 3, 1, 1)
         self.tabWidget.addWidget(self.logTab)
-        self.optionsTab = QtWidgets.QWidget()
+        self.optionsTab = QtWidgets.QScrollArea()
+        self.optionsTab.setWidgetResizable(True)
         self.optionsTab.setObjectName(_fromUtf8("optionsTab"))
         self.tabWidget.addWidget(self.optionsTab)
-        self.verticalLayout_5 = QtWidgets.QVBoxLayout(self.optionsTab)
+        self.optionsTab.setObjectName("optionsTab")
+        self.optionsTabWidgetContents = QtWidgets.QWidget()
+        self.verticalLayout_5 = QtWidgets.QVBoxLayout(self.optionsTabWidgetContents)
         self.verticalLayout_5.setObjectName(_fromUtf8("verticalLayout_5"))
         bold_font = QtGui.QFont()
         bold_font.setBold(True)
@@ -419,6 +458,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.cancelOptBt.setObjectName(_fromUtf8("cancelOptBt"))
         self.horizontalLayout_6.addWidget(self.cancelOptBt)
         self.verticalLayout_5.addLayout(self.horizontalLayout_6)
+        self.optionsTab.setWidget(self.optionsTabWidgetContents)
         self.providerTab = QtWidgets.QWidget()
         self.providerTab.setObjectName(_fromUtf8("providerTab"))
         self.providerTab.setMaximumHeight(1000)
@@ -501,6 +541,27 @@ class QomuiGui(QtWidgets.QWidget):
         self.savePortButton.setVisible(False)
         self.horizontalLayout_31.addWidget(self.savePortButton)
         self.horizontalLayout_31.addStretch()
+        self.gridLayout10 = QtWidgets.QGridLayout(Form)
+        self.gridLayout10.setObjectName("gridLayout")
+        self.preCheck = QtWidgets.QCheckBox(Form)
+        self.preCheck.setObjectName("preCheck")
+        self.gridLayout10.addWidget(self.preCheck, 0, 0, 1, 1)
+        self.preEdit = QtWidgets.QLineEdit(Form)
+        self.preEdit.setObjectName("preEdit")
+        self.gridLayout10.addWidget(self.preEdit, 0, 1, 1, 1)
+        self.upCheck = QtWidgets.QCheckBox(Form)
+        self.upCheck.setObjectName("upCheck")
+        self.gridLayout10.addWidget(self.upCheck, 1, 0, 1, 1)
+        self.upEdit = QtWidgets.QLineEdit(Form)
+        self.upEdit.setObjectName("upEdit")
+        self.gridLayout10.addWidget(self.upEdit, 1, 1, 1, 1)
+        self.downCheck = QtWidgets.QCheckBox(Form)
+        self.downCheck.setObjectName("downCheck")
+        self.gridLayout10.addWidget(self.downCheck, 2, 0, 1, 1)
+        self.downEdit = QtWidgets.QLineEdit(Form)
+        self.downEdit.setObjectName("downEdit")
+        self.gridLayout10.addWidget(self.downEdit, 2, 1, 1, 1)
+        self.verticalLayout_30.addLayout(self.gridLayout10)
         self.verticalLayout_30.addStretch()
         self.tabWidget.addWidget(self.providerTab)
         self.bypassTab = QtWidgets.QWidget()
@@ -661,6 +722,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.aboutTabBt.clicked.connect(self.tab_switch)
         self.optionsTabBt.clicked.connect(self.tab_switch)
         self.logTabBt.clicked.connect(self.tab_switch)
+        self.profileTabBt.clicked.connect(self.tab_switch)
         self.providerTabBt.clicked.connect(self.tab_switch)
         self.applyOptBt.clicked.connect(self.read_option_change)
         self.cancelOptBt.clicked.connect(self.cancelOptions)
@@ -680,12 +742,14 @@ class QomuiGui(QtWidgets.QWidget):
         self.logBox.activated[str].connect(self.log_level)
         self.searchLine.textEdited[str].connect(self.filter_by_text)
         self.bypassVpnButton.clicked.connect(self.set_bypass_vpn)
+        self.addProfileBt.clicked.connect(self.add_profile)
 
     def retranslateUi(self, Form):
         s = ""
         Form.setWindowTitle(_translate("Form", "Qomui", None))
         self.serverTabBt.setText(_translate("Form", "Server", None))
         self.logTabBt.setText(_translate("Form", "Log", None))
+        self.profileTabBt.setText(_translate("Form", "Profiles", None))
         self.providerTabBt.setText(_translate("Form", "Provider", None))
         self.bypassTabBt.setText(_translate("Form", "Bypass", None))
         self.aboutTabBt.setText(_translate("Form", "About", None))
@@ -745,6 +809,12 @@ class QomuiGui(QtWidgets.QWidget):
         self.licenseInfo.setText(_translate("Form", "GPLv3", None))
         self.newVersionLabel.setText(_translate("Form", "A new version is available!", None))
         self.searchLine.setPlaceholderText(_translate("Form", "Search", None))
+        self.preCheck.setText(_translate("Form", "Pre", None))
+        self.upCheck.setText(_translate("Form", "Up", None))
+        self.downCheck.setText(_translate("Form", "Down", None))
+        self.addProfileBt.setText(_translate("Form", "Add Profile", None))
+        self.addProfileBt.setIcon(QtGui.QIcon.fromTheme("list-add"))
+
 
         self.autoconnectOptLabel.setText(_translate("Form",
                                           "Automatically (re-)connect to last server",
@@ -913,18 +983,21 @@ class QomuiGui(QtWidgets.QWidget):
 
     def tab_switch(self):
         button = self.sender().text().replace("&", "")
+        print(button)
         if button == "Server":
             self.tabWidget.setCurrentIndex(0)
-        elif button == "Log":
+        elif button == "Profiles":
             self.tabWidget.setCurrentIndex(1)
+        elif button == "Log":
+            self.tabWidget.setCurrentIndex(2)
             self.logText.verticalScrollBar().setValue(self.logText.verticalScrollBar().maximum())
         elif button == "Options":
             self.setOptiontab(self.config_dict)
-            self.tabWidget.setCurrentIndex(2)
-        elif button == "Provider":
             self.tabWidget.setCurrentIndex(3)
-        elif button == "Bypass":
+        elif button == "Provider":
             self.tabWidget.setCurrentIndex(4)
+        elif button == "Bypass":
+            self.tabWidget.setCurrentIndex(5)
             self.bypassVpnBox.clear()
 
             for k, v in self.server_dict.items():
@@ -933,11 +1006,11 @@ class QomuiGui(QtWidgets.QWidget):
                         self.bypassVpnBox.addItem(k)
 
         elif button == "About":
-            self.tabWidget.setCurrentIndex(5)
+            self.tabWidget.setCurrentIndex(6)
             self.check_update()
 
     def switch_providerTab(self):
-        self.tabWidget.setCurrentIndex(3)
+        self.tabWidget.setCurrentIndex(4)
 
     def systemtray(self):
         self.trayIcon = QtGui.QIcon.fromTheme("qomui")
@@ -1001,6 +1074,8 @@ class QomuiGui(QtWidgets.QWidget):
             self.kill()
             self.disconnect_bypass()
             self.qomui_service.load_firewall(2)
+            with open ("{}/server.json".format(HOMEDIR), "w") as s:
+                json.dump(self.server_dict, s)
             self.exit_event.accept()
 
     def change_timeout(self):
@@ -1047,6 +1122,12 @@ class QomuiGui(QtWidgets.QWidget):
 
                         except KeyError:
                             self.establish_connection(self.ovpn_dict)
+
+                        try:
+                            if "profile" in self.ovpn_dict.keys():
+                                self.connect_profile(self.ovpn_dict["profile"])
+                        except KeyError:
+                            pass
 
                         try:
                             if self.ovpn_dict["favourite"] == "on":
@@ -1137,6 +1218,9 @@ class QomuiGui(QtWidgets.QWidget):
 
         except KeyError:
             pass
+
+        for p in self.profile_dict.keys():
+            self.display_profile(p)
 
         self.setOptiontab(self.config_dict)
         self.pop_boxes(country='All countries')
@@ -1360,6 +1444,87 @@ class QomuiGui(QtWidgets.QWidget):
                         )
 
             self.pop_boxes()
+
+    def add_profile(self, edit=0):
+        dialog = profiles.EditProfile(
+                                    self.tunnel_list,
+                                    self.country_list,
+                                    self.provider_list,
+                                    selected=edit)
+        dialog.save_profile.connect(self.new_profile)
+        dialog.exec_()
+
+    def del_profile(self, number):
+        self.profile_dict.pop(number)
+        with open ("{}/profile.json".format(HOMEDIR), "w") as s:
+                json.dump(self.profile_dict, s)
+        getattr(self, "{}_widget".format(number)).deleteLater()
+        self.verticalLayout_58.removeWidget(getattr(self, "{}_widget".format(number)))
+
+    def edit_profile(self, number):
+        self.add_profile(edit=self.profile_dict[number])
+
+    def new_profile(self, profile_dict):
+        if "number" not in profile_dict.keys():
+            n = len(self.profile_dict)
+            if "profile_{}".format(n) not in self.profile_dict.keys():
+                number = "profile_{}".format(n)
+            elif "profile_{}".format(n-1) not in self.profile_dict.keys():
+                number = "profile_{}".format(n-1)
+            else:
+                number = "profile_{}".format(n+1)
+            self.profile_dict[number] = profile_dict
+            self.profile_dict[number]["number"] = number
+            self.display_profile(number)
+
+        else:
+            number = profile_dict["number"]
+            self.profile_dict[number] = profile_dict
+            getattr(self, "{}_widget".format(number)).setText(self.profile_dict[number])
+
+        with open ("{}/profile.json".format(HOMEDIR), "w") as s:
+                    json.dump(self.profile_dict, s)
+
+    def display_profile(self, number):
+        setattr(self, "{}_widget".format(number), profiles.ProfileWidget(self.profile_dict[number]))
+        getattr(self, "{}_widget".format(number)).del_profile.connect(self.del_profile)
+        getattr(self, "{}_widget".format(number)).edit_profile.connect(self.edit_profile)
+        getattr(self, "{}_widget".format(number)).connect_profile.connect(self.connect_profile)
+        self.verticalLayout_58.addWidget(getattr(self, "{}_widget".format(number)))
+
+    def connect_profile(self, p):
+        result = None
+        profile = self.profile_dict[p]
+        temp_list = []
+        for s, v in self.server_dict.items():
+            if v["country"] in profile["countries"] and v["provider"] in profile["providers"]:
+                if profile["protocol"] == v["tunnel"]:
+                    temp_list.append(s)
+                elif profile["protocol"] == "All protocols":
+                    temp_list.append(s)
+
+        if temp_list:
+            if profile["mode"] == "Fastest":
+                fastest = 10000
+                for s in temp_list:
+                    try:
+                        lat = float(self.server_dict[s]["latency"])
+                    except KeyError:
+                        lat = 1000
+
+                    if lat <= fastest:
+                        fastest = lat
+                        result = s
+
+            elif profile["mode"] == "Random":
+                result = random.choice(temp_list)
+
+            print(result)
+            self.server_chosen(result, profile=p)
+
+        else:
+            self.notify("No match found", "No server fits your profile", icon="Error")
+
 
     def start_progress_bar(self, bar, server=None):
         action = bar
@@ -1619,7 +1784,9 @@ class QomuiGui(QtWidgets.QWidget):
         server = result[0]
         latency_string = result[1]
         latency_float = result[2]
+
         try:
+            self.server_dict[server]["latency"] = str(latency_float)
             old_index = self.index_list.index(server)
             bisect.insort(self.latency_list, latency_float)
             update_index = self.latency_list.index(latency_float)
@@ -1927,7 +2094,7 @@ class QomuiGui(QtWidgets.QWidget):
         server = self.bypassVpnBox.currentText()
         self.server_chosen(server, bypass=1)
 
-    def server_chosen(self, server, random=None, bypass=None):
+    def server_chosen(self, server, random=None, bypass=None, profile=None):
         try:
             current_dict = self.server_dict[server].copy()
 
@@ -1968,6 +2135,9 @@ class QomuiGui(QtWidgets.QWidget):
 
                 if random is not None:
                     self.ovpn_dict.update({"random" : "on"})
+
+                if profile is not None:
+                    self.ovpn_dict.update({"profile" : profile})
 
                 if bypass == 1:
                     self.bypass_ovpn_dict.update({"hop":"0", "bypass":"1"})

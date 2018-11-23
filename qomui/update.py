@@ -278,7 +278,7 @@ class AddServers(QtCore.QThread):
         with requests.Session() as self.session:
 
             try:
-                certfiles = ["ca.crt", "crl.pem"]
+                certfiles = ["ca.crt", "api_root_ca.pem"]
                 git_raw = "https://raw.githubusercontent.com/mullvad/mullvadvpn-app/master/dist-assets/"
 
                 for c in certfiles:
@@ -528,12 +528,16 @@ class AddServers(QtCore.QThread):
                 userpass = json.loads(get_cred.content.decode("utf-8"))
 
                 try:
+                    self.username = userpass["username"]
+                    self.password = userpass["password"]
                     self.log.emit(("info", "Created Windscribe credentials for OpenVPN"))
+                    self.windscribe_get_servers()
 
+                    """
                     with open("{}/windscribe_userpass.txt".format(CERTDIR), "w") as cd:
                         cd.write("{}\n{}\n".format(userpass["username"], userpass["password"]))
                         self.log.emit(("debug", "Windscribe OpenVPN credentials written to {}/windscribe_userpass.txt".format(CERTDIR)))
-                        self.windscribe_get_servers()
+                    """
 
                 except KeyError:
 
@@ -900,7 +904,7 @@ class AddServers(QtCore.QThread):
 
             self.Mullvad_files =    [
                                     ("ca.crt", "mullvad_ca.crt"),
-                                    ("crl.pem", "mullvad_crl.pem"),
+                                    ("api_root_ca.pem", "mullvad_crl.pem"),
                                     ("mullvad_wg.conf", "mullvad_wg.conf")
                                     ]
 
