@@ -44,8 +44,6 @@ class EditProfile(QtWidgets.QDialog):
         self.protocols = protocols
         self.countries = countries
         self.providers = providers
-        print(self.providers)
-        print(self.countries)
         self.selected = selected
         self.setupUi(self)
         self.popBoxes()

@@ -10,6 +10,7 @@ import shutil
 import time
 import random
 import logging
+from functools import partial
 from datetime import datetime, date
 from subprocess import CalledProcessError, check_call, check_output
 from PyQt5 import QtCore, QtWidgets, QtGui
@@ -292,11 +293,10 @@ class QomuiGui(QtWidgets.QWidget):
         self.profileTab.setObjectName(_fromUtf8("profileTab"))
         self.verticalLayout50 = QtWidgets.QVBoxLayout(self.profileTab)
         self.verticalLayout50.setObjectName("verticalLayout50")
-        self.scrollProfiles = QtWidgets.QScrollArea(self.profileTab)
+        self.scrollProfiles = QtWidgets.QScrollArea()
         self.scrollProfiles.setWidgetResizable(True)
         self.scrollProfiles.setObjectName("scrollProfiles")
-        self.scrollProfilesContents= QtWidgets.QWidget()
-        self.scrollProfilesContents.setGeometry(QtCore.QRect(0, 0, 603, 591))
+        self.scrollProfilesContents = QtWidgets.QWidget(self.scrollProfiles)
         self.scrollProfilesContents.setObjectName("scrollProfilesContents")
         self.verticalLayout_58 = QtWidgets.QVBoxLayout(self.scrollProfilesContents)
         self.scrollProfiles.setWidget(self.scrollProfilesContents)
@@ -454,12 +454,11 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout_6.addWidget(self.cancelOptBt)
         self.verticalLayout_5.addLayout(self.horizontalLayout_6)
         self.optionsTab.setWidget(self.optionsTabWidgetContents)
-        self.providerTab = QtWidgets.QScrollArea(self.profileTab)
+        self.providerTab = QtWidgets.QScrollArea()
         self.providerTab.setObjectName(_fromUtf8("providerTab"))
         self.providerTab.setMaximumHeight(1000)
         self.verticalLayout_30 = QtWidgets.QVBoxLayout(self.providerTab)
         self.verticalLayout_30.setObjectName("verticalLayout_30")
-        self.providerTab = QtWidgets.QScrollArea(self.profileTab)
         self.providerTab.setWidgetResizable(True)
         self.providerTabContents= QtWidgets.QWidget()
         self.providerTabContents.setObjectName("providerTabContents")
@@ -1044,6 +1043,11 @@ class QomuiGui(QtWidgets.QWidget):
             self.tray.setIcon(self.trayIcon)
             self.trayMenu = QtWidgets.QMenu()
             show = self.trayMenu.addAction("Show")
+            self.trayMenu.addSeparator()
+            for p,v in self.profile_dict.items():
+                name = self.trayMenu.addAction(v["name"])
+                name.triggered.connect(partial(self.connect_profile, p))
+            self.trayMenu.addSeparator()
             exit = self.trayMenu.addAction("Quit")
             show.triggered.connect(self.show)
             exit.triggered.connect(self.shutdown)
@@ -1516,7 +1520,8 @@ class QomuiGui(QtWidgets.QWidget):
         getattr(self, "{}_widget".format(number)).edit_profile.connect(self.edit_profile)
         getattr(self, "{}_widget".format(number)).connect_profile.connect(self.connect_profile)
         self.verticalLayout_58.addWidget(getattr(self, "{}_widget".format(number)))
-
+        name = self.profile_dict[number]["name"]
+ 
     def connect_profile(self, p):
         result = None
         profile = self.profile_dict[p]
