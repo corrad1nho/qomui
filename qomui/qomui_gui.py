@@ -888,15 +888,11 @@ class QomuiGui(QtWidgets.QWidget):
     def notify(self, header, text, icon="Question"):
 
         try:
-            check_call(["notify-send", header, text, "--icon=dialog-{}".format(icon.lower())])
+            check_call(["notifyi-send", header, text, "--icon=dialog-{}".format(icon.lower())])
 
         except (CalledProcessError, FileNotFoundError):
-
-            if icon == "Error":
-                icon = "Critical"
-
-            self.messageBox(header, text, buttons=[("Ok", "YesRole")], icon="Question")
-
+            self.logger.warning("Desktop notifications not available")
+            
     def messageBox(self, header, text, buttons=[], icon="Question"):
         box = QtWidgets.QMessageBox(self)
         box.setText(header)
@@ -1074,13 +1070,14 @@ class QomuiGui(QtWidgets.QWidget):
         self.exit_event = event
         self.confirm = QtWidgets.QMessageBox()
         self.timeout = 5
-        self.confirm.setText("Do you want to exit program or minimize to tray?")
+        self.confirm.setText("Do you really want to quit Qomui?")
         info = "Closing in {} seconds".format(self.timeout)
         self.confirm.setInformativeText(info)
         self.confirm.setIcon(QtWidgets.QMessageBox.Question)
-        self.confirm.addButton(QtWidgets.QPushButton("Minimize"), QtWidgets.QMessageBox.NoRole)
         self.confirm.addButton(QtWidgets.QPushButton("Exit"), QtWidgets.QMessageBox.YesRole)
-        self.confirm.addButton(QtWidgets.QPushButton("Cancel"), QtWidgets.QMessageBox.RejectRole)
+        self.confirm.addButton(QtWidgets.QPushButton("Cancel"), QtWidgets.QMessageBox.NoRole)
+        if self.tray.isSystemTrayAvailable() == True:
+            self.confirm.addButton(QtWidgets.QPushButton("Minimize"), QtWidgets.QMessageBox.RejectRole)
         self.exit_timer = QtCore.QTimer(self)
         self.exit_timer.setInterval(1000)
         self.exit_timer.timeout.connect(self.change_timeout)
@@ -1089,13 +1086,13 @@ class QomuiGui(QtWidgets.QWidget):
         ret = self.confirm.exec_()
         self.exit_timer.stop()
 
-        if ret == 2:
+        if ret == 1:
             self.exit_event.ignore()
 
-        elif ret == 0:
+        elif ret == 2:
             self.hide()
 
-        elif ret == 1:
+        elif ret == 0:
             self.tray.hide()
             self.kill()
             self.disconnect_bypass()
@@ -1145,15 +1142,14 @@ class QomuiGui(QtWidgets.QWidget):
                         try:
                             if self.ovpn_dict["random"] == "on":
                                 self.choose_random_server()
-
+                        
                         except KeyError:
-                            self.establish_connection(self.ovpn_dict)
 
-                        try:
                             if "profile" in self.ovpn_dict.keys():
                                 self.connect_profile(self.ovpn_dict["profile"])
-                        except KeyError:
-                            pass
+                            
+                            else:
+                                self.establish_connection(self.ovpn_dict)
 
                         try:
                             if self.ovpn_dict["favourite"] == "on":
