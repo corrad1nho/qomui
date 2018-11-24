@@ -459,11 +459,17 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout_6.addWidget(self.cancelOptBt)
         self.verticalLayout_5.addLayout(self.horizontalLayout_6)
         self.optionsTab.setWidget(self.optionsTabWidgetContents)
-        self.providerTab = QtWidgets.QWidget()
+        self.providerTab = QtWidgets.QScrollArea(self.profileTab)
         self.providerTab.setObjectName(_fromUtf8("providerTab"))
         self.providerTab.setMaximumHeight(1000)
         self.verticalLayout_30 = QtWidgets.QVBoxLayout(self.providerTab)
         self.verticalLayout_30.setObjectName("verticalLayout_30")
+        self.providerTab = QtWidgets.QScrollArea(self.profileTab)
+        self.providerTab.setWidgetResizable(True)
+        self.providerTabContents= QtWidgets.QWidget()
+        self.providerTabContents.setObjectName("providerTabContents")
+        self.verticalLayout_30 = QtWidgets.QVBoxLayout(self.providerTabContents)
+        self.providerTab.setWidget(self.providerTabContents)
         bold_font = QtGui.QFont()
         bold_font.setBold(True)
         bold_font.setWeight(75)
@@ -541,27 +547,46 @@ class QomuiGui(QtWidgets.QWidget):
         self.savePortButton.setVisible(False)
         self.horizontalLayout_31.addWidget(self.savePortButton)
         self.horizontalLayout_31.addStretch()
+        self.scriptLabel = QtWidgets.QLabel(self.providerTab)
+        self.scriptLabel.setFont(bold_font)
+        self.scriptLabel.setObjectName("scriptLabel")
+        self.verticalLayout_30.addWidget(self.scriptLabel)
         self.gridLayout10 = QtWidgets.QGridLayout(Form)
         self.gridLayout10.setObjectName("gridLayout")
-        self.preCheck = QtWidgets.QCheckBox(Form)
+        self.preCheck = QtWidgets.QRadioButton(Form)
+        self.preCheck.setCheckable(False)
         self.preCheck.setObjectName("preCheck")
         self.gridLayout10.addWidget(self.preCheck, 0, 0, 1, 1)
         self.preEdit = QtWidgets.QLineEdit(Form)
         self.preEdit.setObjectName("preEdit")
         self.gridLayout10.addWidget(self.preEdit, 0, 1, 1, 1)
-        self.upCheck = QtWidgets.QCheckBox(Form)
+        self.upCheck = QtWidgets.QRadioButton(Form)
+        self.upCheck.setCheckable(False)
         self.upCheck.setObjectName("upCheck")
         self.gridLayout10.addWidget(self.upCheck, 1, 0, 1, 1)
         self.upEdit = QtWidgets.QLineEdit(Form)
         self.upEdit.setObjectName("upEdit")
         self.gridLayout10.addWidget(self.upEdit, 1, 1, 1, 1)
-        self.downCheck = QtWidgets.QCheckBox(Form)
+        self.downCheck = QtWidgets.QRadioButton(Form)
+        self.downCheck.setCheckable(False)
         self.downCheck.setObjectName("downCheck")
         self.gridLayout10.addWidget(self.downCheck, 2, 0, 1, 1)
         self.downEdit = QtWidgets.QLineEdit(Form)
         self.downEdit.setObjectName("downEdit")
         self.gridLayout10.addWidget(self.downEdit, 2, 1, 1, 1)
         self.verticalLayout_30.addLayout(self.gridLayout10)
+        self.horizontalLayout_32 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_32.setObjectName("horizontalLayout_32")
+        spacerItem3 = QtWidgets.QSpacerItem(40, 20,
+                                            QtWidgets.QSizePolicy.Expanding,
+                                            QtWidgets.QSizePolicy.Minimum
+                                            )
+        self.horizontalLayout_32.addItem(spacerItem3)
+        self.confirmScripts = QtWidgets.QDialogButtonBox(self.providerTab)
+        self.confirmScripts.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Save)
+        self.confirmScripts.setObjectName("confirmScripts")
+        self.horizontalLayout_32.addWidget(self.confirmScripts)
+        self.verticalLayout_30.addLayout(self.horizontalLayout_32)
         self.verticalLayout_30.addStretch()
         self.tabWidget.addWidget(self.providerTab)
         self.bypassTab = QtWidgets.QWidget()
@@ -810,14 +835,15 @@ class QomuiGui(QtWidgets.QWidget):
         self.licenseInfo.setText(_translate("Form", "GPLv3", None))
         self.newVersionLabel.setText(_translate("Form", "A new version is available!", None))
         self.searchLine.setPlaceholderText(_translate("Form", "Search", None))
-        self.preCheck.setText(_translate("Form", "Pre", None))
-        self.upCheck.setText(_translate("Form", "Up", None))
-        self.downCheck.setText(_translate("Form", "Down", None))
+        self.preCheck.setText(_translate("Form", "Pre:", None))
+        self.upCheck.setText(_translate("Form", "Up:", None))
+        self.downCheck.setText(_translate("Form", "Down:", None))
         self.addProfileBt.setText(_translate("Form", "Add Profile", None))
         self.addProfileBt.setIcon(QtGui.QIcon.fromTheme("list-add"))
         self.preEdit.setPlaceholderText("Enter script path")
         self.upEdit.setPlaceholderText("Enter script path")
         self.downEdit.setPlaceholderText("Enter script path")
+        self.scriptLabel.setText(_translate("Form", "Add custom scripts:", None))
 
         self.autoconnectOptLabel.setText(_translate("Form",
                                           "Automatically (re-)connect to last server",
@@ -1448,6 +1474,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.pop_boxes()
 
     def add_profile(self, edit=0):
+        print(self.country_list)
         dialog = profiles.EditProfile(
                                     self.tunnel_list,
                                     self.country_list,
@@ -1497,15 +1524,12 @@ class QomuiGui(QtWidgets.QWidget):
     def connect_profile(self, p):
         result = None
         profile = self.profile_dict[p]
-        print(profile)
         temp_list = []
         for s, v in self.server_dict.items():
             if v["country"] in profile["countries"] and v["provider"] in profile["providers"]:
                 if len(profile["filters"]) != 0:
                     for f in profile["filters"]:
                         search = "{}{}".format(s, v["city"])
-                        print(search)
-                        print(f)
                         if f.lower() in search.lower() and f != "":
                             if profile["protocol"] == v["tunnel"]:
                                 temp_list.append(s)

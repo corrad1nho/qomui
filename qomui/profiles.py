@@ -118,6 +118,7 @@ class EditProfile(QtWidgets.QDialog):
 
     def popchoiceTable(self):
         self.choiceTable.clear()
+        self.choiceTable.clearSpans()
         width = self.choiceTable.width()
         n = len(self.countries)-1
         cols = int(width / 120)
@@ -136,7 +137,8 @@ class EditProfile(QtWidgets.QDialog):
         font.setBold(True)
         item.setFont(font)
         item.setText("Choose providers:")
-        self.choiceTable.setSpan(0,0,1,cols)
+        if cols > 1:
+            self.choiceTable.setSpan(0,0,1,cols)
         self.choiceTable.setItem(0,0,item)
         r+=1
         for provider in self.providers:
@@ -148,7 +150,6 @@ class EditProfile(QtWidgets.QDialog):
                 item.setCheckState(QtCore.Qt.Checked)
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
-            self.choiceTable.setSpan(r,c,1,1)
             self.choiceTable.setItem(r,c,item)
             if c == cols:
                 r += 1
@@ -161,10 +162,12 @@ class EditProfile(QtWidgets.QDialog):
         item = QtWidgets.QTableWidgetItem()
         item.setFont(font)
         item.setText("Choose countries:")
-        self.choiceTable.setSpan(r,0,1,cols)
+        if cols > 1:
+            self.choiceTable.setSpan(r,0,1,cols)
         self.choiceTable.setItem(r,0,item)
         r+=1
-        for country in self.countries:
+
+        for country in sorted(self.countries):
             item = QtWidgets.QTableWidgetItem()
             item.setText(country)
             item.setData(QtCore.Qt.UserRole, "countries")
@@ -173,7 +176,6 @@ class EditProfile(QtWidgets.QDialog):
                 item.setCheckState(QtCore.Qt.Checked)
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
-            self.choiceTable.setSpan(r,c,1,1)
             self.choiceTable.setItem(r,c,item)
             if c == cols:
                 r += 1
