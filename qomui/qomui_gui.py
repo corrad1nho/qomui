@@ -743,6 +743,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.searchLine.textEdited[str].connect(self.filter_by_text)
         self.bypassVpnButton.clicked.connect(self.set_bypass_vpn)
         self.addProfileBt.clicked.connect(self.add_profile)
+        self.preEdit.editingFinished.connect(self.save_script_path)
 
     def retranslateUi(self, Form):
         s = ""
@@ -814,7 +815,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.downCheck.setText(_translate("Form", "Down", None))
         self.addProfileBt.setText(_translate("Form", "Add Profile", None))
         self.addProfileBt.setIcon(QtGui.QIcon.fromTheme("list-add"))
-
+        self.preEdit.setPlaceholderText("Enter script path")
+        self.upEdit.setPlaceholderText("Enter script path")
+        self.downEdit.setPlaceholderText("Enter script path")
 
         self.autoconnectOptLabel.setText(_translate("Form",
                                           "Automatically (re-)connect to last server",
@@ -983,7 +986,6 @@ class QomuiGui(QtWidgets.QWidget):
 
     def tab_switch(self):
         button = self.sender().text().replace("&", "")
-        print(button)
         if button == "Server":
             self.tabWidget.setCurrentIndex(0)
         elif button == "Profiles":
@@ -1495,13 +1497,26 @@ class QomuiGui(QtWidgets.QWidget):
     def connect_profile(self, p):
         result = None
         profile = self.profile_dict[p]
+        print(profile)
         temp_list = []
         for s, v in self.server_dict.items():
             if v["country"] in profile["countries"] and v["provider"] in profile["providers"]:
-                if profile["protocol"] == v["tunnel"]:
-                    temp_list.append(s)
-                elif profile["protocol"] == "All protocols":
-                    temp_list.append(s)
+                if len(profile["filters"]) != 0:
+                    for f in profile["filters"]:
+                        search = "{}{}".format(s, v["city"])
+                        print(search)
+                        print(f)
+                        if f.lower() in search.lower() and f != "":
+                            if profile["protocol"] == v["tunnel"]:
+                                temp_list.append(s)
+                            elif profile["protocol"] == "All protocols":
+                                temp_list.append(s)
+
+                else:
+                    if profile["protocol"] == v["tunnel"]:
+                        temp_list.append(s)
+                    elif profile["protocol"] == "All protocols":
+                        temp_list.append(s)
 
         if temp_list:
             if profile["mode"] == "Fastest":
@@ -1511,7 +1526,6 @@ class QomuiGui(QtWidgets.QWidget):
                         lat = float(self.server_dict[s]["latency"])
                     except KeyError:
                         lat = 1000
-
                     if lat <= fastest:
                         fastest = lat
                         result = s
@@ -1519,7 +1533,6 @@ class QomuiGui(QtWidgets.QWidget):
             elif profile["mode"] == "Random":
                 result = random.choice(temp_list)
 
-            print(result)
             self.server_chosen(result, profile=p)
 
         else:
@@ -2390,6 +2403,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.conn_timer = QtCore.QTimer()
         self.conn_timer.setSingleShot(True)
         self.conn_timer.timeout.connect(lambda: self.timeout(bar, server_dict["name"]))
+
+    def save_script_path(self):
+        print(self.preEdit.text())
 
     def show_firewall_editor(self):
         other_firewalls = firewall.check_firewall_services()
