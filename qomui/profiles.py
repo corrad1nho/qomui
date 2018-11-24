@@ -118,13 +118,14 @@ class EditProfile(QtWidgets.QDialog):
         self.choiceTable.clear()
         self.choiceTable.clearSpans()
         width = self.choiceTable.width()
-        n = len(self.countries)-1
+        n = len(self.countries)
+        np = len(self.providers)
         cols = int(width / 120)
         if cols == 0:
             cols = 1
-        rows = int(n / cols) + (n % cols> 0)
-        np = len(self.providers)
-        rows = rows + int(np / cols) + (np % cols> 0) +2
+
+        n = n + len(self.providers)    
+        rows = int(n / cols) + (n % cols> 0) + int(np / cols) + (np % cols> 0) + 3
         self.choiceTable.setRowCount(rows)
         self.choiceTable.setColumnCount(cols)
         self.choiceTable.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
@@ -135,7 +136,7 @@ class EditProfile(QtWidgets.QDialog):
         font.setBold(True)
         item.setFont(font)
         item.setText("Choose providers:")
-        if cols > 1:
+        if cols >= 1:
             self.choiceTable.setSpan(0,0,1,cols)
         self.choiceTable.setItem(0,0,item)
         r+=1
@@ -149,18 +150,18 @@ class EditProfile(QtWidgets.QDialog):
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
             self.choiceTable.setItem(r,c,item)
-            if c == cols:
+            if c == cols-1:
                 r += 1
                 c = 0
             else:
                 c += 1
 
+        r += 1
         c = 0
-        r+=1
         item = QtWidgets.QTableWidgetItem()
         item.setFont(font)
         item.setText("Choose countries:")
-        if cols > 1:
+        if cols >= 1:
             self.choiceTable.setSpan(r,0,1,cols)
         self.choiceTable.setItem(r,0,item)
         r+=1
@@ -175,7 +176,7 @@ class EditProfile(QtWidgets.QDialog):
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
             self.choiceTable.setItem(r,c,item)
-            if c == cols:
+            if c == cols-1:
                 r += 1
                 c = 0
             else:
