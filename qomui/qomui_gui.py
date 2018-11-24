@@ -288,11 +288,8 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout.addWidget(self.delServerBt)
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.tabWidget.addWidget(self.serverTab)
-
-
         self.profileTab = QtWidgets.QWidget()
         self.profileTab.setObjectName(_fromUtf8("profileTab"))
-
         self.verticalLayout50 = QtWidgets.QVBoxLayout(self.profileTab)
         self.verticalLayout50.setObjectName("verticalLayout50")
         self.scrollProfiles = QtWidgets.QScrollArea(self.profileTab)
@@ -313,8 +310,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout50.addWidget(self.addProfileBt)
         self.verticalLayout50.addLayout(self.horizontalLayout50)
         self.tabWidget.addWidget(self.profileTab)
-
-
         self.logTab = QtWidgets.QWidget()
         self.logTab.setObjectName(_fromUtf8("logTab"))
         self.gridLayout_2 = QtWidgets.QGridLayout(self.logTab)
@@ -553,22 +548,19 @@ class QomuiGui(QtWidgets.QWidget):
         self.verticalLayout_30.addWidget(self.scriptLabel)
         self.gridLayout10 = QtWidgets.QGridLayout(Form)
         self.gridLayout10.setObjectName("gridLayout")
-        self.preCheck = QtWidgets.QRadioButton(Form)
-        self.preCheck.setCheckable(False)
+        self.preCheck = QtWidgets.QLabel(Form)
         self.preCheck.setObjectName("preCheck")
         self.gridLayout10.addWidget(self.preCheck, 0, 0, 1, 1)
         self.preEdit = QtWidgets.QLineEdit(Form)
         self.preEdit.setObjectName("preEdit")
         self.gridLayout10.addWidget(self.preEdit, 0, 1, 1, 1)
-        self.upCheck = QtWidgets.QRadioButton(Form)
-        self.upCheck.setCheckable(False)
+        self.upCheck = QtWidgets.QLabel(Form)
         self.upCheck.setObjectName("upCheck")
         self.gridLayout10.addWidget(self.upCheck, 1, 0, 1, 1)
         self.upEdit = QtWidgets.QLineEdit(Form)
         self.upEdit.setObjectName("upEdit")
         self.gridLayout10.addWidget(self.upEdit, 1, 1, 1, 1)
-        self.downCheck = QtWidgets.QRadioButton(Form)
-        self.downCheck.setCheckable(False)
+        self.downCheck = QtWidgets.QLabel(Form)
         self.downCheck.setObjectName("downCheck")
         self.gridLayout10.addWidget(self.downCheck, 2, 0, 1, 1)
         self.downEdit = QtWidgets.QLineEdit(Form)
@@ -768,7 +760,8 @@ class QomuiGui(QtWidgets.QWidget):
         self.searchLine.textEdited[str].connect(self.filter_by_text)
         self.bypassVpnButton.clicked.connect(self.set_bypass_vpn)
         self.addProfileBt.clicked.connect(self.add_profile)
-        self.preEdit.editingFinished.connect(self.save_script_path)
+        self.confirmScripts.accepted.connect(self.save_scripts)
+        self.confirmScripts.rejected.connect(self.clear_scripts)
 
     def retranslateUi(self, Form):
         s = ""
@@ -1328,6 +1321,8 @@ class QomuiGui(QtWidgets.QWidget):
 
             self.config_dict = temp_config
 
+            return "updated"
+
         except CalledProcessError as e:
             self.logger.info("Non-zero exit status: configuration changes not applied")
 
@@ -1336,6 +1331,8 @@ class QomuiGui(QtWidgets.QWidget):
                         "Configuration not updated",
                         icon="Error"
                         )
+
+            return "failed"
 
     def network_change(self, state):
         self.network_state = state
@@ -1474,7 +1471,6 @@ class QomuiGui(QtWidgets.QWidget):
             self.pop_boxes()
 
     def add_profile(self, edit=0):
-        print(self.country_list)
         dialog = profiles.EditProfile(
                                     self.tunnel_list,
                                     self.country_list,
@@ -2027,6 +2023,8 @@ class QomuiGui(QtWidgets.QWidget):
             except KeyError:
                 pass
 
+        self.clear_scripts()
+
     def protocol_change(self, selection):
         provider = self.providerProtocolBox.currentText()
         if provider in SUPPORTED_PROVIDERS:
@@ -2428,8 +2426,38 @@ class QomuiGui(QtWidgets.QWidget):
         self.conn_timer.setSingleShot(True)
         self.conn_timer.timeout.connect(lambda: self.timeout(bar, server_dict["name"]))
 
-    def save_script_path(self):
+    def save_scripts(self):
         print(self.preEdit.text())
+        events = ["pre", "up", "down"]
+        provider = self.providerProtocolBox.currentText()
+        scripts = {}
+        temp_config = {}
+        print(provider)
+
+        for event in events:
+            if getattr(self, "{}Edit".format(event)).text() != "":
+                scripts[event] = getattr(self, "{}Edit".format(event)).text()
+
+        temp_config["{}_scripts".format(provider)] = scripts
+        ret = self.save_options(temp_config)
+
+        if ret == "failed":
+            self.clear_scripts()
+
+    def clear_scripts(self):
+        provider = self.providerProtocolBox.currentText()
+        events = ["pre", "up", "down"]
+        for e in events:
+            try:
+                if e in self.config_dict["{}_scripts".format(provider)].keys():
+                    getattr(self, "{}Edit".format(e)).setText(
+                        self.config_dict["{}_scripts".format(provider)][e]
+                        )
+                else:
+                    getattr(self, "{}Edit".format(e)).clear()
+
+            except KeyError:
+                getattr(self, "{}Edit".format(e)).clear()
 
     def show_firewall_editor(self):
         other_firewalls = firewall.check_firewall_services()

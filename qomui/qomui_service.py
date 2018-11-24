@@ -119,6 +119,7 @@ class QomuiDbus(dbus.service.Object):
         name = ovpn_dict["name"]
         if ovpn_dict["tunnel"] == "WireGuard":
             self.wg_connect = 1
+            self.wg_provider = ovpn_dict["provider"]
 
         setattr(self, "{}_dict".format(name), tunnel.TunnelThread(ovpn_dict, self.hop_dict, self.config))
         getattr(self, "{}_dict".format(name)).log.connect(self.log_thread)
@@ -239,7 +240,6 @@ class QomuiDbus(dbus.service.Object):
                     self.kill_pid(i)
 
             if self.wg_connect == 1:
-
                 try:
                     wg_down = Popen(["wg-quick", "down", "{}/wg_qomui.conf".format(ROOTDIR)], stdout=PIPE, stderr=STDOUT)
                     for line in wg_down.stdout:
@@ -248,7 +248,7 @@ class QomuiDbus(dbus.service.Object):
                 except CalledProcessError:
                     pass
 
-                #as WireGuard is down - we can remove those rules
+                #as WireGuard is down we can remove those rules
                 wg_rules = [
                     ["-D", "INPUT", "-i", "wg_qomui", "-j", "ACCEPT"],
                     ["-D", "OUTPUT", "-o", "wg_qomui", "-j", "ACCEPT"]
@@ -257,6 +257,8 @@ class QomuiDbus(dbus.service.Object):
                 for rule in wg_rules:
                     firewall.add_rule_6(rule)
                     firewall.add_rule(rule)
+
+                tunnel.exe_custom_scripts("down", self.wg_provider, self.config)
 
                 self.wg_connect = 0
 
