@@ -292,12 +292,6 @@ class ProfileWidget(QtWidgets.QWidget):
         self.filterLabel.setIndent(20)
         self.verticalLayout.addWidget(self.filterLabel)
 
-        spacerItem = QtWidgets.QSpacerItem(0, 0,
-                                            QtWidgets.QSizePolicy.Minimum,
-                                            QtWidgets.QSizePolicy.MinimumExpanding
-                                            )
-        self.verticalLayout.addItem(spacerItem)
-
         self.delProfBt.clicked.connect(self.delete)
         self.editProfBt.clicked.connect(self.edit)
         self.connProfileBt.clicked.connect(self.connect)

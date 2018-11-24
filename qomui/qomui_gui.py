@@ -299,6 +299,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.scrollProfilesContents = QtWidgets.QWidget(self.scrollProfiles)
         self.scrollProfilesContents.setObjectName("scrollProfilesContents")
         self.verticalLayout_58 = QtWidgets.QVBoxLayout(self.scrollProfilesContents)
+        self.verticalLayout_58.addStretch()
         self.scrollProfiles.setWidget(self.scrollProfilesContents)
         self.verticalLayout50.addWidget(self.scrollProfiles)
         self.horizontalLayout50 = QtWidgets.QHBoxLayout()
@@ -1519,7 +1520,7 @@ class QomuiGui(QtWidgets.QWidget):
         getattr(self, "{}_widget".format(number)).del_profile.connect(self.del_profile)
         getattr(self, "{}_widget".format(number)).edit_profile.connect(self.edit_profile)
         getattr(self, "{}_widget".format(number)).connect_profile.connect(self.connect_profile)
-        self.verticalLayout_58.addWidget(getattr(self, "{}_widget".format(number)))
+        self.verticalLayout_58.insertWidget(0, getattr(self, "{}_widget".format(number)))
         name = self.profile_dict[number]["name"]
  
     def connect_profile(self, p):
