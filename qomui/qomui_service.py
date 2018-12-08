@@ -51,6 +51,7 @@ class QomuiDbus(dbus.service.Object):
     wg_connect = 0
     version = "None"
     thread_list = []
+    interface = "eth0"
 
     def __init__(self):
         self.sys_bus = dbus.SystemBus()
@@ -421,13 +422,13 @@ class QomuiDbus(dbus.service.Object):
                 pass
 
     @dbus.service.method(BUS_NAME, in_signature='a{ss}', out_signature='')
-    def bypass(self, ug):
-        self.ug = ug
-        default_routes = self.default_gateway_check()
-        self.gw = default_routes["gateway"]
-        self.gw_6 = default_routes["gateway_6"]
-        default_interface_4 = default_routes["interface"]
-        default_interface_6 = default_routes["interface_6"]
+    def bypass(self, net):
+        self.net = net
+        #default_routes = self.default_gateway_check()
+        self.gw = self.net["gateway"]
+        self.gw_6 = self.net["gateway_6"]
+        default_interface_4 = self.net["interface"]
+        default_interface_6 = self.net["interface_6"]
 
         if self.gw != "None" or self.gw_6 != "None":
             try:
@@ -439,12 +440,12 @@ class QomuiDbus(dbus.service.Object):
                     self.interface = default_interface_4
 
                 else:
-                    self.interface = "eth0"
+                    self.interface = "None"
 
                 if self.config["bypass"] == 1:
                     bypass.create_cgroup(
-                        self.ug["user"],
-                        self.ug["group"],
+                        self.net["user"],
+                        self.net["group"],
                         self.interface,
                         gw=self.gw,
                         gw_6=self.gw_6,
@@ -472,8 +473,8 @@ class QomuiDbus(dbus.service.Object):
             except KeyError:
                 self.logger.warning('Config file corrupted - bypass option does not exist')
 
-    #determine default ipv4/ipv6 routes and default network interface
-    @dbus.service.method(BUS_NAME, in_signature='', out_signature='a{ss}')
+    #determine default ipv4/ipv6 routes and default network interface - moved to NetMon thread
+    """@dbus.service.method(BUS_NAME, in_signature='', out_signature='a{ss}')
     def default_gateway_check(self):
         try:
             route_cmd = ["ip", "route", "show", "default", "0.0.0.0/0"]
@@ -509,7 +510,7 @@ class QomuiDbus(dbus.service.Object):
             "gateway_6" : default_gateway_6,
             "interface" : default_interface_4,
             "interface_6" : default_interface_6
-            }
+            }"""
 
     def cgroup_vpn(self):
         self.kill_dnsmasq()
@@ -517,8 +518,8 @@ class QomuiDbus(dbus.service.Object):
         if self.tun_bypass is not None:
             dev_bypass = self.tun_bypass
             bypass.create_cgroup(
-                            self.ug["user"],
-                            self.ug["group"],
+                            self.net["user"],
+                            self.net["group"],
                             dev_bypass,
                             default_int=self.interface
                             )
@@ -553,8 +554,8 @@ class QomuiDbus(dbus.service.Object):
                                 )
 
             bypass.create_cgroup(
-                                self.ug["user"],
-                                self.ug["group"],
+                                self.net["user"],
+                                self.net["group"],
                                 dev_bypass,
                                 gw=self.gw,
                                 gw_6=self.gw_6,

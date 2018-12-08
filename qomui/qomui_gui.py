@@ -86,6 +86,13 @@ class QomuiGui(QtWidgets.QWidget):
                    "auto_update"
                    ]
 
+    routes = {       
+            "gateway" : "None",
+            "gateway_6" : "None",
+            "interface" : "None",
+            "interface_6" : "None"
+            }
+
     def __init__(self, parent = None):
         super(QomuiGui, self).__init__(parent)
         self.logger = logging.getLogger()
@@ -888,7 +895,7 @@ class QomuiGui(QtWidgets.QWidget):
     def notify(self, header, text, icon="Question"):
 
         try:
-            check_call(["notifyi-send", header, text, "--icon=dialog-{}".format(icon.lower())])
+            check_call(["notify-send", header, text, "--icon=dialog-{}".format(icon.lower())])
 
         except (CalledProcessError, FileNotFoundError):
             self.logger.warning("Desktop notifications not available")
@@ -1305,7 +1312,7 @@ class QomuiGui(QtWidgets.QWidget):
             check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
             self.qomui_service.load_firewall(1)
-            self.qomui_service.bypass(utils.get_user_group())
+            self.qomui_service.bypass({**self.routes, **utils.get_user_group()})
             self.notify(
                         "Qomui: configuration changed",
                         "Configuration updated successfully",
@@ -1335,18 +1342,20 @@ class QomuiGui(QtWidgets.QWidget):
 
             return "failed"
 
-    def network_change(self, state):
+    def network_change(self, state, routes):
         self.network_state = state
 
-        if self.network_state == 1:
+        if self.network_state != 0:
+            self.routes = routes
+            print(self.routes)
             self.logger.info("Detected new network connection")
             self.qomui_service.save_default_dns()
             if self.config_dict["ping"] == 1:
                 self.get_latencies()
             self.kill()
             self.disconnect_bypass()
-            self.qomui_service.bypass(utils.get_user_group())
             self.connect_last_server()
+            self.qomui_service.bypass({**self.routes, **utils.get_user_group()})
 
         elif self.network_state == 0:
             self.logger.info("Lost network connection - VPN tunnel terminated")
@@ -1805,7 +1814,8 @@ class QomuiGui(QtWidgets.QWidget):
         except AttributeError:
             pass
 
-        gateway = self.qomui_service.default_gateway_check()["interface"]
+        gateway = self.routes["interface"]
+        print(gateway)
 
         if gateway != "None":
             self.latency_list = []
@@ -2429,12 +2439,10 @@ class QomuiGui(QtWidgets.QWidget):
         self.conn_timer.timeout.connect(lambda: self.timeout(bar, server_dict["name"]))
 
     def save_scripts(self):
-        print(self.preEdit.text())
         events = ["pre", "up", "down"]
         provider = self.providerProtocolBox.currentText()
         scripts = {}
         temp_config = {}
-        print(provider)
 
         for event in events:
             if getattr(self, "{}Edit".format(event)).text() != "":
@@ -2651,7 +2659,7 @@ class QomuiGui(QtWidgets.QWidget):
                 return row
 
 class NetMon(QtCore.QThread):
-    net_state_change = QtCore.pyqtSignal(int)
+    net_state_change = QtCore.pyqtSignal(int, dict)
     log = QtCore.pyqtSignal(tuple)
 
     def __init__(self):
@@ -2660,10 +2668,18 @@ class NetMon(QtCore.QThread):
     def run(self):
         net_iface_dir = "/sys/class/net/"
         net_check = 0
+        i = "None"
 
         while True:
             prior = net_check
+            i = "None"
             net_check = 0
+            routes = {       
+                        "gateway" : "None",
+                        "gateway_6" : "None",
+                        "interface" : "None",
+                        "interface_6" : "None"
+                        }
 
             try:
                 for iface in os.listdir(net_iface_dir):
@@ -2671,14 +2687,63 @@ class NetMon(QtCore.QThread):
 
                         if n.read() == "up\n":
                             net_check = 1
+                            i = iface
 
-                if prior != net_check:
-                    self.net_state_change.emit(net_check)
+                if prior != net_check and net_check == 1:
+                    routes = self.default_gateway_check()
+                    gw = routes["gateway"]
+                    gw_6 = routes["gateway_6"]
+
+                    if gw != "None" or gw_6 != "None":
+                        self.net_state_change.emit(net_check, routes)
+
+                    else:
+                        net_check = 0
+
+                elif prior != net_check and net_check == 0:
+                    self.net_state_change.emit(net_check, routes)
 
                 time.sleep(2)
 
             except (FileNotFoundError, PermissionError) as e:
                 self.log.emit(("error", e))
+
+    def default_gateway_check(self):
+        try:
+            route_cmd = ["ip", "route", "show", "default", "0.0.0.0/0"]
+            default_route = check_output(route_cmd).decode("utf-8")
+            parse_route = default_route.split(" ")
+            default_gateway_4 = parse_route[2]
+            default_interface_4 = parse_route[4]
+
+        except (CalledProcessError, IndexError):
+            self.log.emit(('info', 'Could not identify default gateway - no network connectivity'))
+            default_gateway_4 = "None"
+            default_interface_4 = "None"
+
+        try:
+            route_cmd = ["ip", "-6", "route", "show", "default", "::/0"]
+            default_route = check_output(route_cmd).decode("utf-8")
+            parse_route = default_route.split(" ")
+            default_gateway_6 = parse_route[2]
+            default_interface_6 = parse_route[4]
+
+        except (CalledProcessError, IndexError):
+            self.log.emit(('error', 'Could not identify default gateway for ipv6 - no network connectivity'))
+            default_gateway_6 = "None"
+            default_interface_6 = "None"
+
+        self.log.emit(("debug", "Network interface - ipv4: {}".format(default_interface_4)))
+        self.log.emit(("debug","Default gateway - ipv4: {}".format(default_gateway_4)))
+        self.log.emit(("debug","Network interface - ipv6: {}".format(default_interface_6)))
+        self.log.emit(("debug","Default gateway - ipv6: {}".format(default_gateway_6)))
+
+        return {
+            "gateway" : default_gateway_4,
+            "gateway_6" : default_gateway_6,
+            "interface" : default_interface_4,
+            "interface_6" : default_interface_6
+            }
 
 def main():
     if not os.path.exists("{}/.qomui".format(os.path.expanduser("~"))):
