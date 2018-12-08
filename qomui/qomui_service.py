@@ -190,7 +190,7 @@ class QomuiDbus(dbus.service.Object):
             elif activate == 2:
                 if self.config["fw_gui_only"] == 1:
                     firewall.restore_iptables()
-                    firewall.apply_rules(0, block_lan=0, preserve=preserve_rules)
+                    firewall.apply_rules(0, block_lan=0, preserve=preserve)
 
                     try:
                         bypass.delete_cgroup(self.default_interface_4, self.default_interface_6)
@@ -611,7 +611,7 @@ class QomuiDbus(dbus.service.Object):
                 upgrade_cmd = ["rpm", "-i", "{}/{}".format(ROOTDIR, rpm_pack)]
 
             else:
-                url = "{}archive/{}.zip".format(base.url, self.version)
+                url = "{}archive/{}.zip".format(base_url, self.version)
                 self.logger.debug(url)
                 upgrade_cmd = [
                     python,

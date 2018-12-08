@@ -1347,7 +1347,6 @@ class QomuiGui(QtWidgets.QWidget):
 
         if self.network_state != 0:
             self.routes = routes
-            print(self.routes)
             self.logger.info("Detected new network connection")
             self.qomui_service.save_default_dns()
             if self.config_dict["ping"] == 1:
@@ -1815,8 +1814,6 @@ class QomuiGui(QtWidgets.QWidget):
             pass
 
         gateway = self.routes["interface"]
-        print(gateway)
-
         if gateway != "None":
             self.latency_list = []
             self.PingThread = latency.LatencyCheck(self.server_dict, gateway)
@@ -2398,7 +2395,7 @@ class QomuiGui(QtWidgets.QWidget):
             pass
 
     def kill_hop():
-        self.kill()
+        pass
 
     def kill_bypass(self):
         last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
