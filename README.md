@@ -97,6 +97,20 @@ Qomui has been my first ever programming experience and a practical challenge fo
 
 ### Changelog
 
+#### version 0.8.0:
+- [new] connection profiles 
+- [new] support for custom scripts
+- [change] configurations for Airvpn are now downloaded directly
+- [change] removed minimize option if system tray not available
+- [change] download new Mullvad config/certificates  
+- [change] added scroll areas to some tabs
+- [change] added options for profiles to tray menu
+- [change] window state now recognized correctly
+- [bugfix] improved stability and reliability of network detection 
+- [bugfix] manually imported WireGuard servers don't connect
+- [bugfix] Qomui crashes when downloading Airvpn configs
+- [bugfix] fixed Mullvad & Windscribe configs
+
 #### version 0.7.4:
 - [change] source and binary packages now provided by [OpenSuse Build Service](https://build.opensuse.org/)
 - [change] added support for OpenSuse Leap 15 and OpenSuse Tumbleweed
@@ -107,13 +121,3 @@ Qomui has been my first ever programming experience and a practical challenge fo
 - [bugfix] import may fail if directory for certificates/keys does not exist
 - [bugifx] timestamp not updated after auto-updating servers 
 
-#### version 0.7.3:
-- [change] firewall is reloaded on gui startup 
-- [change] checking for presence of other firewall services such as ufw when configuring firewall
-- [change] selection box for protocols adjusts size 
-- [bugfix] previous iptables rules are now properly saved/restored
-- [bugfix] sometimes external ip is displayed twice
-- [bugfix] Qomui crashes when adding folder and provider not specified
-- [bugfix] WireGuard dns-servers not set correctly when second tunnel in bypass active
-- [bugfix] manually imported WireGuard configs are not added to server list - [issue #24](https://github.com/corrad1nho/qomui/issues/24)
-- [bugfix] potential permission error for temporary files created during importing configs
