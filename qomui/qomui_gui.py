@@ -1052,8 +1052,8 @@ class QomuiGui(QtWidgets.QWidget):
             self.tray.setToolTip("Status: disconnected")
             self.tray.activated.connect(self.restoreUi)
 
-        if self.windowState() == QtCore.Qt.WindowActive:
-            self.trayMenu.insert(Action)
+        #if self.windowState() == QtCore.Qt.WindowActive:
+         #   self.trayMenu.insert(Action)
 
     def pop_tray_menu(self):
         self.trayMenu.clear()
@@ -1082,6 +1082,7 @@ class QomuiGui(QtWidgets.QWidget):
     def activate_window(self):
         self.setWindowState(QtCore.Qt.WindowActive)
         self.showNormal()
+
     def shutdown(self):
         self.tray.hide()
         self.kill()
