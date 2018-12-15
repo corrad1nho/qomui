@@ -28,6 +28,8 @@ data_files = [
                                 'resources/hop_down.sh',
                                 'resources/bypass_up.sh',
                                 'resources/bypass_route.sh',
+                                'resources/airvpn_api.pem',
+                                'resources/airvpn_cacert.pem',
                                 'VERSION']
                             ),
         ('/usr/share/qomui/flags/', glob.glob('resources/flags/*'))

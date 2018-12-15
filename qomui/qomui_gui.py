@@ -1046,20 +1046,42 @@ class QomuiGui(QtWidgets.QWidget):
         else:
             self.tray.setIcon(self.trayIcon)
             self.trayMenu = QtWidgets.QMenu()
-            show = self.trayMenu.addAction("Show")
-            self.trayMenu.addSeparator()
-            for p,v in self.profile_dict.items():
-                name = self.trayMenu.addAction(v["name"])
-                name.triggered.connect(partial(self.connect_profile, p))
-            self.trayMenu.addSeparator()
-            exit = self.trayMenu.addAction("Quit")
-            show.triggered.connect(self.show)
-            exit.triggered.connect(self.shutdown)
+            self.pop_tray_menu()
             self.tray.setContextMenu(self.trayMenu)
             self.tray.show()
             self.tray.setToolTip("Status: disconnected")
             self.tray.activated.connect(self.restoreUi)
 
+        if self.windowState() == QtCore.Qt.WindowActive:
+            self.trayMenu.insert(Action)
+
+    def pop_tray_menu(self):
+        self.trayMenu.clear()
+        self.visibility_action = QtWidgets.QAction()
+        self.visibility_action.setText("Hide")
+        self.trayMenu.addAction(self.visibility_action)
+        self.trayMenu.addSeparator()
+        self.trayMenu.addSeparator()
+        for p,v in self.profile_dict.items():
+            name = self.trayMenu.addAction(v["name"])
+            name.triggered.connect(partial(self.connect_profile, p))
+        self.trayMenu.addSeparator()
+        exit_action = self.trayMenu.addAction("Quit")
+        self.visibility_action.triggered.connect(self.toggle_visibility)
+        exit_action.triggered.connect(self.shutdown)
+
+    def toggle_visibility(self):
+        if self.visibility_action.text() == "Show":
+            self.showNormal()
+            self.visibility_action.setText("Hide")
+
+        else:
+            self.hide()
+            self.visibility_action.setText("Show")
+
+    def activate_window(self):
+        self.setWindowState(QtCore.Qt.WindowActive)
+        self.showNormal()
     def shutdown(self):
         self.tray.hide()
         self.kill()

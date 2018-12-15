@@ -97,7 +97,7 @@ class AddServers(QtCore.QThread):
                      }
 
         #Loading public RSA key
-        with open("/home/corrado/air.pem", "rb") as pem:
+        with open("{}/airvpn_api.pem".format(ROOTDIR), "rb") as pem:
             rsa_pub_key = serialization.load_pem_public_key(
             pem.read(),
             backend=self.backend
@@ -223,7 +223,7 @@ class AddServers(QtCore.QThread):
             xml = requests.post(
                                 "http://54.93.175.114",
                                 data=payload,
-                                cert="/home/corrado/eddie-master/eddie/common/cacert.pem",
+                                cert="{}/airvpn_cacert.pem".format(ROOTDIR),
                                 timeout=2
                                 )
             return xml
