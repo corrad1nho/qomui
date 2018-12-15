@@ -76,197 +76,160 @@ class AddServers(QtCore.QThread):
             self.add_folder()
 
     def airvpn(self):
+        import base64
+        import time
+        from xml.etree import ElementTree as et
+        from lxml import etree
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization, hashes, asymmetric, ciphers
+
         self.airvpn_servers = {}
         self.airvpn_protocols = {}
-        self.url = "https://airvpn.org"
-        self.log.emit(("info", "Logging into airvpn.org"))
+        self.backend = default_backend()
+
+        #Those are sent with AES-256-CBC encryption
+        data_params = {
+                        "login" : self.username,
+                        "password" : self.password,
+                        "system" : "linux_x64",
+                        "version" : "999"
+                     }
+
+        #Loading public RSA key
+        with open("{}/airvpn_api.pem".format(ROOTDIR), "rb") as pem:
+            rsa_pub_key = serialization.load_pem_public_key(
+            pem.read(),
+            backend=self.backend
+            )
+
+        #Generating random AES key
+        self.aes_key = os.urandom(32)
+        self.aes_iv = os.urandom(16)
+        self.cipher = ciphers.Cipher(ciphers.algorithms.AES(self.aes_key), ciphers.modes.CBC(self.aes_iv), backend=self.backend)
+
+        aes_params = {"key" : self.aes_key, "iv" : self.aes_iv}
+        a = b''
+        for k,v in aes_params.items():
+            a = a + base64.b64encode(k.encode('utf-8')) + b':' + base64.b64encode(v) + b'\n'
+
+        #Encrypting AES key with RSA
+        aes_params_crypt = rsa_pub_key.encrypt(a, asymmetric.padding.PKCS1v15())
+        data_params["act"] = "user"
+        user_params_crypt = self.encrypt_data_params(data_params)
+        payload = {
+                "s" :  base64.b64encode(aes_params_crypt).decode("utf-8"),
+                "d" :  base64.b64encode(user_params_crypt).decode("utf-8")
+                }
 
         try:
-            with requests.Session() as self.session:
-                auth_parse = BeautifulSoup(self.session.get(self.url, timeout=2).content, "lxml")
-                auth = auth_parse.find("input", {"type": "hidden"}).get("value")
-                payload = {
-                            'auth_key' : auth,
-                            'referer' : self.url,
-                            'ips_username' : self.username,
-                            'ips_password' : self.password
-                            }
-
-                url = "https://airvpn.org/index.php?app=core&module=global&section=login&do=process"
-                self.session.post(url, data=payload)
-                cook = self.session.cookies.get_dict()
-
-                if "coppa" in cook:
-                    self.log.emit(("info", "Airvpn: Login successful"))
-                    self.airvpn_parse_info()
-                else:
-                    self.log.emit(("info", "Airvpn: Login failed - aborting"))
-                    self.remove_temp_dir(self.provider)
-                    m = "Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
-                    self.failed.emit(m)
-
-        except requests.exceptions.RequestException as e:
-            self.log.emit(("error", "Network error: Unable to retrieve data from airvpn.org"))
-            self.remove_temp_dir(self.provider)
-            self.failed.emit("Network error&No internet connection&{}".format(self.provider))
-
-    def airvpn_parse_info(self):
-        csrf_parse = BeautifulSoup(self.session.get('{}/generator'.format(self.url), timeout=2).content, "lxml")
-        self.csrf = csrf_parse.find("input", {"type" : "hidden"}).get("value")
-        mode_list = self.session.get('{}/generator'.format(self.url), timeout=2)
-        mode_list_parse = BeautifulSoup(mode_list.content, "lxml")
-        self.log.emit(("info", "Parsing Airvpn protocols"))
-
-        for row in mode_list_parse.find("table", {"class":"data"}).findAll('tr'):
-            protocols = row('td')
-            if len(protocols) != 0:
-                number = protocols[0].find('input').get('id')
-                mode = protocols[1].string
-                port = protocols[2].string
-                self.airvpn_protocols[number] = {
-                                                    "protocol" : mode,
-                                                     "port" : port,
-                                                     "ip" : "ip{}".format(protocols[3].string),
-                                                     "ipv6" : "ipv4"
-                                                     }
-
-                self.airvpn_protocols["{}-v6".format(number)] = {
-                                                            "protocol" : mode,
-                                                            "port" : port,
-                                                            "ip" : "ip{}".format(protocols[3].string),
-                                                            "ipv6" : "ipv6",
-                                                            }
+            cert_xml = self.call_air_api(payload)
+            decrypt_server = self.cipher.decryptor()
+            decrypt_user = self.cipher.decryptor()
+            cert_xml = decrypt_user.update(cert_xml.content) + decrypt_user.finalize()
+            parser = etree.XMLParser(recover=True)
+            cert_xml_root = et.fromstring(cert_xml, parser=parser)
+            self.temp_path = "{}/{}".format(TEMPDIR, self.provider)
 
 
-        get_list = requests.get('{}/status'.format(self.url), timeout=2)
-        get_list_parse = BeautifulSoup(get_list.content, "lxml")
-        servers = get_list_parse.findAll("div", {"class":"air_server_box_1"})
-        self.log.emit(("info", "Generating server list"))
-        for item in servers:
-            name = item.find("a").get('href').split("/")[2]
-            city = item.find("span", {"style":"font-size:0.7em;"}).text
-            country = item.find("img").get("alt")
-            self.airvpn_servers[name] = {
-                                            "name" : name,
-                                             "provider": "Airvpn",
-                                             "city": city,
-                                             "country" : country,
-                                             "tunnel" : "OpenVPN"
-                                             }
+            for a in cert_xml_root.attrib:
+                if a != "login" and a != "expirationdate":
+                    with open("{}/{}".format(self.temp_path, a), "w") as c:
+                        c.write(cert_xml_root.attrib[a])
 
-        self.airvpn_download()
+            user_key = cert_xml_root[0][0]
+            for a in user_key.attrib:
+                if a == "crt" or a == "key":
+                    with open("{}/{}".format(self.temp_path, a), "w") as c:
+                        c.write(user_key.attrib[a])
 
-    def airvpn_download(self):
-        download_form = {
-                    "customdirectives" : "",
-                    "download_index" : "0",
-                    "download_mode" : "zip",
-                    "fileprefix" : "",
-                    "noembedkeys" : "on",
-                    "proxy_mode" : "none",
-                    "resolve" : "on",
-                    "system" : "linux",
-                    "tosaccept" : "on",
-                    "tosaccept2" : "on",
-                    "withbinary" : "",
-                    "do" : "javascript:Download('zip');"
-                    }
+            data_params["act"] = "manifest"
+            data_params["ts"] = "0"
+            server_params_crypt = self.encrypt_data_params(data_params)
+            payload["d"] = base64.b64encode(server_params_crypt).decode("utf-8")
+            server_xml = self.call_air_api(payload)
+            decrypt_server = self.cipher.decryptor()
+            server_xml = decrypt_server.update(server_xml.content) + decrypt_server.finalize()
 
-        download_form["csrf_token"] = self.csrf
-        for key, value in self.airvpn_servers.items():
-            server_chosen = "server_" + key.lower()
-            download_form[server_chosen] = "on"
+            server_xml_root = et.fromstring(server_xml, parser = parser)
+            n = 1
+            for mode in server_xml_root[1]:
+                self.airvpn_protocols["protocol_{}".format(n)] = {
+                                    "protocol" : mode.attrib["protocol"].upper(),
+                                    "port" : mode.attrib["port"],
+                                    "ip" : "ip" + str(int(mode.attrib["entry_index"])+1),
+                                    "ipv6" : "ipv4"
+                                    }
 
-        try:
-            self.log.emit(("info", "Donwloading Airvpn Openvpn config files"))
-            download_form["protocol_14"] = "on"
-            download_form["protocol_18"] = "on"
-            download_form["protocol_31"] = "on"
-            download_form["protocol_39"] = "on"
-            download_form["iplayer"] = "ipv4"
+                n+=1
+                self.airvpn_protocols["protocol_{}".format(n)] = {
+                                    "protocol" : mode.attrib["protocol"].upper(),
+                                    "port" : mode.attrib["port"],
+                                    "ip" : "ip" + str(int(mode.attrib["entry_index"])+1),
+                                    "ipv6" : "ipv6"
+                                    }
+                n+=1
 
-            download = self.session.post("https://airvpn.org/generator/",
-                                         data=download_form
-                                         )
+            entry_ips = ["ip1", "ip2", "ip3", "ip4", "ip1_6", "ip2_6", "ip3_6", "ip4_6"]
 
-            path = "{}/{}".format(self.temp_path, self.provider)
-            z = zipfile.ZipFile(io.BytesIO(download.content))
-            z.extractall(path)
+            for server in server_xml_root[3]:
+                country = country_translate(server.attrib["country_code"])
+                self.airvpn_servers[server.attrib["name"]] = {
+                                    "name" : server.attrib["name"],
+                                    "provider": "Airvpn",
+                                    "city": server.attrib["location"],
+                                    "country" : country,
+                                    "tunnel" : "OpenVPN"
+                                    }
 
-            download_form["iplayer"] = "ipv6_ipv4"
-            download = self.session.post("https://airvpn.org/generator/",
-                                         data=download_form
-                                         )
-
-            path_6 = "{}/ipv6".format(self.temp_path, self.provider)
-
-            if not os.path.exists(path_6):
-                os.makedirs(path_6)
-
-            z = zipfile.ZipFile(io.BytesIO(download.content))
-            z.extractall(path_6)
-
-            vpnfiles = sorted([f for f in os.listdir(path) if f.endswith('.ovpn')])
-            vpn6files = sorted([f for f in os.listdir(path_6) if f.endswith('.ovpn')])
-
-            for ovpn in vpnfiles:
-                server = ovpn.split("_")[2]
-                self.log.emit(("debug", "importing {}".format(server)))
-                fullpath = "{}/{}".format(path, ovpn)
-                with open(fullpath, "r") as o:
-                    lines = o.readlines()
-                    for line in lines:
-
-                        if ovpn.endswith('SSL-443.ovpn'):
-                            if line.startswith("route "):
-                                self.airvpn_servers[server]["ip2"] = line.split(" ")[1]
-
-                        elif ovpn.endswith('SSH-22.ovpn'):
-                            if line.startswith("route "):
-                                self.airvpn_servers[server]["ip1"] = line.split(" ")[1]
-
-                        elif ovpn.endswith('Entry3.ovpn'):
-                            if line.startswith("remote "):
-                                self.airvpn_servers[server]["ip3"] = line.split(" ")[1]
-
-                        elif ovpn.endswith('Entry4.ovpn'):
-                            if line.startswith("remote "):
-                                self.airvpn_servers[server]["ip4"] = line.split(" ")[1]
-
-            for ovpn in vpn6files:
-                server = ovpn.split("_")[2]
-                fullpath = "{}/{}".format(path_6, ovpn)
-                with open(fullpath, "r") as o:
-                    lines = o.readlines()
-                    for line in lines:
-
-                        if ovpn.endswith('SSL-443.ovpn'):
-                            if line.startswith("route "):
-                                self.airvpn_servers[server]["ip2_6"] = line.split(" ")[1]
-
-                        elif ovpn.endswith('SSH-22.ovpn'):
-                            if line.startswith("route "):
-                                self.airvpn_servers[server]["ip1_6"] = line.split(" ")[1]
-
-                        elif ovpn.endswith('Entry3.ovpn'):
-                            if line.startswith("remote "):
-                                self.airvpn_servers[server]["ip3_6"] = line.split(" ")[1]
-
-                        elif ovpn.endswith('Entry4.ovpn'):
-                            if line.startswith("remote "):
-                                self.airvpn_servers[server]["ip4_6"] = line.split(" ")[1]
+                self.log.emit(("debug", "Importing {}".format(server.attrib["name"])))
+                ips = server.attrib["ips_entry"].split(",")
+                for index, entry in enumerate(ips):
+                    self.airvpn_servers[server.attrib["name"]][entry_ips[index]] = entry
 
             airvpn_data = {
-                        "server" : self.airvpn_servers,
-                        "protocol" : self.airvpn_protocols,
-                        "provider" : "Airvpn"
-                        }
+                            "server" : self.airvpn_servers,
+                            "protocol" : self.airvpn_protocols,
+                            "provider" : "Airvpn"
+                            }
 
             self.copy_certs(self.provider)
             self.finished.emit(airvpn_data)
 
+        except Exception as e:
+            self.log.emit(("debug", e))
+            self.log.emit(("info", "Airvpn: Request failed - aborting"))
+            self.remove_temp_dir(self.provider)
+            m = "Airvpn download failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
+            self.failed.emit(m)
+
+    def encrypt_data_params(self, params):
+        import base64
+        from cryptography.hazmat.primitives import padding
+
+        d = b''
+        for k,v in params.items():
+            d = d + base64.b64encode(k.encode('utf-8')) + b':' + base64.b64encode(v.encode('utf-8')) + b'\n'
+
+        padder = padding.PKCS7(128).padder()
+        padded_data = padder.update(d) + padder.finalize()
+        encryptor = self.cipher.encryptor()
+        encrypted = encryptor.update(padded_data) + encryptor.finalize()
+
+        return encrypted
+
+    def call_air_api(self, payload):
+        try:
+            xml = requests.post(
+                                "http://54.93.175.114",
+                                data=payload,
+                                cert="{}/airvpn_cacert.pem".format(ROOTDIR),
+                                timeout=2
+                                )
+            return xml
+
         except requests.exceptions.RequestException as e:
-            self.log.emit(("error", "Network error: Unable to retrieve data from airvpn.org"))
+            self.log.emit(("error", "Network error: Unable to retrieve data from Airvpn"))
             self.remove_temp_dir(self.provider)
             self.failed.emit("Network error&No internet connection&{}".format(self.provider))
 
@@ -893,13 +856,13 @@ class AddServers(QtCore.QThread):
         if provider in SUPPORTED_PROVIDERS:
 
             self.Airvpn_files =     [
-                                    ("Airvpn/sshtunnel.key", "sshtunnel.key"),
-                                    ("Airvpn/stunnel.crt", "stunnel.crt"),
-                                    ("Airvpn/ca.crt", "ca.crt"),
-                                    ("Airvpn/ta.key", "ta.key"),
-                                    ("Airvpn/user.key", "user.key"),
-                                    ("Airvpn/user.crt", "user.crt"),
-                                    ("Airvpn/tls-crypt.key", "tls-crypt.key")
+                                    ("ssh_ppk", "sshtunnel.key"),
+                                    ("ssl_crt", "stunnel.crt"),
+                                    ("ca", "ca.crt"),
+                                    ("ta", "ta.key"),
+                                    ("key", "user.key"),
+                                    ("crt", "user.crt"),
+                                    ("tls_crypt", "tls-crypt.key")
                                     ]
 
             self.Mullvad_files =    [

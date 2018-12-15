@@ -10,6 +10,7 @@ import shutil
 import time
 import random
 import logging
+from functools import partial
 from datetime import datetime, date
 from subprocess import CalledProcessError, check_call, check_output
 from PyQt5 import QtCore, QtWidgets, QtGui
@@ -84,6 +85,13 @@ class QomuiGui(QtWidgets.QWidget):
                    "ping",
                    "auto_update"
                    ]
+
+    routes = {       
+            "gateway" : "None",
+            "gateway_6" : "None",
+            "interface" : "None",
+            "interface_6" : "None"
+            }
 
     def __init__(self, parent = None):
         super(QomuiGui, self).__init__(parent)
@@ -288,20 +296,17 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout.addWidget(self.delServerBt)
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.tabWidget.addWidget(self.serverTab)
-
-
         self.profileTab = QtWidgets.QWidget()
         self.profileTab.setObjectName(_fromUtf8("profileTab"))
-
         self.verticalLayout50 = QtWidgets.QVBoxLayout(self.profileTab)
         self.verticalLayout50.setObjectName("verticalLayout50")
-        self.scrollProfiles = QtWidgets.QScrollArea(self.profileTab)
+        self.scrollProfiles = QtWidgets.QScrollArea()
         self.scrollProfiles.setWidgetResizable(True)
         self.scrollProfiles.setObjectName("scrollProfiles")
-        self.scrollProfilesContents= QtWidgets.QWidget()
-        self.scrollProfilesContents.setGeometry(QtCore.QRect(0, 0, 603, 591))
+        self.scrollProfilesContents = QtWidgets.QWidget(self.scrollProfiles)
         self.scrollProfilesContents.setObjectName("scrollProfilesContents")
         self.verticalLayout_58 = QtWidgets.QVBoxLayout(self.scrollProfilesContents)
+        self.verticalLayout_58.addStretch()
         self.scrollProfiles.setWidget(self.scrollProfilesContents)
         self.verticalLayout50.addWidget(self.scrollProfiles)
         self.horizontalLayout50 = QtWidgets.QHBoxLayout()
@@ -313,8 +318,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout50.addWidget(self.addProfileBt)
         self.verticalLayout50.addLayout(self.horizontalLayout50)
         self.tabWidget.addWidget(self.profileTab)
-
-
         self.logTab = QtWidgets.QWidget()
         self.logTab.setObjectName(_fromUtf8("logTab"))
         self.gridLayout_2 = QtWidgets.QGridLayout(self.logTab)
@@ -459,11 +462,16 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout_6.addWidget(self.cancelOptBt)
         self.verticalLayout_5.addLayout(self.horizontalLayout_6)
         self.optionsTab.setWidget(self.optionsTabWidgetContents)
-        self.providerTab = QtWidgets.QWidget()
+        self.providerTab = QtWidgets.QScrollArea()
         self.providerTab.setObjectName(_fromUtf8("providerTab"))
         self.providerTab.setMaximumHeight(1000)
         self.verticalLayout_30 = QtWidgets.QVBoxLayout(self.providerTab)
         self.verticalLayout_30.setObjectName("verticalLayout_30")
+        self.providerTab.setWidgetResizable(True)
+        self.providerTabContents= QtWidgets.QWidget()
+        self.providerTabContents.setObjectName("providerTabContents")
+        self.verticalLayout_30 = QtWidgets.QVBoxLayout(self.providerTabContents)
+        self.providerTab.setWidget(self.providerTabContents)
         bold_font = QtGui.QFont()
         bold_font.setBold(True)
         bold_font.setWeight(75)
@@ -541,27 +549,43 @@ class QomuiGui(QtWidgets.QWidget):
         self.savePortButton.setVisible(False)
         self.horizontalLayout_31.addWidget(self.savePortButton)
         self.horizontalLayout_31.addStretch()
+        self.scriptLabel = QtWidgets.QLabel(self.providerTab)
+        self.scriptLabel.setFont(bold_font)
+        self.scriptLabel.setObjectName("scriptLabel")
+        self.verticalLayout_30.addWidget(self.scriptLabel)
         self.gridLayout10 = QtWidgets.QGridLayout(Form)
         self.gridLayout10.setObjectName("gridLayout")
-        self.preCheck = QtWidgets.QCheckBox(Form)
+        self.preCheck = QtWidgets.QLabel(Form)
         self.preCheck.setObjectName("preCheck")
         self.gridLayout10.addWidget(self.preCheck, 0, 0, 1, 1)
         self.preEdit = QtWidgets.QLineEdit(Form)
         self.preEdit.setObjectName("preEdit")
         self.gridLayout10.addWidget(self.preEdit, 0, 1, 1, 1)
-        self.upCheck = QtWidgets.QCheckBox(Form)
+        self.upCheck = QtWidgets.QLabel(Form)
         self.upCheck.setObjectName("upCheck")
         self.gridLayout10.addWidget(self.upCheck, 1, 0, 1, 1)
         self.upEdit = QtWidgets.QLineEdit(Form)
         self.upEdit.setObjectName("upEdit")
         self.gridLayout10.addWidget(self.upEdit, 1, 1, 1, 1)
-        self.downCheck = QtWidgets.QCheckBox(Form)
+        self.downCheck = QtWidgets.QLabel(Form)
         self.downCheck.setObjectName("downCheck")
         self.gridLayout10.addWidget(self.downCheck, 2, 0, 1, 1)
         self.downEdit = QtWidgets.QLineEdit(Form)
         self.downEdit.setObjectName("downEdit")
         self.gridLayout10.addWidget(self.downEdit, 2, 1, 1, 1)
         self.verticalLayout_30.addLayout(self.gridLayout10)
+        self.horizontalLayout_32 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_32.setObjectName("horizontalLayout_32")
+        spacerItem3 = QtWidgets.QSpacerItem(40, 20,
+                                            QtWidgets.QSizePolicy.Expanding,
+                                            QtWidgets.QSizePolicy.Minimum
+                                            )
+        self.horizontalLayout_32.addItem(spacerItem3)
+        self.confirmScripts = QtWidgets.QDialogButtonBox(self.providerTab)
+        self.confirmScripts.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Save)
+        self.confirmScripts.setObjectName("confirmScripts")
+        self.horizontalLayout_32.addWidget(self.confirmScripts)
+        self.verticalLayout_30.addLayout(self.horizontalLayout_32)
         self.verticalLayout_30.addStretch()
         self.tabWidget.addWidget(self.providerTab)
         self.bypassTab = QtWidgets.QWidget()
@@ -743,6 +767,8 @@ class QomuiGui(QtWidgets.QWidget):
         self.searchLine.textEdited[str].connect(self.filter_by_text)
         self.bypassVpnButton.clicked.connect(self.set_bypass_vpn)
         self.addProfileBt.clicked.connect(self.add_profile)
+        self.confirmScripts.accepted.connect(self.save_scripts)
+        self.confirmScripts.rejected.connect(self.clear_scripts)
 
     def retranslateUi(self, Form):
         s = ""
@@ -809,12 +835,15 @@ class QomuiGui(QtWidgets.QWidget):
         self.licenseInfo.setText(_translate("Form", "GPLv3", None))
         self.newVersionLabel.setText(_translate("Form", "A new version is available!", None))
         self.searchLine.setPlaceholderText(_translate("Form", "Search", None))
-        self.preCheck.setText(_translate("Form", "Pre", None))
-        self.upCheck.setText(_translate("Form", "Up", None))
-        self.downCheck.setText(_translate("Form", "Down", None))
+        self.preCheck.setText(_translate("Form", "Pre:", None))
+        self.upCheck.setText(_translate("Form", "Up:", None))
+        self.downCheck.setText(_translate("Form", "Down:", None))
         self.addProfileBt.setText(_translate("Form", "Add Profile", None))
         self.addProfileBt.setIcon(QtGui.QIcon.fromTheme("list-add"))
-
+        self.preEdit.setPlaceholderText("Enter script path")
+        self.upEdit.setPlaceholderText("Enter script path")
+        self.downEdit.setPlaceholderText("Enter script path")
+        self.scriptLabel.setText(_translate("Form", "Add custom scripts:", None))
 
         self.autoconnectOptLabel.setText(_translate("Form",
                                           "Automatically (re-)connect to last server",
@@ -869,12 +898,8 @@ class QomuiGui(QtWidgets.QWidget):
             check_call(["notify-send", header, text, "--icon=dialog-{}".format(icon.lower())])
 
         except (CalledProcessError, FileNotFoundError):
-
-            if icon == "Error":
-                icon = "Critical"
-
-            self.messageBox(header, text, buttons=[("Ok", "YesRole")], icon="Question")
-
+            self.logger.warning("Desktop notifications not available")
+            
     def messageBox(self, header, text, buttons=[], icon="Question"):
         box = QtWidgets.QMessageBox(self)
         box.setText(header)
@@ -983,7 +1008,6 @@ class QomuiGui(QtWidgets.QWidget):
 
     def tab_switch(self):
         button = self.sender().text().replace("&", "")
-        print(button)
         if button == "Server":
             self.tabWidget.setCurrentIndex(0)
         elif button == "Profiles":
@@ -1022,14 +1046,42 @@ class QomuiGui(QtWidgets.QWidget):
         else:
             self.tray.setIcon(self.trayIcon)
             self.trayMenu = QtWidgets.QMenu()
-            show = self.trayMenu.addAction("Show")
-            exit = self.trayMenu.addAction("Quit")
-            show.triggered.connect(self.show)
-            exit.triggered.connect(self.shutdown)
+            self.pop_tray_menu()
             self.tray.setContextMenu(self.trayMenu)
             self.tray.show()
             self.tray.setToolTip("Status: disconnected")
             self.tray.activated.connect(self.restoreUi)
+
+        #if self.windowState() == QtCore.Qt.WindowActive:
+         #   self.trayMenu.insert(Action)
+
+    def pop_tray_menu(self):
+        self.trayMenu.clear()
+        self.visibility_action = QtWidgets.QAction()
+        self.visibility_action.setText("Hide")
+        self.trayMenu.addAction(self.visibility_action)
+        self.trayMenu.addSeparator()
+        self.trayMenu.addSeparator()
+        for p,v in self.profile_dict.items():
+            name = self.trayMenu.addAction(v["name"])
+            name.triggered.connect(partial(self.connect_profile, p))
+        self.trayMenu.addSeparator()
+        exit_action = self.trayMenu.addAction("Quit")
+        self.visibility_action.triggered.connect(self.toggle_visibility)
+        exit_action.triggered.connect(self.shutdown)
+
+    def toggle_visibility(self):
+        if self.visibility_action.text() == "Show":
+            self.showNormal()
+            self.visibility_action.setText("Hide")
+
+        else:
+            self.hide()
+            self.visibility_action.setText("Show")
+
+    def activate_window(self):
+        self.setWindowState(QtCore.Qt.WindowActive)
+        self.showNormal()
 
     def shutdown(self):
         self.tray.hide()
@@ -1048,13 +1100,14 @@ class QomuiGui(QtWidgets.QWidget):
         self.exit_event = event
         self.confirm = QtWidgets.QMessageBox()
         self.timeout = 5
-        self.confirm.setText("Do you want to exit program or minimize to tray?")
+        self.confirm.setText("Do you really want to quit Qomui?")
         info = "Closing in {} seconds".format(self.timeout)
         self.confirm.setInformativeText(info)
         self.confirm.setIcon(QtWidgets.QMessageBox.Question)
-        self.confirm.addButton(QtWidgets.QPushButton("Minimize"), QtWidgets.QMessageBox.NoRole)
         self.confirm.addButton(QtWidgets.QPushButton("Exit"), QtWidgets.QMessageBox.YesRole)
-        self.confirm.addButton(QtWidgets.QPushButton("Cancel"), QtWidgets.QMessageBox.RejectRole)
+        self.confirm.addButton(QtWidgets.QPushButton("Cancel"), QtWidgets.QMessageBox.NoRole)
+        if self.tray.isSystemTrayAvailable() == True:
+            self.confirm.addButton(QtWidgets.QPushButton("Minimize"), QtWidgets.QMessageBox.RejectRole)
         self.exit_timer = QtCore.QTimer(self)
         self.exit_timer.setInterval(1000)
         self.exit_timer.timeout.connect(self.change_timeout)
@@ -1063,13 +1116,13 @@ class QomuiGui(QtWidgets.QWidget):
         ret = self.confirm.exec_()
         self.exit_timer.stop()
 
-        if ret == 2:
+        if ret == 1:
             self.exit_event.ignore()
 
-        elif ret == 0:
+        elif ret == 2:
             self.hide()
 
-        elif ret == 1:
+        elif ret == 0:
             self.tray.hide()
             self.kill()
             self.disconnect_bypass()
@@ -1119,15 +1172,14 @@ class QomuiGui(QtWidgets.QWidget):
                         try:
                             if self.ovpn_dict["random"] == "on":
                                 self.choose_random_server()
-
+                        
                         except KeyError:
-                            self.establish_connection(self.ovpn_dict)
 
-                        try:
                             if "profile" in self.ovpn_dict.keys():
                                 self.connect_profile(self.ovpn_dict["profile"])
-                        except KeyError:
-                            pass
+                            
+                            else:
+                                self.establish_connection(self.ovpn_dict)
 
                         try:
                             if self.ovpn_dict["favourite"] == "on":
@@ -1283,7 +1335,7 @@ class QomuiGui(QtWidgets.QWidget):
             check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
             self.qomui_service.load_firewall(1)
-            self.qomui_service.bypass(utils.get_user_group())
+            self.qomui_service.bypass({**self.routes, **utils.get_user_group()})
             self.notify(
                         "Qomui: configuration changed",
                         "Configuration updated successfully",
@@ -1300,6 +1352,8 @@ class QomuiGui(QtWidgets.QWidget):
 
             self.config_dict = temp_config
 
+            return "updated"
+
         except CalledProcessError as e:
             self.logger.info("Non-zero exit status: configuration changes not applied")
 
@@ -1309,18 +1363,21 @@ class QomuiGui(QtWidgets.QWidget):
                         icon="Error"
                         )
 
-    def network_change(self, state):
+            return "failed"
+
+    def network_change(self, state, routes):
         self.network_state = state
 
-        if self.network_state == 1:
+        if self.network_state != 0:
+            self.routes = routes
             self.logger.info("Detected new network connection")
             self.qomui_service.save_default_dns()
             if self.config_dict["ping"] == 1:
                 self.get_latencies()
             self.kill()
             self.disconnect_bypass()
-            self.qomui_service.bypass(utils.get_user_group())
             self.connect_last_server()
+            self.qomui_service.bypass({**self.routes, **utils.get_user_group()})
 
         elif self.network_state == 0:
             self.logger.info("Lost network connection - VPN tunnel terminated")
@@ -1490,18 +1547,29 @@ class QomuiGui(QtWidgets.QWidget):
         getattr(self, "{}_widget".format(number)).del_profile.connect(self.del_profile)
         getattr(self, "{}_widget".format(number)).edit_profile.connect(self.edit_profile)
         getattr(self, "{}_widget".format(number)).connect_profile.connect(self.connect_profile)
-        self.verticalLayout_58.addWidget(getattr(self, "{}_widget".format(number)))
-
+        self.verticalLayout_58.insertWidget(0, getattr(self, "{}_widget".format(number)))
+        name = self.profile_dict[number]["name"]
+ 
     def connect_profile(self, p):
         result = None
         profile = self.profile_dict[p]
         temp_list = []
         for s, v in self.server_dict.items():
             if v["country"] in profile["countries"] and v["provider"] in profile["providers"]:
-                if profile["protocol"] == v["tunnel"]:
-                    temp_list.append(s)
-                elif profile["protocol"] == "All protocols":
-                    temp_list.append(s)
+                if len(profile["filters"]) != 0:
+                    for f in profile["filters"]:
+                        search = "{}{}".format(s, v["city"])
+                        if f.lower() in search.lower() and f != "":
+                            if profile["protocol"] == v["tunnel"]:
+                                temp_list.append(s)
+                            elif profile["protocol"] == "All protocols":
+                                temp_list.append(s)
+
+                else:
+                    if profile["protocol"] == v["tunnel"]:
+                        temp_list.append(s)
+                    elif profile["protocol"] == "All protocols":
+                        temp_list.append(s)
 
         if temp_list:
             if profile["mode"] == "Fastest":
@@ -1511,7 +1579,6 @@ class QomuiGui(QtWidgets.QWidget):
                         lat = float(self.server_dict[s]["latency"])
                     except KeyError:
                         lat = 1000
-
                     if lat <= fastest:
                         fastest = lat
                         result = s
@@ -1519,7 +1586,6 @@ class QomuiGui(QtWidgets.QWidget):
             elif profile["mode"] == "Random":
                 result = random.choice(temp_list)
 
-            print(result)
             self.server_chosen(result, profile=p)
 
         else:
@@ -1770,8 +1836,7 @@ class QomuiGui(QtWidgets.QWidget):
         except AttributeError:
             pass
 
-        gateway = self.qomui_service.default_gateway_check()["interface"]
-
+        gateway = self.routes["interface"]
         if gateway != "None":
             self.latency_list = []
             self.PingThread = latency.LatencyCheck(self.server_dict, gateway)
@@ -1989,6 +2054,8 @@ class QomuiGui(QtWidgets.QWidget):
 
             except KeyError:
                 pass
+
+        self.clear_scripts()
 
     def protocol_change(self, selection):
         provider = self.providerProtocolBox.currentText()
@@ -2351,7 +2418,7 @@ class QomuiGui(QtWidgets.QWidget):
             pass
 
     def kill_hop():
-        self.kill()
+        pass
 
     def kill_bypass(self):
         last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
@@ -2390,6 +2457,37 @@ class QomuiGui(QtWidgets.QWidget):
         self.conn_timer = QtCore.QTimer()
         self.conn_timer.setSingleShot(True)
         self.conn_timer.timeout.connect(lambda: self.timeout(bar, server_dict["name"]))
+
+    def save_scripts(self):
+        events = ["pre", "up", "down"]
+        provider = self.providerProtocolBox.currentText()
+        scripts = {}
+        temp_config = {}
+
+        for event in events:
+            if getattr(self, "{}Edit".format(event)).text() != "":
+                scripts[event] = getattr(self, "{}Edit".format(event)).text()
+
+        temp_config["{}_scripts".format(provider)] = scripts
+        ret = self.save_options(temp_config)
+
+        if ret == "failed":
+            self.clear_scripts()
+
+    def clear_scripts(self):
+        provider = self.providerProtocolBox.currentText()
+        events = ["pre", "up", "down"]
+        for e in events:
+            try:
+                if e in self.config_dict["{}_scripts".format(provider)].keys():
+                    getattr(self, "{}Edit".format(e)).setText(
+                        self.config_dict["{}_scripts".format(provider)][e]
+                        )
+                else:
+                    getattr(self, "{}Edit".format(e)).clear()
+
+            except KeyError:
+                getattr(self, "{}Edit".format(e)).clear()
 
     def show_firewall_editor(self):
         other_firewalls = firewall.check_firewall_services()
@@ -2581,7 +2679,7 @@ class QomuiGui(QtWidgets.QWidget):
                 return row
 
 class NetMon(QtCore.QThread):
-    net_state_change = QtCore.pyqtSignal(int)
+    net_state_change = QtCore.pyqtSignal(int, dict)
     log = QtCore.pyqtSignal(tuple)
 
     def __init__(self):
@@ -2590,10 +2688,18 @@ class NetMon(QtCore.QThread):
     def run(self):
         net_iface_dir = "/sys/class/net/"
         net_check = 0
+        i = "None"
 
         while True:
             prior = net_check
+            i = "None"
             net_check = 0
+            routes = {       
+                        "gateway" : "None",
+                        "gateway_6" : "None",
+                        "interface" : "None",
+                        "interface_6" : "None"
+                        }
 
             try:
                 for iface in os.listdir(net_iface_dir):
@@ -2601,14 +2707,63 @@ class NetMon(QtCore.QThread):
 
                         if n.read() == "up\n":
                             net_check = 1
+                            i = iface
 
-                if prior != net_check:
-                    self.net_state_change.emit(net_check)
+                if prior != net_check and net_check == 1:
+                    routes = self.default_gateway_check()
+                    gw = routes["gateway"]
+                    gw_6 = routes["gateway_6"]
+
+                    if gw != "None" or gw_6 != "None":
+                        self.net_state_change.emit(net_check, routes)
+
+                    else:
+                        net_check = 0
+
+                elif prior != net_check and net_check == 0:
+                    self.net_state_change.emit(net_check, routes)
 
                 time.sleep(2)
 
             except (FileNotFoundError, PermissionError) as e:
                 self.log.emit(("error", e))
+
+    def default_gateway_check(self):
+        try:
+            route_cmd = ["ip", "route", "show", "default", "0.0.0.0/0"]
+            default_route = check_output(route_cmd).decode("utf-8")
+            parse_route = default_route.split(" ")
+            default_gateway_4 = parse_route[2]
+            default_interface_4 = parse_route[4]
+
+        except (CalledProcessError, IndexError):
+            self.log.emit(('info', 'Could not identify default gateway - no network connectivity'))
+            default_gateway_4 = "None"
+            default_interface_4 = "None"
+
+        try:
+            route_cmd = ["ip", "-6", "route", "show", "default", "::/0"]
+            default_route = check_output(route_cmd).decode("utf-8")
+            parse_route = default_route.split(" ")
+            default_gateway_6 = parse_route[2]
+            default_interface_6 = parse_route[4]
+
+        except (CalledProcessError, IndexError):
+            self.log.emit(('error', 'Could not identify default gateway for ipv6 - no network connectivity'))
+            default_gateway_6 = "None"
+            default_interface_6 = "None"
+
+        self.log.emit(("debug", "Network interface - ipv4: {}".format(default_interface_4)))
+        self.log.emit(("debug","Default gateway - ipv4: {}".format(default_gateway_4)))
+        self.log.emit(("debug","Network interface - ipv6: {}".format(default_interface_6)))
+        self.log.emit(("debug","Default gateway - ipv6: {}".format(default_gateway_6)))
+
+        return {
+            "gateway" : default_gateway_4,
+            "gateway_6" : default_gateway_6,
+            "interface" : default_interface_4,
+            "interface_6" : default_interface_6
+            }
 
 def main():
     if not os.path.exists("{}/.qomui".format(os.path.expanduser("~"))):

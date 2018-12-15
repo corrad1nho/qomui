@@ -89,9 +89,12 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None)
     with open("/proc/sys/net/ipv4/conf/all/rp_filter", 'w') as rp_edit_all:
         rp_edit_all.write("2")
 
-    with open("/proc/sys/net/ipv4/conf/{}/rp_filter".format(interface), 'w') as rp_edit_int:
-        rp_edit_int.write("2")
-        logging.debug("Disabled reverse path filtering for {}".format(interface))
+    try:
+        with open("/proc/sys/net/ipv4/conf/{}/rp_filter".format(interface), 'w') as rp_edit_int:
+            rp_edit_int.write("2")
+            logging.debug("Disabled reverse path filtering for {}".format(interface))
+    except FileNotFoundError:
+        logging.error("Failed to disable reverse path filtering for {}".format(interface))
 
     try:
         check_call(["cgcreate", "-t", "{}:{}".format(user, group), "-a" "{}:{}".format(user, group), "-g", "net_cls:bypass_qomui"])

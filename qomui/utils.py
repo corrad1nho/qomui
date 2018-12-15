@@ -42,7 +42,7 @@ def create_server_dict(current_dict, protocol_dict):
                     ip = current_dict[ip_chosen]
 
             except KeyError:
-                ip = current_dict[prim_ip]
+                ip = current_dict["ip1"]
 
             current_dict.update({"ip" : ip, "port": port, "protocol": protocol, 
                                     "prot_index": mode, "ipv6" : ipv6, "tlscrypt" : tlscrypt})

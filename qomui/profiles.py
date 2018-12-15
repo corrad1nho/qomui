@@ -44,7 +44,6 @@ class EditProfile(QtWidgets.QDialog):
         self.protocols = protocols
         self.countries = countries
         self.providers = providers
-        print(self.providers)
         self.selected = selected
         self.setupUi(self)
         self.popBoxes()
@@ -72,6 +71,8 @@ class EditProfile(QtWidgets.QDialog):
         self.choiceTable.horizontalHeader().hide()
         self.choiceTable.verticalHeader().hide()
         self.verticalLayout.addWidget(self.choiceTable)
+        self.filterLine = QtWidgets.QLineEdit(profileEdit)
+        self.verticalLayout.addWidget(self.filterLine)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
         spacerItem = QtWidgets.QSpacerItem(595, 17, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -81,8 +82,6 @@ class EditProfile(QtWidgets.QDialog):
         self.buttonBox.setObjectName("buttonBox")
         self.horizontalLayout.addWidget(self.buttonBox)
         self.verticalLayout.addLayout(self.horizontalLayout)
-
-
         self.retranslateUi(profileEdit)
         QtCore.QMetaObject.connectSlotsByName(profileEdit)
 
@@ -94,6 +93,7 @@ class EditProfile(QtWidgets.QDialog):
         _translate = QtCore.QCoreApplication.translate
         profileEdit.setWindowTitle(_translate("profileEdit", "Edit profile"))
         self.profileLine.setPlaceholderText(_translate("profileEdit", "Enter profile name"))
+        self.filterLine.setPlaceholderText("Enter keywords to filter server names: k1;k2;k3...")
 
     def popBoxes(self):
         for prot in self.protocols:
@@ -108,20 +108,24 @@ class EditProfile(QtWidgets.QDialog):
             self.modeBox.setCurrentText(self.selected["mode"])
             self.chooseProtocolBox.setCurrentText(self.selected["protocol"])
             self.profileLine.setText(self.selected["name"])
+            if self.selected["filters"]:
+                self.filterLine.setText(";".join(self.selected["filters"]))
 
 
         self.popchoiceTable()
 
     def popchoiceTable(self):
         self.choiceTable.clear()
+        self.choiceTable.clearSpans()
         width = self.choiceTable.width()
-        n = len(self.countries)-1
+        n = len(self.countries)
+        np = len(self.providers)
         cols = int(width / 120)
         if cols == 0:
             cols = 1
-        rows = int(n / cols) + (n % cols> 0)
-        np = len(self.providers)
-        rows = rows + int(np / cols) + (np % cols> 0) +2
+
+        n = n + len(self.providers)    
+        rows = int(n / cols) + (n % cols> 0) + int(np / cols) + (np % cols> 0) + 3
         self.choiceTable.setRowCount(rows)
         self.choiceTable.setColumnCount(cols)
         self.choiceTable.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
@@ -132,7 +136,8 @@ class EditProfile(QtWidgets.QDialog):
         font.setBold(True)
         item.setFont(font)
         item.setText("Choose providers:")
-        self.choiceTable.setSpan(0,0,1,cols)
+        if cols >= 1:
+            self.choiceTable.setSpan(0,0,1,cols)
         self.choiceTable.setItem(0,0,item)
         r+=1
         for provider in self.providers:
@@ -145,21 +150,23 @@ class EditProfile(QtWidgets.QDialog):
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
             self.choiceTable.setItem(r,c,item)
-            if c == cols:
+            if c == cols-1:
                 r += 1
                 c = 0
             else:
                 c += 1
 
+        r += 1
         c = 0
-        r+=1
         item = QtWidgets.QTableWidgetItem()
         item.setFont(font)
         item.setText("Choose countries:")
-        self.choiceTable.setSpan(r,0,1,cols)
+        if cols >= 1:
+            self.choiceTable.setSpan(r,0,1,cols)
         self.choiceTable.setItem(r,0,item)
         r+=1
-        for country in self.countries:
+
+        for country in sorted(self.countries):
             item = QtWidgets.QTableWidgetItem()
             item.setText(country)
             item.setData(QtCore.Qt.UserRole, "countries")
@@ -169,7 +176,7 @@ class EditProfile(QtWidgets.QDialog):
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
             self.choiceTable.setItem(r,c,item)
-            if c == cols:
+            if c == cols-1:
                 r += 1
                 c = 0
             else:
@@ -199,6 +206,7 @@ class EditProfile(QtWidgets.QDialog):
         profile_dict["countries"] = sorted(self.countries_selected)
         profile_dict["mode"] = self.modeBox.currentText()
         profile_dict["protocol"] = self.chooseProtocolBox.currentText()
+        profile_dict["filters"] = self.filterLine.text().split(";")[:-1]
 
         if self.selected != 0:
              profile_dict["number"] = self.selected["number"]
@@ -279,11 +287,11 @@ class ProfileWidget(QtWidgets.QWidget):
         self.countryLabel.setIndent(20)
         self.verticalLayout.addWidget(self.countryLabel)
 
-        spacerItem = QtWidgets.QSpacerItem(0, 0,
-                                            QtWidgets.QSizePolicy.Minimum,
-                                            QtWidgets.QSizePolicy.MinimumExpanding
-                                            )
-        self.verticalLayout.addItem(spacerItem)
+        self.filterLabel = QtWidgets.QLabel(Form)
+        self.filterLabel.setObjectName("filterLabel")
+        self.filterLabel.setWordWrap(True)
+        self.filterLabel.setIndent(20)
+        self.verticalLayout.addWidget(self.filterLabel)
 
         self.delProfBt.clicked.connect(self.delete)
         self.editProfBt.clicked.connect(self.edit)
@@ -307,6 +315,9 @@ class ProfileWidget(QtWidgets.QWidget):
         self.protocolLabel.setText("<b>Protocol: </b>" + profile["protocol"])
         self.providerLabel.setText("<b>Provider: </b>" + ', '.join(profile["providers"]))
         self.countryLabel.setText("<b>Countries: </b>" + ', '.join(profile["countries"]))
+
+        if profile["filters"]:
+            self.filterLabel.setText("<b>Filter: </b>" + ', '.join(profile["filters"]))
 
     def connect(self):
         self.connect_profile.emit(self.profile["number"])

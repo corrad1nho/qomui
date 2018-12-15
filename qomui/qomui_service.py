@@ -51,6 +51,7 @@ class QomuiDbus(dbus.service.Object):
     wg_connect = 0
     version = "None"
     thread_list = []
+    interface = "eth0"
 
     def __init__(self):
         self.sys_bus = dbus.SystemBus()
@@ -119,6 +120,7 @@ class QomuiDbus(dbus.service.Object):
         name = ovpn_dict["name"]
         if ovpn_dict["tunnel"] == "WireGuard":
             self.wg_connect = 1
+            self.wg_provider = ovpn_dict["provider"]
 
         setattr(self, "{}_dict".format(name), tunnel.TunnelThread(ovpn_dict, self.hop_dict, self.config))
         getattr(self, "{}_dict".format(name)).log.connect(self.log_thread)
@@ -188,7 +190,7 @@ class QomuiDbus(dbus.service.Object):
             elif activate == 2:
                 if self.config["fw_gui_only"] == 1:
                     firewall.restore_iptables()
-                    firewall.apply_rules(0, block_lan=0, preserve=preserve_rules)
+                    firewall.apply_rules(0, block_lan=0, preserve=preserve)
 
                     try:
                         bypass.delete_cgroup(self.default_interface_4, self.default_interface_6)
@@ -239,7 +241,6 @@ class QomuiDbus(dbus.service.Object):
                     self.kill_pid(i)
 
             if self.wg_connect == 1:
-
                 try:
                     wg_down = Popen(["wg-quick", "down", "{}/wg_qomui.conf".format(ROOTDIR)], stdout=PIPE, stderr=STDOUT)
                     for line in wg_down.stdout:
@@ -248,7 +249,7 @@ class QomuiDbus(dbus.service.Object):
                 except CalledProcessError:
                     pass
 
-                #as WireGuard is down - we can remove those rules
+                #as WireGuard is down we can remove those rules
                 wg_rules = [
                     ["-D", "INPUT", "-i", "wg_qomui", "-j", "ACCEPT"],
                     ["-D", "OUTPUT", "-o", "wg_qomui", "-j", "ACCEPT"]
@@ -257,6 +258,8 @@ class QomuiDbus(dbus.service.Object):
                 for rule in wg_rules:
                     firewall.add_rule_6(rule)
                     firewall.add_rule(rule)
+
+                tunnel.exe_custom_scripts("down", self.wg_provider, self.config)
 
                 self.wg_connect = 0
 
@@ -419,13 +422,13 @@ class QomuiDbus(dbus.service.Object):
                 pass
 
     @dbus.service.method(BUS_NAME, in_signature='a{ss}', out_signature='')
-    def bypass(self, ug):
-        self.ug = ug
-        default_routes = self.default_gateway_check()
-        self.gw = default_routes["gateway"]
-        self.gw_6 = default_routes["gateway_6"]
-        default_interface_4 = default_routes["interface"]
-        default_interface_6 = default_routes["interface_6"]
+    def bypass(self, net):
+        self.net = net
+        #default_routes = self.default_gateway_check()
+        self.gw = self.net["gateway"]
+        self.gw_6 = self.net["gateway_6"]
+        default_interface_4 = self.net["interface"]
+        default_interface_6 = self.net["interface_6"]
 
         if self.gw != "None" or self.gw_6 != "None":
             try:
@@ -437,12 +440,12 @@ class QomuiDbus(dbus.service.Object):
                     self.interface = default_interface_4
 
                 else:
-                    self.interface = "eth0"
+                    self.interface = "None"
 
                 if self.config["bypass"] == 1:
                     bypass.create_cgroup(
-                        self.ug["user"],
-                        self.ug["group"],
+                        self.net["user"],
+                        self.net["group"],
                         self.interface,
                         gw=self.gw,
                         gw_6=self.gw_6,
@@ -470,8 +473,8 @@ class QomuiDbus(dbus.service.Object):
             except KeyError:
                 self.logger.warning('Config file corrupted - bypass option does not exist')
 
-    #determine default ipv4/ipv6 routes and default network interface
-    @dbus.service.method(BUS_NAME, in_signature='', out_signature='a{ss}')
+    #determine default ipv4/ipv6 routes and default network interface - moved to NetMon thread
+    """@dbus.service.method(BUS_NAME, in_signature='', out_signature='a{ss}')
     def default_gateway_check(self):
         try:
             route_cmd = ["ip", "route", "show", "default", "0.0.0.0/0"]
@@ -507,7 +510,7 @@ class QomuiDbus(dbus.service.Object):
             "gateway_6" : default_gateway_6,
             "interface" : default_interface_4,
             "interface_6" : default_interface_6
-            }
+            }"""
 
     def cgroup_vpn(self):
         self.kill_dnsmasq()
@@ -515,8 +518,8 @@ class QomuiDbus(dbus.service.Object):
         if self.tun_bypass is not None:
             dev_bypass = self.tun_bypass
             bypass.create_cgroup(
-                            self.ug["user"],
-                            self.ug["group"],
+                            self.net["user"],
+                            self.net["group"],
                             dev_bypass,
                             default_int=self.interface
                             )
@@ -551,8 +554,8 @@ class QomuiDbus(dbus.service.Object):
                                 )
 
             bypass.create_cgroup(
-                                self.ug["user"],
-                                self.ug["group"],
+                                self.net["user"],
+                                self.net["group"],
                                 dev_bypass,
                                 gw=self.gw,
                                 gw_6=self.gw_6,
@@ -608,7 +611,7 @@ class QomuiDbus(dbus.service.Object):
                 upgrade_cmd = ["rpm", "-i", "{}/{}".format(ROOTDIR, rpm_pack)]
 
             else:
-                url = "{}archive/{}.zip".format(base.url, self.version)
+                url = "{}archive/{}.zip".format(base_url, self.version)
                 self.logger.debug(url)
                 upgrade_cmd = [
                     python,

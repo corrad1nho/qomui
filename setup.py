@@ -5,7 +5,7 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.7.4"
+VERSION = "0.8.0"
 data_files = [
         ('/usr/share/qomui', ['resources/countries.json']),
         ('/usr/share/applications/', ['resources/qomui.desktop']),
@@ -28,6 +28,8 @@ data_files = [
                                 'resources/hop_down.sh',
                                 'resources/bypass_up.sh',
                                 'resources/bypass_route.sh',
+                                'resources/airvpn_api.pem',
+                                'resources/airvpn_cacert.pem',
                                 'VERSION']
                             ),
         ('/usr/share/qomui/flags/', glob.glob('resources/flags/*'))
