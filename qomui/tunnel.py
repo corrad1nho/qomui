@@ -5,6 +5,7 @@ import os
 import time
 import threading
 import shutil
+import shlex
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError, check_call, run
 import pexpect
 from PyQt5 import QtCore
@@ -550,8 +551,7 @@ def exe_custom_scripts(stage, provider, config):
         script = config["{}_scripts".format(provider)][stage]
 
         try:
-            cmd = script.split(" ")
-            run(cmd)
+            run(shlex.split(cmd))
             logging.info("Executed {}".format(script))
             #self.log.emit(("info", "Executed {}".format(script)))
 
