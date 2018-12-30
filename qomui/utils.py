@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from subprocess import check_output
+import grp
+import getpass
+import pwd
 
 SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 
 def get_user_group():
-    user = check_output(['id', '-u', '-n']).decode("utf-8").split("\n")[0]
-    group = check_output(['id', '-g', '-n']).decode("utf-8").split("\n")[0]
-    return {"user" : user, "group" : group}
+    username = getpass.getuser()
+    group = grp.getgrgid(pwd.getpwnam(username).pw_gid).gr_name
+    return {"user" : username, "group" : group}
 
 def create_server_dict(current_dict, protocol_dict):
     provider = current_dict["provider"]
