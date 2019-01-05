@@ -131,8 +131,9 @@ class AddServers(QtCore.QThread):
             cert_xml_root = et.fromstring(cert_xml, parser=parser)
             self.temp_path = "{}/{}".format(TEMPDIR, self.provider)
 
-
             for a in cert_xml_root.attrib:
+                if cert_xml_root.attrib[a] == "Wrong login/password.":
+                    raise ValueError("Wrong credentials")
                 if a != "login" and a != "expirationdate":
                     with open("{}/{}".format(self.temp_path, a), "w") as c:
                         c.write(cert_xml_root.attrib[a])
@@ -150,42 +151,56 @@ class AddServers(QtCore.QThread):
             server_xml = self.call_air_api(payload)
             decrypt_server = self.cipher.decryptor()
             server_xml = decrypt_server.update(server_xml.content) + decrypt_server.finalize()
+            server_xml = server_xml.decode("utf-8").split("</manifest>")[0] + "</manifest>"
+            server_xml_root = et.fromstring(server_xml, parser=parser)
+            for i, child in enumerate(server_xml_root):
+                if child.tag == "modes":
+                    modes = i
+                elif child.tag == "servers":
+                    servers = i
 
-            server_xml_root = et.fromstring(server_xml, parser = parser)
             n = 1
-            for mode in server_xml_root[1]:
-                self.airvpn_protocols["protocol_{}".format(n)] = {
-                                    "protocol" : mode.attrib["protocol"].upper(),
-                                    "port" : mode.attrib["port"],
-                                    "ip" : "ip" + str(int(mode.attrib["entry_index"])+1),
-                                    "ipv6" : "ipv4"
-                                    }
+            for mode in server_xml_root[modes]:
+                try:
+                    self.airvpn_protocols["protocol_{}".format(n)] = {
+                                        "protocol" : mode.attrib["protocol"].upper(),
+                                        "port" : mode.attrib["port"],
+                                        "ip" : "ip" + str(int(mode.attrib["entry_index"])+1),
+                                        "ipv6" : "ipv4"
+                                        }
 
-                n+=1
-                self.airvpn_protocols["protocol_{}".format(n)] = {
-                                    "protocol" : mode.attrib["protocol"].upper(),
-                                    "port" : mode.attrib["port"],
-                                    "ip" : "ip" + str(int(mode.attrib["entry_index"])+1),
-                                    "ipv6" : "ipv6"
-                                    }
-                n+=1
+                    n+=1
+                    self.airvpn_protocols["protocol_{}".format(n)] = {
+                                        "protocol" : mode.attrib["protocol"].upper(),
+                                        "port" : mode.attrib["port"],
+                                        "ip" : "ip" + str(int(mode.attrib["entry_index"])+1),
+                                        "ipv6" : "ipv6"
+                                        }
+                    n+=1
+                except KeyError:
+                    pass
 
             entry_ips = ["ip1", "ip2", "ip3", "ip4", "ip1_6", "ip2_6", "ip3_6", "ip4_6"]
 
-            for server in server_xml_root[3]:
-                country = country_translate(server.attrib["country_code"])
-                self.airvpn_servers[server.attrib["name"]] = {
-                                    "name" : server.attrib["name"],
-                                    "provider": "Airvpn",
-                                    "city": server.attrib["location"],
-                                    "country" : country,
-                                    "tunnel" : "OpenVPN"
-                                    }
+            for server in server_xml_root[servers]:
+                try:
+                    country = country_translate(server.attrib["country_code"])
+                    self.airvpn_servers[server.attrib["name"]] = {
+                                        "name" : server.attrib["name"],
+                                        "provider": "Airvpn",
+                                        "city": server.attrib["location"],
+                                        "country" : country,
+                                        "tunnel" : "OpenVPN"
+                                        }
 
-                self.log.emit(("debug", "Importing {}".format(server.attrib["name"])))
-                ips = server.attrib["ips_entry"].split(",")
-                for index, entry in enumerate(ips):
-                    self.airvpn_servers[server.attrib["name"]][entry_ips[index]] = entry
+                    self.log.emit(("debug", "Importing {}".format(server.attrib["name"])))
+                    ips = server.attrib["ips_entry"].split(",")
+                    for index, entry in enumerate(ips):
+                        self.airvpn_servers[server.attrib["name"]][entry_ips[index]] = entry
+
+                except KeyError:
+                    pass
+
 
             airvpn_data = {
                             "server" : self.airvpn_servers,
@@ -196,12 +211,17 @@ class AddServers(QtCore.QThread):
             self.copy_certs(self.provider)
             self.finished.emit(airvpn_data)
 
+        except ValueError as e:
+            self.log.emit(("debug", e))
+            m = "Airvpn download failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
+            self.remove_temp_dir(self.provider)
+            self.failed.emit(m)
+
         except Exception as e:
             self.log.emit(("debug", e))
             self.log.emit(("info", "Airvpn: Request failed - aborting"))
             self.remove_temp_dir(self.provider)
-            m = "Airvpn download failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
-            self.failed.emit(m)
+            self.failed.emit("Sorry, something went wrong")
 
     def encrypt_data_params(self, params):
         import base64

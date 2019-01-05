@@ -67,6 +67,14 @@ class QomuiDbus(dbus.service.Object):
         self.filehandler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.setLevel(logging.DEBUG)
         self.logger.info("Dbus-service successfully initialized")
+        
+        #Clean slate after (re-)starting 
+        try:
+            check_call(["killall", "openvpn"])
+            self.logger.debug("Killed all running instances of OpenVPN")
+        except CalledProcessError:
+            pass
+
         self.check_version()
         firewall.save_iptables()
         self.load_firewall(0)

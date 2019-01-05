@@ -18,7 +18,7 @@ from dbus.mainloop.pyqt5 import DBusQtMainLoop
 import bisect
 import signal
 
-from qomui import update, latency, utils, firewall, widgets, profiles
+from qomui import update, latency, utils, firewall, widgets, profiles, monitor
 
 
 try:
@@ -104,11 +104,10 @@ class QomuiGui(QtWidgets.QWidget):
 
         try:
             self.qomui_dbus = self.dbus.get_object('org.qomui.service', '/org/qomui/service')
-            self.logger.debug('Successfully connected to DBUS system service')
+            self.logger.debug('Successfully connected to qomui-service via DBus')
 
         except dbus.exceptions.DBusException:
             self.logger.error('DBus Error: Qomui-Service is currently not available')
-
             ret = self.messageBox(
                                 "Error: Qomui-service is not active",
                                 "Do you want to start it, enable it permanently or close Qomui?",
@@ -121,37 +120,15 @@ class QomuiGui(QtWidgets.QWidget):
                                 )
 
             if ret == 0:
-
-                try:
-                    check_call(["pkexec", "systemctl", "enable", "--now", "qomui"])
-                    self.qomui_dbus = self.dbus.get_object('org.qomui.service',
-                                                           '/org/qomui/service'
-                                                           )
-
-                except (CalledProcessError, FileNotFoundError):
-                    self.notify("Error", "Failed to start qomui-service", icon="Error")
-                    sys.exit(1)
+                self.initalize_service("enable", "--now")
 
             elif ret == 1:
-
-                try:
-                    check_call(["pkexec", "systemctl", "start", "qomui.service"])
-                    self.qomui_dbus = self.dbus.get_object('org.qomui.service', '/org/qomui/service')
-
-                except (CalledProcessError, FileNotFoundError):
-                    self.notify("Error", "Failed to start qomui-service", icon="Error")
-                    sys.exit(1)
+                self.initalize_service("start")
 
             elif ret == 2:
                 sys.exit(1)
 
-        self.qomui_service = dbus.Interface(self.qomui_dbus, 'org.qomui.service')
-        self.qomui_service.connect_to_signal("send_log", self.receive_log)
-        self.qomui_service.connect_to_signal("reply", self.openvpn_log_monitor)
-        self.qomui_service.connect_to_signal("updated", self.restart)
-        self.qomui_service.connect_to_signal("imported", self.downloaded)
-        self.qomui_service.connect_to_signal("progress_bar", self.start_progress_bar)
-
+        self.create_dbus_object()
         handler = DbusLogHandler(self.qomui_service)
         handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(handler)
@@ -162,16 +139,102 @@ class QomuiGui(QtWidgets.QWidget):
                                       600, 750
                                       ))
 
-        self.qomui_service.disconnect("main")
-        self.qomui_service.disconnect("bypass")
-        self.qomui_service.save_default_dns()
+        self.dbus_call("disconnect", "main")
+        self.dbus_call("disconnect", "bypass")
+        self.dbus_call("save_default_dns")
+        self.check_other_instance()
         self.load_saved_files()
         self.systemtray()
 
-        self.net_mon_thread = NetMon()
+        self.net_mon_thread = monitor.NetMon()
         self.net_mon_thread.log.connect(self.log_from_thread)
         self.net_mon_thread.net_state_change.connect(self.network_change)
         self.net_mon_thread.start()
+
+    def check_other_instance(self):
+        try:
+            pids = check_output(["pgrep", "qomui-gui"]).decode("utf-8").split("\n")
+            if len(pids) > 0:
+                this_instance = str(os.getpid())
+                for pid in pids:
+                    if pid != this_instance and pid != '':
+                        check_call(["kill", pid])
+                        self.logger.info("Closed instance of qomui-gui with pid {}".format(pid))
+
+        except (CalledProcessError, FileNotFoundError):
+            self.logger.error("Failed to identify or close other instances of qomui-gui")
+
+    def dbus_call(self, cmd, *args):
+        try:
+            call = getattr(self.qomui_service, cmd)(*args)
+            return call
+
+        except dbus.exceptions.DBusException as e:
+            self.logger.error("Dbus Error: {}".format(e))
+            self.notify("Qomui: Dbus Error", "No reply from qomui-service. It may have crashed.", icon="Warning")
+            ret = self.messageBox(
+                                "Error: Qomui-service is not available",
+                                "Do you want restart it or quit Qomui?",
+                                buttons = [
+                                            ("Quit", "NoRole"),
+                                            ("Restart", "YesRole")
+                                            ],
+                                icon = "Question"
+                                )
+
+            if ret == 0:
+                sys.exit(1)
+
+            elif ret == 1:
+                self.initialize_service("restart")
+                time.sleep(3)
+
+                try:
+                    if self.config_dict["bypass"] == 1:
+                        self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
+                
+                except KeyError:
+                    pass
+                    
+                retry = self.dbus_call(cmd, *args)
+                return retry
+
+    def initialize_service(self, *args):
+        try:
+            check_call(["pkexec", "systemctl", *args, "qomui"])
+            self.qomui_dbus = self.dbus.get_object('org.qomui.service',
+                                                    '/org/qomui/service'
+                                                    )
+            self.create_dbus_object()
+
+        except (CalledProcessError, FileNotFoundError):
+            self.logger.info("Failed to start qomui-service via systemd: Is systemd installed?")
+            self.logger.info("Trying to start qomui-service without systemd")
+            self.notify("Qomui: Systemd not available", "Starting qomui-service directly", icon="Info")
+
+            try:
+                temp_bash = "{}/start_service.sh".format(HOMEDIR)
+                with open (temp_bash, "w") as temp_sh:
+                    lines = ["#!/bin/bash \n", "nohup qomui-service & \n"]
+                    temp_sh.writelines(lines)
+                    temp_sh.close()
+                    os.chmod(temp_bash, 0o774)
+                    check_call(["pkexec", temp_bash])
+                    self.create_dbus_object()
+
+            except (CalledProcessError, FileNotFoundError):
+                self.logger.error("Starting qomui-service failed: Exiting...")
+                self.notify("Qomui: Failed to start service", "Exiting...", icon="Error")
+                sys.exit(1)
+
+    def create_dbus_object(self):
+        self.qomui_dbus = self.dbus.get_object('org.qomui.service', '/org/qomui/service')
+        self.qomui_service = dbus.Interface(self.qomui_dbus, 'org.qomui.service')
+        self.qomui_service.connect_to_signal("send_log", self.receive_log)
+        self.qomui_service.connect_to_signal("reply", self.openvpn_log_monitor)
+        self.qomui_service.connect_to_signal("updated", self.restart)
+        self.qomui_service.connect_to_signal("imported", self.downloaded)
+        self.qomui_service.connect_to_signal("progress_bar", self.start_progress_bar)
 
     def receive_log(self, msg):
         self.logText.appendPlainText(msg)
@@ -917,7 +980,7 @@ class QomuiGui(QtWidgets.QWidget):
 
     def log_level(self, level):
         self.logger.setLevel(getattr(logging, level.upper()))
-        self.qomui_service.log_level_change(level)
+        self.dbus_call("log_level_change", level)
 
     def restart(self, new_version):
         self.stop_progress_bar("upgrade")
@@ -952,7 +1015,7 @@ class QomuiGui(QtWidgets.QWidget):
             if systemctl_check == 0:
                 self.logger.debug("Qomui-service running as systemd service - restarting")
                 self.notify("Qomui", "Restarting Qomui now...", icon="Information")
-                self.qomui_service.restart()
+                self.dbus_call("restart")
                 os.execl(sys.executable, sys.executable, * sys.argv)
 
             else:
@@ -1003,7 +1066,7 @@ class QomuiGui(QtWidgets.QWidget):
             pass
 
     def update_qomui(self):
-        self.qomui_service.update_qomui(self.release, self.packetmanager)
+        self.dbus_call("update_qomui", self.release, self.packetmanager)
         self.start_progress_bar("upgrade")
 
     def tab_switch(self):
@@ -1126,7 +1189,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.tray.hide()
             self.kill()
             self.disconnect_bypass()
-            self.qomui_service.load_firewall(2)
+            self.dbus_call("load_firewall", 2)
             with open ("{}/server.json".format(HOMEDIR), "w") as s:
                 json.dump(self.server_dict, s)
             self.exit_event.accept()
@@ -1201,13 +1264,11 @@ class QomuiGui(QtWidgets.QWidget):
                 version = v.read().split("\n")
                 self.installed = version[0]
                 self.logger.info("Qomui version {}".format(self.installed))
+                service_version = self.dbus_call("get_version")
 
-                try:
-                    service_version = self.qomui_service.get_version()
-
-                except dbus.exceptions.DBusException:
-                    service_version = self.installed
+                if service_version is None:
                     self.logger.error("Checking version of qomui-service failed")
+                    service_version = "None"
 
                 if service_version != self.installed and service_version != "None":
                     self.notify(
@@ -1251,7 +1312,7 @@ class QomuiGui(QtWidgets.QWidget):
 
         try:
             if self.config_dict["firewall"] == 1 and self.config_dict["fw_gui_only"] == 1:
-                self.qomui_service.load_firewall(1)
+                self.dbus_call("load_firewall", 1)
 
         except KeyError:
             pass
@@ -1334,8 +1395,8 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
-            self.qomui_service.load_firewall(1)
-            self.qomui_service.bypass({**self.routes, **utils.get_user_group()})
+            self.dbus_call("load_firewall", 1)
+            self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
             self.notify(
                         "Qomui: configuration changed",
                         "Configuration updated successfully",
@@ -1371,13 +1432,13 @@ class QomuiGui(QtWidgets.QWidget):
         if self.network_state != 0:
             self.routes = routes
             self.logger.info("Detected new network connection")
-            self.qomui_service.save_default_dns()
+            self.dbus_call("save_default_dns")
             if self.config_dict["ping"] == 1:
                 self.get_latencies()
             self.kill()
             self.disconnect_bypass()
             self.connect_last_server()
-            self.qomui_service.bypass({**self.routes, **utils.get_user_group()})
+            self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
 
         elif self.network_state == 0:
             self.logger.info("Lost network connection - VPN tunnel terminated")
@@ -1461,7 +1522,7 @@ class QomuiGui(QtWidgets.QWidget):
 
             self.addProviderUserEdit.setText("")
             self.addProviderPassEdit.setText("")
-            self.qomui_service.import_thread(credentials)
+            self.dbus_call("import_thread", credentials)
 
     def log_from_thread(self, log):
         getattr(logging, log[0])(log[1])
@@ -1489,7 +1550,7 @@ class QomuiGui(QtWidgets.QWidget):
             except KeyError:
                 pass
 
-            self.qomui_service.delete_provider(provider)
+            self.dbus_call("delete_provider", provider)
 
             with open ("{}/server.json".format(HOMEDIR), "w") as s:
                 json.dump(self.server_dict, s)
@@ -1647,7 +1708,7 @@ class QomuiGui(QtWidgets.QWidget):
         else:
             self.stop_progress_bar(action)
             self.logger.info("Importing {} aborted".format(action))
-            self.qomui_service.cancel_import(action)
+            self.dbus_call("cancel_import", action)
 
     def downloaded(self, msg):
         split = msg.split("&")
@@ -2136,7 +2197,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.showHop.setVisible(True)
         self.showHop.setText(self.hop_server_dict)
         self.showHop.clear.connect(self.delete_hop)
-        self.qomui_service.set_hop(self.hop_server_dict)
+        self.dbus_call("set_hop", self.hop_server_dict)
 
     def delete_hop(self):
         self.hop_active = 0
@@ -2246,7 +2307,7 @@ class QomuiGui(QtWidgets.QWidget):
             json.dump(last_server_dict, lserver)
             lserver.close()
 
-        tun = self.qomui_service.return_tun_device("tun")
+        tun = self.dbus_call("return_tun_device", "tun")
         self.tray.setToolTip("Connected to {}".format(self.ovpn_dict["name"]))
         self.gridLayout.addWidget(self.showActive, 0, 0, 1, 3)
         self.showActive.setVisible(True)
@@ -2257,7 +2318,7 @@ class QomuiGui(QtWidgets.QWidget):
 
     def connection_established_hop(self):
         self.tunnel_hop_active = 1
-        self.tun_hop = self.qomui_service.return_tun_device("tun_hop")
+        self.tun_hop = self.dbus_call("return_tun_device", "tun_hop")
         self.notify(
                     "Qomui",
                     "First hop connected: {}".format(self.hop_server_dict["name"]),
@@ -2268,7 +2329,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.tunnel_bypass_active = 1
         QtWidgets.QApplication.restoreOverrideCursor()
         self.stop_progress_bar("connection", server=self.bypass_ovpn_dict["name"])
-        tun = self.qomui_service.return_tun_device("tun_bypass")
+        tun = self.dbus_call("return_tun_device", "tun_bypass")
         self.notify(
                     "Qomui",
                     "Bypass connected to: {}".format(self.bypass_ovpn_dict["name"]),
@@ -2387,7 +2448,7 @@ class QomuiGui(QtWidgets.QWidget):
 
                         if self.config_dict["auto_update"] == 1:
                             self.logger.info("Updating {}".format(provider))
-                            self.qomui_service.import_thread(credentials)
+                            self.dbus_call("import_thread", credentials)
 
                 except KeyError:
                     self.logger.debug("Update timestamp for {} not found".format(provider))
@@ -2400,7 +2461,7 @@ class QomuiGui(QtWidgets.QWidget):
     def kill(self):
         self.tunnel_active = 0
         self.tunnel_hop_active = 0
-        self.qomui_service.disconnect("main")
+        self.dbus_call("disconnect", "main")
         self.showActive.setVisible(False)
 
         try:
@@ -2434,7 +2495,7 @@ class QomuiGui(QtWidgets.QWidget):
 
     def disconnect_bypass(self):
         self.tunnel_bypass_active = 0
-        self.qomui_service.disconnect("bypass")
+        self.dbus_call("disconnect", "bypass")
 
         try:
             self.stop_progress_bar("connection_bypass", server=self.bypass_ovpn_dict["name"])
@@ -2447,13 +2508,7 @@ class QomuiGui(QtWidgets.QWidget):
     def establish_connection(self, server_dict, bar=""):
         self.logger.info("Connecting to {}....".format(server_dict["name"]))
         self.start_progress_bar("connecting{}".format(bar), server=server_dict["name"])
-
-        try:
-            self.qomui_service.connect_to_server(server_dict)
-
-        except dbus.exceptions.DBusException as e:
-            self.logger.error("Dbus-service not available")
-
+        self.dbus_call("connect_to_server", server_dict)
         self.conn_timer = QtCore.QTimer()
         self.conn_timer.setSingleShot(True)
         self.conn_timer.timeout.connect(lambda: self.timeout(bar, server_dict["name"]))
@@ -2668,7 +2723,7 @@ class QomuiGui(QtWidgets.QWidget):
                                     new_config[index] = ip_insert
                                     config_change.writelines(new_config)
 
-                self.qomui_service.change_ovpn_config(provider, "{}/temp".format(HOMEDIR))
+                self.dbus_call("change_ovpn_config", provider, "{}/temp".format(HOMEDIR))
 
             except FileNotFoundError:
                 pass
@@ -2677,93 +2732,6 @@ class QomuiGui(QtWidgets.QWidget):
         for row in range(self.serverListWidget.count()):
             if self.serverListWidget.item(row).data(QtCore.Qt.UserRole) == key:
                 return row
-
-class NetMon(QtCore.QThread):
-    net_state_change = QtCore.pyqtSignal(int, dict)
-    log = QtCore.pyqtSignal(tuple)
-
-    def __init__(self):
-        QtCore.QThread.__init__(self)
-
-    def run(self):
-        net_iface_dir = "/sys/class/net/"
-        net_check = 0
-        i = "None"
-
-        while True:
-            prior = net_check
-            i = "None"
-            net_check = 0
-            routes = {       
-                        "gateway" : "None",
-                        "gateway_6" : "None",
-                        "interface" : "None",
-                        "interface_6" : "None"
-                        }
-
-            try:
-                for iface in os.listdir(net_iface_dir):
-                    with open("{}{}/operstate".format(net_iface_dir, iface), "r") as n:
-
-                        if n.read() == "up\n":
-                            net_check = 1
-                            i = iface
-
-                if prior != net_check and net_check == 1:
-                    routes = self.default_gateway_check()
-                    gw = routes["gateway"]
-                    gw_6 = routes["gateway_6"]
-
-                    if gw != "None" or gw_6 != "None":
-                        self.net_state_change.emit(net_check, routes)
-
-                    else:
-                        net_check = 0
-
-                elif prior != net_check and net_check == 0:
-                    self.net_state_change.emit(net_check, routes)
-
-                time.sleep(2)
-
-            except (FileNotFoundError, PermissionError) as e:
-                self.log.emit(("error", e))
-
-    def default_gateway_check(self):
-        try:
-            route_cmd = ["ip", "route", "show", "default", "0.0.0.0/0"]
-            default_route = check_output(route_cmd).decode("utf-8")
-            parse_route = default_route.split(" ")
-            default_gateway_4 = parse_route[2]
-            default_interface_4 = parse_route[4]
-
-        except (CalledProcessError, IndexError):
-            self.log.emit(('info', 'Could not identify default gateway - no network connectivity'))
-            default_gateway_4 = "None"
-            default_interface_4 = "None"
-
-        try:
-            route_cmd = ["ip", "-6", "route", "show", "default", "::/0"]
-            default_route = check_output(route_cmd).decode("utf-8")
-            parse_route = default_route.split(" ")
-            default_gateway_6 = parse_route[2]
-            default_interface_6 = parse_route[4]
-
-        except (CalledProcessError, IndexError):
-            self.log.emit(('error', 'Could not identify default gateway for ipv6 - no network connectivity'))
-            default_gateway_6 = "None"
-            default_interface_6 = "None"
-
-        self.log.emit(("debug", "Network interface - ipv4: {}".format(default_interface_4)))
-        self.log.emit(("debug","Default gateway - ipv4: {}".format(default_gateway_4)))
-        self.log.emit(("debug","Network interface - ipv6: {}".format(default_interface_6)))
-        self.log.emit(("debug","Default gateway - ipv6: {}".format(default_gateway_6)))
-
-        return {
-            "gateway" : default_gateway_4,
-            "gateway_6" : default_gateway_6,
-            "interface" : default_interface_4,
-            "interface_6" : default_interface_6
-            }
 
 def main():
     if not os.path.exists("{}/.qomui".format(os.path.expanduser("~"))):

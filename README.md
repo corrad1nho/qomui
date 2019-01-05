@@ -97,6 +97,13 @@ Qomui has been my first ever programming experience and a practical challenge fo
 
 ### Changelog
 
+#### version 0.8.1:
+- [change] option to restart qomui-service from gui if it crashes
+- [change] added exceptions for all DBus calls
+- [change] improved support for non-systemd distributions
+- [change] detecting and closing simultaneously running instances
+- [bugfix] Airvpn auto-download fixed
+
 #### version 0.8.0:
 - [new] connection profiles 
 - [new] support for custom scripts
@@ -110,14 +117,3 @@ Qomui has been my first ever programming experience and a practical challenge fo
 - [bugfix] manually imported WireGuard servers don't connect
 - [bugfix] Qomui crashes when downloading Airvpn configs
 - [bugfix] fixed Mullvad & Windscribe configs
-
-#### version 0.7.4:
-- [change] source and binary packages now provided by [OpenSuse Build Service](https://build.opensuse.org/)
-- [change] added support for OpenSuse Leap 15 and OpenSuse Tumbleweed
-- [change] split Qomui into more modules and started commenting code
-- [bugfix] bypass tab not shown even though it is active
-- [bugfix] progress bar shown twice for the same action
-- [bugfix] manually adding config files fails if "proto" line not present
-- [bugfix] import may fail if directory for certificates/keys does not exist
-- [bugifx] timestamp not updated after auto-updating servers 
-

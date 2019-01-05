@@ -1,5 +1,26 @@
 ## Changelog
 
+version 0.8.1:
+- [change] option to restart qomui-service from gui if it crashes
+- [change] added exceptions for all DBus calls
+- [change] improved support for non-systemd distributions
+- [change] detecting and closing simultaneously running instances
+- [bugfix] Airvpn auto-download fixed
+
+version 0.8.0:
+- [new] connection profiles 
+- [new] support for custom scripts
+- [change] configurations for Airvpn are now downloaded directly
+- [change] removed minimize option if system tray not available
+- [change] download new Mullvad config/certificates  
+- [change] added scroll areas to some tabs
+- [change] added options for profiles to tray menu
+- [change] window state now recognized correctly
+- [bugfix] improved stability and reliability of network detection 
+- [bugfix] manually imported WireGuard servers don't connect
+- [bugfix] Qomui crashes when downloading Airvpn configs
+- [bugfix] fixed Mullvad & Windscribe configs
+
 version 0.7.4:
 - [change] source and binary packages now provided by [OpenSuse Build Service](https://build.opensuse.org/)
 - [change] added support for OpenSuse Leap 15 and OpenSuse Tumbleweed
