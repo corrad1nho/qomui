@@ -134,6 +134,9 @@ class AddServers(QtCore.QThread):
             for a in cert_xml_root.attrib:
                 if cert_xml_root.attrib[a] == "Wrong login/password.":
                     raise ValueError("Wrong credentials")
+                if a != "login" and a != "expirationdate":
+                    with open("{}/{}".format(self.temp_path, a), "w") as c:
+                        c.write(cert_xml_root.attrib[a])
 
             user_key = cert_xml_root[0][0]
             for a in user_key.attrib:

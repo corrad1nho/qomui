@@ -12,7 +12,7 @@ import random
 import logging
 from functools import partial
 from datetime import datetime, date
-from subprocess import CalledProcessError, check_call
+from subprocess import CalledProcessError, check_call, check_output
 from PyQt5 import QtCore, QtWidgets, QtGui
 from dbus.mainloop.pyqt5 import DBusQtMainLoop
 import bisect
@@ -142,6 +142,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.dbus_call("disconnect", "main")
         self.dbus_call("disconnect", "bypass")
         self.dbus_call("save_default_dns")
+        self.check_other_instance()
         self.load_saved_files()
         self.systemtray()
 
@@ -149,6 +150,19 @@ class QomuiGui(QtWidgets.QWidget):
         self.net_mon_thread.log.connect(self.log_from_thread)
         self.net_mon_thread.net_state_change.connect(self.network_change)
         self.net_mon_thread.start()
+
+    def check_other_instance(self):
+        try:
+            pids = check_output(["pgrep", "qomui-gui"]).decode("utf-8").split("\n")
+            if len(pids) > 0:
+                this_instance = str(os.getpid())
+                for pid in pids:
+                    if pid != this_instance and pid != '':
+                        check_call(["kill", pid])
+                        self.logger.info("Closed instance of qomui-gui with pid {}".format(pid))
+
+        except (CalledProcessError, FileNotFoundError):
+            self.logger.error("Failed to identify or close other instances of qomui-gui")
 
     def dbus_call(self, cmd, *args):
         try:
