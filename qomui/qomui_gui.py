@@ -188,8 +188,14 @@ class QomuiGui(QtWidgets.QWidget):
             elif ret == 1:
                 self.initialize_service("restart")
                 time.sleep(3)
-                if self.config_dict["bypass"] == 1:
-                    self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
+
+                try:
+                    if self.config_dict["bypass"] == 1:
+                        self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
+                
+                except KeyError:
+                    pass
+                    
                 retry = self.dbus_call(cmd, *args)
                 return retry
 
