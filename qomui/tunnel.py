@@ -551,7 +551,7 @@ def exe_custom_scripts(stage, provider, config):
         script = config["{}_scripts".format(provider)][stage]
 
         try:
-            run(shlex.split(cmd))
+            run(shlex.split(script))
             logging.info("Executed {}".format(script))
             #self.log.emit(("info", "Executed {}".format(script)))
 
