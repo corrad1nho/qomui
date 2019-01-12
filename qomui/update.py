@@ -56,6 +56,11 @@ class AddServers(QtCore.QThread):
         self.folderpath = credentials["folderpath"]
         self.temp_path = "{}/{}".format(TEMPDIR, self.provider)
 
+        try:
+            self.key = credentials["key"]
+        except KeyError:
+            pass
+
     def run(self):
         self.started.emit(self.provider)
         self.log.emit(("debug", "Started new thread to import {}".format(self.provider)))
@@ -138,7 +143,15 @@ class AddServers(QtCore.QThread):
                     with open("{}/{}".format(self.temp_path, a), "w") as c:
                         c.write(cert_xml_root.attrib[a])
 
-            user_key = cert_xml_root[0][0]
+            key_index = 0
+            keys_available = len(cert_xml_root[0])
+            for k in range(keys_available):
+                for n in cert_xml_root[0][k].attrib:
+                    if n == "name" and cert_xml_root[0][k].attrib[n] == self.key:
+                        key_index = k
+
+            user_key = cert_xml_root[0][key_index]
+
             for a in user_key.attrib:
                 if a == "crt" or a == "key":
                     with open("{}/{}".format(self.temp_path, a), "w") as c:
@@ -205,7 +218,8 @@ class AddServers(QtCore.QThread):
             airvpn_data = {
                             "server" : self.airvpn_servers,
                             "protocol" : self.airvpn_protocols,
-                            "provider" : "Airvpn"
+                            "provider" : "Airvpn",
+                            "airvpn_key" : self.key
                             }
 
             self.copy_certs(self.provider)
@@ -357,7 +371,7 @@ class AddServers(QtCore.QThread):
                             wg.writelines(wg_conf)
 
                     else:
-                        m = "Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
+                        m = "Mullvad: Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
                         self.remove_temp_dir(self.provider)
                         self.failed.emit(m)
                         auth = 1
@@ -511,21 +525,16 @@ class AddServers(QtCore.QThread):
                 userpass = json.loads(get_cred.content.decode("utf-8"))
 
                 try:
-                    self.username = userpass["username"]
-                    self.password = userpass["password"]
                     self.log.emit(("info", "Created Windscribe credentials for OpenVPN"))
-                    self.windscribe_get_servers()
-
-                    """
                     with open("{}/windscribe_userpass.txt".format(CERTDIR), "w") as cd:
                         cd.write("{}\n{}\n".format(userpass["username"], userpass["password"]))
                         self.log.emit(("debug", "Windscribe OpenVPN credentials written to {}/windscribe_userpass.txt".format(CERTDIR)))
-                    """
+
+                    self.windscribe_get_servers()
 
                 except KeyError:
-
                     self.log.emit(("info", "Windscribe: Login failed"))
-                    m = "Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
+                    m = "Windscribe: Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
                     self.remove_temp_dir(self.provider)
                     self.failed.emit(m)
 

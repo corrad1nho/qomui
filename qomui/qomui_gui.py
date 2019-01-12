@@ -561,6 +561,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.addProviderPassEdit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.addProviderPassEdit.setObjectName(_fromUtf8("addProviderPassEdit"))
         self.gridLayout_3.addWidget(self.addProviderPassEdit, 1, 0, 1, 2)
+        self.airvpnKeyEdit = QtWidgets.QLineEdit(self.providerTab)
+        self.airvpnKeyEdit.setObjectName(_fromUtf8("airvpnKeyEdit"))
+        self.gridLayout_3.addWidget(self.airvpnKeyEdit, 2, 0, 1, 2)
         self.verticalLayout_30.addLayout(self.gridLayout_3)
         self.delProviderLabel = QtWidgets.QLabel(self.providerTab)
         self.delProviderLabel.setFont(bold_font)
@@ -1083,6 +1086,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.tabWidget.setCurrentIndex(3)
         elif button == "Provider":
             self.tabWidget.setCurrentIndex(4)
+            self.providerChosen()
         elif button == "Bypass":
             self.tabWidget.setCurrentIndex(5)
             self.bypassVpnBox.clear()
@@ -1459,6 +1463,7 @@ class QomuiGui(QtWidgets.QWidget):
                 }
 
         if provider in SUPPORTED_PROVIDERS:
+            self.airvpnKeyEdit.setVisible(False)
             self.addProviderEdit.setVisible(False)
             self.addProviderUserEdit.setPlaceholderText(_translate("Form", p_txt[provider][0], None))
             self.addProviderPassEdit.setPlaceholderText(_translate("Form", p_txt[provider][1], None))
@@ -1466,8 +1471,12 @@ class QomuiGui(QtWidgets.QWidget):
                 self.addProviderDownloadBt.setText(_translate("Form", "Update", None))
             else:
                 self.addProviderDownloadBt.setText(_translate("Form", "Download", None))
+            if provider == "Airvpn":
+                self.airvpnKeyEdit.setPlaceholderText(_translate("Form", "Key/Device: Default", None))
+                self.airvpnKeyEdit.setVisible(True)
 
         else:
+            self.airvpnKeyEdit.setVisible(False)
             self.addProviderEdit.setVisible(True)
             self.addProviderEdit.setPlaceholderText(_translate("Form",
                                                                "Specify name of provider",
@@ -1517,8 +1526,14 @@ class QomuiGui(QtWidgets.QWidget):
                             "username" : username,
                             "password" : password,
                             "folderpath" : folderpath,
-                            "homedir" : HOMEDIR
+                            "homedir" : HOMEDIR,
                             }
+
+            if provider == "Airvpn":
+                if self.airvpnKeyEdit.text() != "":
+                    credentials["key"] = self.airvpnKeyEdit.text()
+                else:
+                    credentials["key"] = "Default"
 
             self.addProviderUserEdit.setText("")
             self.addProviderPassEdit.setText("")

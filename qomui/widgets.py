@@ -1074,3 +1074,4 @@ class ModifyServer(QtWidgets.QDialog):
 
         self.modified.emit(change_dict)
         self.hide()
+

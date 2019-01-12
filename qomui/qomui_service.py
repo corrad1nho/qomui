@@ -67,8 +67,8 @@ class QomuiDbus(dbus.service.Object):
         self.filehandler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.setLevel(logging.DEBUG)
         self.logger.info("Dbus-service successfully initialized")
-        
-        #Clean slate after (re-)starting 
+
+        #Clean slate after (re-)starting
         try:
             check_call(["killall", "openvpn"])
             self.logger.debug("Killed all running instances of OpenVPN")
@@ -372,6 +372,9 @@ class QomuiDbus(dbus.service.Object):
                 except FileNotFoundError:
                     self.logger.error("Could not find {} - Aborting update".format(auth_file))
 
+                if provider == "Airvpn":
+                    credentials["key"] = self.config["airvpn_key"]
+
         except KeyError:
             pass
 
@@ -403,6 +406,8 @@ class QomuiDbus(dbus.service.Object):
         if provider in SUPPORTED_PROVIDERS:
             with open('{}/config.json'.format(ROOTDIR), 'w') as save_config:
                 self.config["{}_last".format(provider)] = str(datetime.utcnow())
+                if provider == "Airvpn":
+                    self.config["airvpn_key"] = content["airvpn_key"]
                 json.dump(self.config, save_config)
 
         with open('{}/{}.json'.format(self.homedir, provider), 'w') as p:
