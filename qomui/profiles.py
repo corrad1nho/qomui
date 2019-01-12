@@ -101,6 +101,7 @@ class EditProfile(QtWidgets.QDialog):
 
         self.modeBox.addItem("Random")
         self.modeBox.addItem("Fastest")
+        self.modeBox.addItem("Fast/Random")
 
         if self.selected != 0:
             self.countries_selected = self.selected["countries"]
@@ -124,7 +125,7 @@ class EditProfile(QtWidgets.QDialog):
         if cols == 0:
             cols = 1
 
-        n = n + len(self.providers)    
+        n = n + len(self.providers)
         rows = int(n / cols) + (n % cols> 0) + int(np / cols) + (np % cols> 0) + 3
         self.choiceTable.setRowCount(rows)
         self.choiceTable.setColumnCount(cols)

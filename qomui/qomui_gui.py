@@ -86,7 +86,7 @@ class QomuiGui(QtWidgets.QWidget):
                    "auto_update"
                    ]
 
-    routes = {       
+    routes = {
             "gateway" : "None",
             "gateway_6" : "None",
             "interface" : "None",
@@ -192,10 +192,10 @@ class QomuiGui(QtWidgets.QWidget):
                 try:
                     if self.config_dict["bypass"] == 1:
                         self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
-                
+
                 except KeyError:
                     pass
-                    
+
                 retry = self.dbus_call(cmd, *args)
                 return retry
 
@@ -962,7 +962,7 @@ class QomuiGui(QtWidgets.QWidget):
 
         except (CalledProcessError, FileNotFoundError):
             self.logger.warning("Desktop notifications not available")
-            
+
     def messageBox(self, header, text, buttons=[], icon="Question"):
         box = QtWidgets.QMessageBox(self)
         box.setText(header)
@@ -1235,12 +1235,12 @@ class QomuiGui(QtWidgets.QWidget):
                         try:
                             if self.ovpn_dict["random"] == "on":
                                 self.choose_random_server()
-                        
+
                         except KeyError:
 
                             if "profile" in self.ovpn_dict.keys():
                                 self.connect_profile(self.ovpn_dict["profile"])
-                            
+
                             else:
                                 self.establish_connection(self.ovpn_dict)
 
@@ -1610,7 +1610,7 @@ class QomuiGui(QtWidgets.QWidget):
         getattr(self, "{}_widget".format(number)).connect_profile.connect(self.connect_profile)
         self.verticalLayout_58.insertWidget(0, getattr(self, "{}_widget".format(number)))
         name = self.profile_dict[number]["name"]
- 
+
     def connect_profile(self, p):
         result = None
         profile = self.profile_dict[p]
@@ -1643,6 +1643,32 @@ class QomuiGui(QtWidgets.QWidget):
                     if lat <= fastest:
                         fastest = lat
                         result = s
+
+            elif profile["mode"] == "Fast/Random":
+                l_list = []
+                s_list = []
+                counter = {}
+                max_length = int(len(temp_list) * 0.20)
+                for s in temp_list:
+                    country = self.server_dict[s]["country"]
+                    try:
+                        lat = float(self.server_dict[s]["latency"])
+                    except KeyError:
+                        lat = 1000
+
+                    bisect.insort(l_list, lat)
+                    s_list.insert(l_list.index(lat), (s, country))
+
+                s_list = s_list[:max_length + 1]
+                from collections import Counter
+                occs = [v for k, v in Counter(e[1] for e in s_list).items()]
+                max_occ = sum(occs) / len(occs)
+                for s,c in s_list:
+                    counter[c] = counter.get(c, 0) + 1
+                    if counter[c] <= max_occ:
+                       s_list.remove((s,c))
+
+                result = random.choice(s_list)[0]
 
             elif profile["mode"] == "Random":
                 result = random.choice(temp_list)
