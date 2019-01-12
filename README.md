@@ -4,18 +4,15 @@
 Qomui (Qt OpenVPN Management UI) is an easy-to-use OpenVPN/WireGuard gui for GNU/Linux with some unique features such as provider-independent support for double-hop connections. Qomui supports multiple providers with added convenience when using AirVPN, PIA, ProtonVPN, Windscribe or Mullvad. 
 
 ### Features
-- should work with all VPN providers that offer OpenVPN config files
-- automatic download function for Mullvad, Private Internet Access, Windscribe, ProtonVPN and AirVPN 
-- support for OpenVPN over SSL and SSH for AirVPN and OpenVPN over SSL for Windscribe (Stealth Mode)
+- works with all VPN providers that offer OpenVPN/WireGuard config files
+- easy-to-use gui written in PyQt5
+- automatic download function for Mullvad, Private Internet Access, Windscribe, ProtonVPN and AirVPN including support for OpenVPN over SSL and SSH for AirVPN and OpenVPN over SSL for Windscribe (Stealth Mode)
 - allows double-hop VPN connections (VPN chains) between different providers
-- gui written in PyQt including option to minimize application to system tray 
+- killswitch & leak protection via an iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
+- provides the possibility to allow applications to bypass the VPN tunnel, open a second VPN tunnel or use the VPN only for specific applications
+- supports WireGuard
+- command-line interface 
 - security-conscious separation of the gui and a D-Bus service that handles commands that require root privileges
-- protection against DNS leaks/ipv6 leaks
-- iptables-based, configurable firewall that blocks all outgoing network traffic in case the VPN connection breaks down
-- allow applications to bypass the VPN tunnel, open a second VPN tunnel or use the VPN only for specific applications
-- experimental support for WireGuard
-- command-line interface
-- automatic weekly updates of server configurations for supported providers - experimental
 
 ### Screenshots
 Screenshots were taken on Arch Linux/Plasma Arc Dark Theme - Qomui will adapt to your theme.<br/>
@@ -43,9 +40,22 @@ Qomui contains two components: qomui-gui and qomui-service (and qomui-cli: see b
 
 Current configurations for AirVPN, Mullvad, ProtonVPN, PIA and Windscribe can be automatically downloaded via the provider tab. Qomui will update these once a week if you choose to enable the respective setting in the options tab. For all other providers you can conveniently add a config file folder. Qomui will automatically resolve host names, determine the location of servers (using geoip-database) and save your username and password (in a file readable only by root). 
 
-Once you added server configurations, you can browse and filter them in the server tab. Furthermore, you can mark servers as favourites and connect to one of them randomly. To see a list of all favourited servers click on the star in the upper right. 
+Once you added server configurations, you can browse and filter them in the server tab. Furthermore, you can mark servers as favourites and connect to one of them randomly. To see a list of all favourited servers click on the star in the upper right. There is also an option to create connection profiles in the respective tab. Profiles will select a server automatically based on the criteria you set. Criteria include protocol (OpenVPN or WireGuard), countries, providers and one of the following selection modes:
+- ***Random:*** Chooses a random server among all servers matching the profile
+- ***Fastest:*** Chooses the fastest server matching the profile based on latency. For this option to work properly the "Perform latency checks" option needs to be ticked.
+- ***Fast/Random:*** Chooses a random server among the fastest twenty percent. If you profile includes more than one country, the algorithm also tries to increase the chance to select a server from a different country next. 
 
-### Firewall - Network lock
+### Options
+- ***Autoconnect/reconnect:*** Automatically connect to the last server/last profile once a new internet connection has been detected or after the OpenVPN process has died unexpectedly 
+- ***Start minimized:*** Hides the application window on startup. This only works if your Desktop Environment supports tray icons.
+- ***Auto-update:*** Updates server configurations for supported providers automatically every five days 
+- ***Perform latency check:*** Checks server latency and sorts servers accordingly
+- ***Disable IPv6:*** Completely disables the IPv6 stack systemwide. This is not recommended unless you know what you are doing.
+- ***Allow OpenVPN bypass:*** See bypass section below
+- ***Activate Firewall:*** See firewall section below
+- ***Alternative DNS Servers***: Enforces the usage of custom DNS servers instead of those by your provider. The DNS servers set here will also be used for bypass mode if you don't launch a secondary VPN tunnel.
+
+### Firewall (Killswitch)
 It is highly recommended to activate the firewall to prevent against ipv6 and DNS leaks. By default, once qomui-service has been started, all internet connectivity outside the VPN tunnel will be blocked whether or not the gui is running. Hence, your system will be always protected if you enable qomui-service via systemd. Depending on your distribution, it might be necessary to disable preinstalled firewall services such as ufw or firewalld to avoid conflicts. Alternatively, the "Edit firewall" dialog in the options tab offers a setting to enable/disable the firewall only if you start/quit the gui. You can also add custom iptables rules there. 
 
 ### Double-Hop
@@ -67,7 +77,7 @@ The bypass feature also allows you to open a second OpenVPN tunnel (this does cu
 You can add WireGuard config files from any provider as easily as OpenVPN files. WireGuard configs for Mullvad are now downloaded automatically alongside their OpenVPN configs as long as WireGuard is installed. If you choose to manually import WireGuard config files, Qomui will automatically recognize the type of file. As of now, WireGuard will not be installed automatically with DEB and RPM packages. You can find the official installation guidelines for different distributions [here](https://www.wireguard.com/install/).
 
 ### Cli
-The cli interface is still experimental and missing some features, e.g. automatic reconnects. Avoid using the cli and the Gui concurrently. 
+The cli interface is still experimental and missing some features, e.g. automatic reconnects. Avoid using the cli and the gui concurrently. 
 
 #### Example usage
 
