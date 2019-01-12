@@ -15,9 +15,15 @@ class LatencyCheck(QtCore.QThread):
         self.server_dict = server_dict
         self.interface = interface
 
+    def sort_by_latency(self, server):
+        try:
+            return float(server[1]["latency"])
+        except KeyError:
+            return 999
+
     def run(self):
         try:
-            for k,v in self.server_dict.items():
+            for k,v in sorted(self.server_dict.items(), key=self.sort_by_latency):
                 try:
                     ip = v["ip"]
                 except KeyError:
