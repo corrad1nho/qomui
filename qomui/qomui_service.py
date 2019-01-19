@@ -367,7 +367,7 @@ class QomuiDbus(dbus.service.Object):
             if credentials["credentials"] == "unknown":
 
                 try:
-                    auth_file = "{}/certs/{}-auth.txt".format(ROOTDIR, provider)
+                    auth_file = "{}/{}/{}-auth.txt".format(ROOTDIR, provider, provider)
 
                     with open(auth_file, "r") as auth:
                         up = auth.read().split("\n")

@@ -610,7 +610,7 @@ class TunnelMon(QtCore.QThread):
             time_measure = time.time()
             elapsed = time_measure - start_time
 
-            if int(elapsed) % 3600 == 0:
+            if int(elapsed) % 900 == 0:
                 self.check.emit()
 
             return_time = self.time_format(int(elapsed))

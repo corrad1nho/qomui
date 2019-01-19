@@ -59,7 +59,7 @@ class AddServers(QtCore.QThread):
         try:
             self.key = credentials["key"]
         except KeyError:
-            pass
+            self.key = "Default"
 
     def run(self):
         self.started.emit(self.provider)
@@ -95,7 +95,7 @@ class AddServers(QtCore.QThread):
                      }
 
         certificates = {
-                        "ssh_ppk": "sshtunnel.key",
+                        "ssh_key": "sshtunnel.key",
                         "ssl_crt": "stunnel.crt",
                         "ca" : "ca.crt",
                         "ta" : "ta.key",
@@ -143,8 +143,11 @@ class AddServers(QtCore.QThread):
                 if cert_xml_root.attrib[a] == "Wrong login/password.":
                     raise ValueError("Wrong credentials")
                 if a != "login" and a != "expirationdate":
-                    with open("{}/{}".format(self.temp_path, certificates[a]), "w") as c:
-                        c.write(cert_xml_root.attrib[a])
+                    try:
+                        with open("{}/{}".format(self.temp_path, certificates[a]), "w") as c:
+                            c.write(cert_xml_root.attrib[a])
+                    except KeyError:
+                        pass
 
             key_index = 0
             keys_available = len(cert_xml_root[0])
@@ -229,13 +232,14 @@ class AddServers(QtCore.QThread):
             self.finished.emit(airvpn_data)
 
         except ValueError as e:
-            self.log.emit(("debug", e))
+            self.log.emit(("debug", e.args))
             m = "Airvpn download failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
             self.remove_temp_dir(self.provider)
             self.failed.emit(m)
 
+        
         except Exception as e:
-            self.log.emit(("debug", e))
+            self.log.emit(("debug", e.args))
             self.log.emit(("info", "Airvpn: Request failed - aborting"))
             self.remove_temp_dir(self.provider)
             self.failed.emit("Sorry, something went wrong")
@@ -550,7 +554,7 @@ class AddServers(QtCore.QThread):
                     self.log.emit(("info", "Created Windscribe credentials for OpenVPN"))
                     with open("{}/windscribe_userpass.txt".format(self.temp_path), "w") as cd:
                         cd.write("{}\n{}\n".format(userpass["username"], userpass["password"]))
-                        self.log.emit(("debug", "Windscribe OpenVPN credentials written to {}/windscribe_userpass.txt".format(CERTDIR)))
+                        self.log.emit(("debug", "Windscribe OpenVPN credentials written to {}/windscribe_userpass.txt".format(self.temp_path)))
 
                     self.windscribe_get_servers()
 
@@ -988,7 +992,7 @@ class AddServers(QtCore.QThread):
             self.log.emit(("debug", e))
             self.log.emit(("error", "An unexpected error occured: Aborting"))
             self.remove_temp_dir(self.provider)
-            self.failed.emit("Network error&No internet connection&{}".format(self.provider))
+            self.failed.emit("AzireVPN import failed&An unknown error occured&{}".format(self.provider))
 
         else:
             az_protocols = {

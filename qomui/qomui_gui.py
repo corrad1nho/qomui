@@ -74,6 +74,7 @@ class QomuiGui(QtWidgets.QWidget):
     bypass_dict = {}
     config_dict = {}
     packetmanager = None
+    queue = []
     tunnel_list = ["OpenVPN", "WireGuard"]
     config_list = [
                    "firewall",
@@ -2470,32 +2471,40 @@ class QomuiGui(QtWidgets.QWidget):
 
     def update_check(self):
         QtWidgets.QApplication.restoreOverrideCursor()
-        for provider in SUPPORTED_PROVIDERS:
-            if provider in self.provider_list:
 
-                try:
-                    get_last = self.config_dict["{}_last".format(provider)]
-                    last_update = datetime.strptime(get_last, '%Y-%m-%d %H:%M:%S.%f')
-                    time_now = datetime.utcnow()
-                    delta = time_now.date() - last_update.date()
-                    days_since = delta.days
-                    self.logger.info("Last {} update: {} days ago".format(provider, days_since))
+        if not self.queue:
+            self.queue = [p for p in SUPPORTED_PROVIDERS if p in self.provider_list]
 
-                    if days_since >= 5:
-                        credentials = {
-                                        "provider" : provider,
-                                        "credentials" : "unknown",
-                                        "folderpath" : "None",
-                                        "homedir" : HOMEDIR,
-                                        "update" : "0"
-                                        }
+        print(self.queue)
+        provider = self.queue[0]
+        print(provider)
 
-                        if self.config_dict["auto_update"] == 1:
-                            self.logger.info("Updating {}".format(provider))
-                            self.dbus_call("import_thread", credentials)
+        try:
+            get_last = self.config_dict["{}_last".format(provider)]
+            last_update = datetime.strptime(get_last, '%Y-%m-%d %H:%M:%S.%f')
+            time_now = datetime.utcnow()
+            delta = time_now.date() - last_update.date()
+            days_since = delta.days
+            self.logger.info("Last {} update: {} days ago".format(provider, days_since))
 
-                except KeyError:
-                    self.logger.debug("Update timestamp for {} not found".format(provider))
+            if days_since >= 0:
+                credentials = {
+                                "provider" : provider,
+                                "credentials" : "unknown",
+                                "folderpath" : "None",
+                                "homedir" : HOMEDIR,
+                                "update" : "0"
+                                }
+
+                if self.config_dict["auto_update"] == 1:
+                    self.logger.info("Updating {}".format(provider))
+                    self.dbus_call("import_thread", credentials)
+
+        except KeyError:
+            self.logger.debug("Update timestamp for {} not found".format(provider))
+
+        finally:
+            self.queue.remove(provider)
 
     def reconnect(self):
         if self.tunnel_active == 1:
