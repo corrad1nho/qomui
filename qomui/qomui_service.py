@@ -24,6 +24,7 @@ from dbus.mainloop.pyqt5 import DBusQtMainLoop
 from qomui import firewall, bypass, update, dns_manager, tunnel
 
 ROOTDIR = "/usr/share/qomui"
+LOGDIR = "/usr/share/qomui/logs"
 OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
 BUS_NAME = "org.qomui.service"
@@ -54,6 +55,10 @@ class QomuiDbus(dbus.service.Object):
     interface = "eth0"
 
     def __init__(self):
+        
+        if not os.path.exists(LOGDIR):
+            os.makedirs(LOGDIR)
+
         self.sys_bus = dbus.SystemBus()
         self.bus_name = dbus.service.BusName(BUS_NAME, bus=self.sys_bus)
         dbus.service.Object.__init__(self, self.bus_name, OPATH)
@@ -61,8 +66,8 @@ class QomuiDbus(dbus.service.Object):
         self.gui_handler = GuiLogHandler(self.send_log)
         self.gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(self.gui_handler)
-        self.filehandler = logging.handlers.RotatingFileHandler("{}/qomui.log".format(ROOTDIR),
-                                                       maxBytes=2*1024*1024, backupCount=1)
+        self.filehandler = logging.handlers.RotatingFileHandler("{}/qomui.log".format(LOGDIR),
+                                                       maxBytes=2*1024*1024, backupCount=3)
         self.logger.addHandler(self.filehandler)
         self.filehandler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.setLevel(logging.DEBUG)
