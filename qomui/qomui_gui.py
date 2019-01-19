@@ -1400,7 +1400,7 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
-            self.dbus_call("load_firewall", 1)
+            self.dbus_call("load_firewall", 0)
             self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
             self.notify(
                         "Qomui: configuration changed",
@@ -2474,10 +2474,8 @@ class QomuiGui(QtWidgets.QWidget):
 
         if not self.queue:
             self.queue = [p for p in SUPPORTED_PROVIDERS if p in self.provider_list]
-
-        print(self.queue)
+            
         provider = self.queue[0]
-        print(provider)
 
         try:
             get_last = self.config_dict["{}_last".format(provider)]
@@ -2487,7 +2485,7 @@ class QomuiGui(QtWidgets.QWidget):
             days_since = delta.days
             self.logger.info("Last {} update: {} days ago".format(provider, days_since))
 
-            if days_since >= 0:
+            if days_since >= 5:
                 credentials = {
                                 "provider" : provider,
                                 "credentials" : "unknown",
