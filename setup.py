@@ -24,14 +24,16 @@ data_files = [
                                 'resources/Mullvad_config',
                                 'resources/ssl_config',
                                 'resources/qomui.png',
-                                'resources/hop.sh',
-                                'resources/hop_down.sh',
-                                'resources/bypass_up.sh',
-                                'resources/bypass_route.sh',
                                 'resources/airvpn_api.pem',
                                 'resources/airvpn_cacert.pem',
                                 'VERSION']
                             ),
+        ('/usr/share/qomui/scripts/', [
+                                        'scripts/hop.sh',
+                                        'scripts/hop_down.sh',
+                                        'scripts/bypass_up.sh',
+                                        'scripts/bypass_route.sh'
+                                       ]),
         ('/usr/share/qomui/flags/', glob.glob('resources/flags/*'))
         ]
 

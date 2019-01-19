@@ -232,9 +232,9 @@ class TunnelThread(QtCore.QThread):
             if "bypass" in ovpn_dict:
                 edit = "bypass"
                 if ovpn_dict["bypass"] == "1":
-                    config.append("iproute /usr/share/qomui/bypass_route.sh\n")
+                    config.append("iproute {}/scripts/bypass_route.sh\n".format(ROOTDIR))
                     config.append("script-security 2\n")
-                    config.append("route-up /usr/share/qomui/bypass_up.sh\n")
+                    config.append("route-up {}/scripts/bypass_up.sh\n".format(ROOTDIR))
 
             for line, value in enumerate(config):
                 if value.startswith("proto ") is True:
@@ -363,10 +363,12 @@ class TunnelThread(QtCore.QThread):
                         '--config', '{}'.format(ovpn_file),
                         '--route-nopull',
                         '--script-security', '2',
-                        '--up', '/usr/share/qomui/hop.sh -f {} {}'.format(self.hop_dict["ip"],
-                                                                     self.server_dict["ip"]
+                        '--up', '{}/scripts/hop.sh -f {} {}'.format(
+                                                                    ROOTDIR,
+                                                                    self.hop_dict["ip"],
+                                                                    self.server_dict["ip"]
                                                                      ),
-                        '--down', '/usr/share/qomui/hop_down.sh {}'.format(self.hop_dict["ip"])
+                        '--down', '{}/scripts/hop_down.sh {}'.format(ROOTDIR, self.hop_dict["ip"])
                         ]
 
         elif h == "2":
