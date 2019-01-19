@@ -69,8 +69,6 @@ def add_rule_6(rule):
 
 def apply_rules(opt, block_lan=0, preserve=0):
     fw_rules = get_config()
-    save_existing_rules(fw_rules)
-    save_existing_rules_6(fw_rules)
 
     for rule in fw_rules["flush"]:
         if opt != 2:
@@ -82,12 +80,12 @@ def apply_rules(opt, block_lan=0, preserve=0):
 
     logging.info("iptables: flushed existing rules")
 
-    for rule in saved_rules:
-        if preserve == 1:
+    if preserve == 1:
+        save_existing_rules(fw_rules)
+        save_existing_rules_6(fw_rules)
+        for rule in saved_rules:
             add_rule(rule)
-
-    for rule in saved_rules_6:
-        if preserve == 1:
+        for rule in saved_rules_6:
             add_rule_6(rule)
 
     if opt == 1:
@@ -206,29 +204,21 @@ def check_firewall_services():
     return detected_firewall
 
 def save_iptables():
-    outfile = open("{}/iptables_before.rules".format(ROOTDIR), "w")
-    save = Popen(["iptables-save"], stdout=outfile, stderr=PIPE)
-    save.wait()
-    outfile.flush()
-
-    if save.stderr:
-        print(save.stderr)
-        logging.debug("Failed to save current iptables rules")
-
-    else:
+    try:
+        outfile = open("{}/iptables_before.rules".format(ROOTDIR), "w")
+        save = Popen(["iptables-save"], stdout=outfile, stderr=PIPE)
+        save.wait()
+        outfile.flush()
         logging.debug("Saved iptables rule")
 
+    except (CalledProcessError, FileNotFoundError):
+        logging.debug("Failed to save current iptables rules")
 
 def restore_iptables():
     try:
         #infile = open("{}/iptables_before.rules".format(ROOTDIR), "r")
         restore = Popen(["iptables-restore", "{}/iptables_before.rules".format(ROOTDIR)], stderr=PIPE)
-
-        if restore.stderr:
-            logging.debug("Failed to restore iptables rules")
-
-        else:
-            logging.debug("Restored previous iptables rules")
+        logging.debug("Restored previous iptables rules")
 
     except (CalledProcessError, FileNotFoundError):
         logging.debug("FileNotFoundError: Failed to restore iptables rules")

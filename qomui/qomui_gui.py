@@ -146,7 +146,6 @@ class QomuiGui(QtWidgets.QWidget):
         self.check_other_instance()
         self.load_saved_files()
         self.systemtray()
-
         self.net_mon_thread = monitor.NetMon()
         self.net_mon_thread.log.connect(self.log_from_thread)
         self.net_mon_thread.net_state_change.connect(self.network_change)
