@@ -350,7 +350,7 @@ class QomuiDbus(dbus.service.Object):
             f_source = "{}/{}".format(certpath, f)
 
             if provider in SUPPORTED_PROVIDERS:
-                f_dest = "{}/{}".format(ROOTDIR, f)
+                f_dest = "{}/{}/openvpn.conf".format(ROOTDIR, provider)
             else:
                 f_dest = "{}/{}/{}".format(ROOTDIR, provider, f)
 

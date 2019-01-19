@@ -52,7 +52,7 @@ class TunnelThread(QtCore.QThread):
         oldmask = os.umask(0o077)
         path = "{}/wg_qomui.conf".format(ROOTDIR)
         if self.server_dict["provider"] == "Mullvad":
-            with open("{}/certs/mullvad_wg.conf".format(ROOTDIR), "r") as wg:
+            with open("{}/Mullvad/mullvad_wg.conf".format(ROOTDIR), "r") as wg:
                 conf = wg.readlines()
                 conf.insert(8, "PublicKey = {}\n".format(self.server_dict["public_key"]))
                 conf.insert(9, "Endpoint = {}:{}\n".format(self.server_dict["ip"], self.server_dict["port"]))
@@ -151,6 +151,9 @@ class TunnelThread(QtCore.QThread):
         elif provider == "ProtonVPN":
             self.write_config(self.server_dict)
 
+        elif provider == "AzireVPN":
+            self.write_config(self.server_dict)
+
         else:
             config_file = "{}/{}".format(ROOTDIR, self.server_dict["path"])
 
@@ -200,9 +203,15 @@ class TunnelThread(QtCore.QThread):
         ip = ovpn_dict["ip"]
         port = ovpn_dict["port"]
         protocol = ovpn_dict["protocol"]
+        compat = 1
 
         if path is None:
-            ovpn_file = "{}/{}_config".format(ROOTDIR, provider)
+            if os.path.exists("{}/{}/openvpn.conf".format(ROOTDIR, provider)):
+                ovpn_file = "{}/{}/openvpn.conf".format(ROOTDIR, provider)
+            else:
+                #Ensure compatibility with older versions
+                ovpn_file = "{}/{}_config".format(ROOTDIR, provider)
+                compat = 0
         else:
             ovpn_file = path
 
@@ -267,6 +276,18 @@ class TunnelThread(QtCore.QThread):
 
                 except KeyError:
                     config.append("tls-auth {}/certs/ta.key 1 \n".format(ROOTDIR))
+
+            elif provider == "AzireVPN":
+                ca = "ca {}/{}/{}.crt\n".format(ROOTDIR, provider, ovpn_dict["name"])
+                tls = "tls-auth {}/{}/{}.key 1\n".format(ROOTDIR, provider, ovpn_dict["name"])
+                config.append(ca)
+                config.append(tls)
+
+            #Ensure compatibility with older versions:
+            if compat == 0:
+                for i, l in enumerate(config):
+                    config[i] = l.replace("{}/".format(provider), "certs/")
+
 
             with open("{}/{}.ovpn".format(ROOTDIR, edit), "w") as ovpn_dump:
                     ovpn_dump.writelines(config)

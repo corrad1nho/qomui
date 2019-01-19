@@ -997,7 +997,7 @@ class ModifyServer(QtWidgets.QDialog):
 
     def display_config(self):
         if self.provider in SUPPORTED_PROVIDERS:
-            config = "{}/{}_config".format(ROOTDIR, self.provider)
+            config = "{}/{}/openvpn.conf".format(ROOTDIR, self.provider)
 
         else:
             config = "{}/{}".format(ROOTDIR, self.server_info["path"])
