@@ -120,34 +120,42 @@ def apply_rules(opt, block_lan=0, preserve=0):
         logging.info("iptables: deactivated firewall")
 
 def save_existing_rules(fw_rules):
-    existing_rules = check_output(["iptables", "-S"]).decode("utf-8")
-    for line in existing_rules.split('\n'):
-        rpl = line.replace("/32", "")
-        rule = shlex.split(rpl)
-        if len(rule) != 0:
-            match = 0
-            omit = fw_rules["ipv4rules"] + fw_rules["flush"] + fw_rules["ipv4local"]
-            for x in omit:
-                if Counter(x) == Counter(rule):
-                    match = 1
-            if match == 0 and rule not in saved_rules:
-                saved_rules.append(rule)
-            match = 0
+    try:
+        existing_rules = check_output(["iptables", "-S"]).decode("utf-8")
+        for line in existing_rules.split('\n'):
+            rpl = line.replace("/32", "")
+            rule = shlex.split(rpl)
+            if len(rule) != 0:
+                match = 0
+                omit = fw_rules["ipv4rules"] + fw_rules["flush"] + fw_rules["ipv4local"]
+                for x in omit:
+                    if Counter(x) == Counter(rule):
+                        match = 1
+                if match == 0 and rule not in saved_rules:
+                    saved_rules.append(rule)
+                match = 0
+
+    except (CalledProcessError, FileNotFoundError) as e:
+        logging.error("ip4tables: Could not read active rules - {}".format(e))
 
 def save_existing_rules_6(fw_rules):
-    existing_rules = check_output(["ip6tables", "-S"]).decode("utf-8")
-    for line in existing_rules.split('\n'):
-        rpl = line.replace("/32", "")
-        rule = shlex.split(rpl)
-        if len(rule) != 0:
-            match = 0
-            omit = fw_rules["ipv6rules"] + fw_rules["flushv6"] + fw_rules["ipv6local"]
-            for x in omit:
-                if Counter(x) == Counter(rule):
-                    match = 1
-            if match == 0 and rule not in saved_rules_6:
-                saved_rules_6.append(rule)
-            match = 0
+    try:
+        existing_rules = check_output(["ip6tables", "-S"]).decode("utf-8")
+        for line in existing_rules.split('\n'):
+            rpl = line.replace("/32", "")
+            rule = shlex.split(rpl)
+            if len(rule) != 0:
+                match = 0
+                omit = fw_rules["ipv6rules"] + fw_rules["flushv6"] + fw_rules["ipv6local"]
+                for x in omit:
+                    if Counter(x) == Counter(rule):
+                        match = 1
+                if match == 0 and rule not in saved_rules_6:
+                    saved_rules_6.append(rule)
+                match = 0
+
+    except (CalledProcessError, FileNotFoundError) as e:
+        logging.error("ip6tables: Could not read active rules - {}".format(e))
 
 def allow_dest_ip(ip, action):
     rule = [action, 'OUTPUT', '-d', ip, '-j', 'ACCEPT']
@@ -207,10 +215,11 @@ def save_iptables():
     else:
         logging.debug("Saved iptables rule")
 
+
 def restore_iptables():
     infile = open("{}/iptables_before.rules".format(ROOTDIR), "r")
     restore = Popen(["iptables-restore"], stdin=infile, stderr=PIPE)
-    save.wait()
+    restore.wait()
 
     if restore.stderr:
         logging.debug("Failed to restore iptables rules")

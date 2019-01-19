@@ -38,7 +38,7 @@ except AttributeError:
 
 ROOTDIR = "/usr/share/qomui"
 HOMEDIR = "{}/.qomui".format(os.path.expanduser("~"))
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 JSON_FILE_LIST = [("config_dict", "{}/config.json".format(ROOTDIR)),
                   ("server_dict", "{}/server.json".format(HOMEDIR)),
                   ("protocol_dict", "{}/protocol.json".format(HOMEDIR)),
@@ -1458,6 +1458,7 @@ class QomuiGui(QtWidgets.QWidget):
                 "Airvpn" : ("Username", "Password"),
                 "PIA" : ("Username", "Password"),
                 "Windscribe" : ("Username", "Password"),
+                "AzireVPN" : ("Username", "Password"),
                 "Mullvad" : ("Account Number", "N.A. - Leave empty"),
                 "ProtonVPN" : ("OpenVPN username", "OpenVPN password")
                 }
@@ -1527,6 +1528,7 @@ class QomuiGui(QtWidgets.QWidget):
                             "password" : password,
                             "folderpath" : folderpath,
                             "homedir" : HOMEDIR,
+                            "update" : "1"
                             }
 
             if provider == "Airvpn":
@@ -2484,7 +2486,8 @@ class QomuiGui(QtWidgets.QWidget):
                                         "provider" : provider,
                                         "credentials" : "unknown",
                                         "folderpath" : "None",
-                                        "homedir" : HOMEDIR
+                                        "homedir" : HOMEDIR,
+                                        "update" : "0"
                                         }
 
                         if self.config_dict["auto_update"] == 1:

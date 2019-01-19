@@ -27,7 +27,7 @@ except AttributeError:
 ROOTDIR = "/usr/share/qomui"
 TEMPDIR = "/usr/share/qomui/temp"
 CERTDIR = "/usr/share/qomui/certs"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 
 def country_translate(cc):
     try:
@@ -54,6 +54,7 @@ class AddServers(QtCore.QThread):
         self.password = credentials["password"]
         self.provider = credentials["provider"]
         self.folderpath = credentials["folderpath"]
+        self.update = credentials["update"]
         self.temp_path = "{}/{}".format(TEMPDIR, self.provider)
 
         try:
@@ -857,6 +858,108 @@ class AddServers(QtCore.QThread):
         self.copy_certs(self.provider)
         self.finished.emit(custom_dict)
 
+    def azirevpn(self):
+        az_path = "{}/AzireVPN".format(ROOTDIR)
+        self.az_servers = {}
+        if not os.path.exists(az_path):
+            os.makedirs(az_path)
+
+        try:
+            self.log.emit(("info", "Downloading AzireVPN OpenVPN configs"))
+            az_api_url = "https://api.azirevpn.com/v1/locations"
+            az_servers = json.loads(requests.get(az_api_url, timeout=2).content.decode("utf-8"))
+
+            for s in az_servers["locations"]:
+                name = s["name"] + "-openvpn" + "-azirevpn"
+                wg_name = s["name"] + "-wireguard" + "-azirevpn"
+                country = country_translate(s["iso"])
+                ip = resolve(s["endpoints"]["openvpn"][0]["hostname"])
+                self.log.emit(("info", "Importing {}".format(name)))
+                self.az_servers[name] = {
+                                        "name": name,
+                                        "provider" : self.provider,
+                                        "city" : s["city"],
+                                        "ip" : ip,
+                                        "country" : country,
+                                        "tunnel" : "OpenVPN"
+                                        }
+
+                crt_url = s["openvpn-ca"]
+                crt_file = "{}/{}.crt".format(az_path, name)
+                crt = requests.get(az_api_url, timeout=2).content.decode("utf-8")
+                with open(crt_file, "w") as c:
+                    c.write(crt)
+
+                tls_url = s["openvpn-tls-key"]
+                tls_file = "{}/{}.key".format(az_path, name)
+                tls = requests.get(az_api_url, timeout=2).content.decode("utf-8")
+                with open(tls_file, "w") as t:
+                    t.write(tls)
+
+                try:
+                    wg_file = "{}/{}.conf".format(az_path, wg_name)
+                    wg_api_url = s["endpoints"]["wireguard"]
+                    wg_keys = self.gen_wg_key(wg_file)
+
+                    if wg_keys is not None or self.update == "1":
+                        datas = {'username' : str(self.username),
+                                'password' : str(self.password),
+                                'pubkey' : wg_keys[1]
+                                }
+
+                        pub_up = json.loads(requests.post(wg_api_url, data=datas, timeout=5).content.decode("utf-8"))
+                        wg_ip = resolve(pub_up["data"]["Endpoint"].split(":")[0])
+                        wg_conf = [
+                                        "[Interface]\n",
+                                        "PrivateKey = {}\n".format(wg_keys[0]),
+                                        "Address = {}\n".format(pub_up["data"]["Address"]),
+                                        "DNS = {}\n".format(pub_up["data"]["DNS"]),
+                                        "\n",
+                                        "[Peer]\n",
+                                        "Endpoint = {}:51820\n".format(wg_ip),
+                                        "AllowedIPs = 0.0.0.0/0, ::/0\n"
+                                        ]
+
+                        self.az_servers[wg_name] = {
+                                        "name": wg_name,
+                                        "provider" : self.provider,
+                                        "city" : s["city"],
+                                        "ip" : wg_ip,
+                                        "country" : country,
+                                        "tunnel" : "WireGuard"
+                                        }
+
+                        with open(wg_file, "w") as wg:
+                            wg.writelines(wg_conf)
+
+
+                except (CalledProcessError, FileNotFoundError) as e:
+                    self.log.emit(("info", "WireGuard is not installed/not found - skipping"))
+
+                except (requests.exceptions.RequestException, json.JSONDecodeError):
+                    self.log.emit(("info", "Network error: Uploading WireGuard public key failed"))
+
+        except requests.exceptions.RequestException as e:
+            self.log.emit(("error", "Network error: Unable to retrieve data from api.azirevpn.com"))
+            self.remove_temp_dir(self.provider)
+            self.failed.emit("Network error&No internet connection&{}".format(self.provider))
+
+        else:
+            az_protocols = {
+                            "protocol_1" : {"protocol": "UDP", "port": "1194"},
+                            "protocol_2" : {"protocol": "TCP", "port": "1194"},
+                            "protocol_3" : {"protocol": "UDP", "port": "443"},
+                            "protocol_4" : {"protocol": "TCP", "port": "443"}
+                            }
+
+            azire_dict = {
+                            "server" : self.az_servers,
+                            "protocol" : az_protocols,
+                            "provider" : "AzireVPN"
+                            }
+
+            self.finished.emit(azire_dict)
+
     def sanity_check(self, path):
         unrelated_files = 0
 
@@ -872,6 +975,26 @@ class AddServers(QtCore.QThread):
                     unrelated_files += 1
 
         return unrelated_files
+
+    def gen_wg_key(self, config):
+        #check if key already exists
+        if os.path.exists("{}/{}.conf".format(ROOTDIR, config)):
+            self.log.emit(("debug", "WireGuard keys for {} have already been generated".format(config.split("/")[-1])))
+            wg_keys = None
+
+        else:
+            self.log.emit(("info", "Generating WireGuard keys for {}".format(config.split("/")[-1])))
+
+            try:
+                private_key = check_output(["wg", "genkey"]).decode("utf-8").split("\n")[0]
+                pubgen = run(["wg", "pubkey"], stdout=PIPE, input=private_key, encoding='ascii')
+                public_key = pubgen.stdout.split("\n")[0]
+                wg_keys = (private_key, public_key)
+            except (CalledProcessError, FileNotFoundError) as e:
+                wg_keys = None
+                self.log.emit(("info", "WireGuard is not installed/not found - skipping"))
+
+        return wg_keys
 
     def copy_certs(self, provider):
         oldmask = os.umask(0o077)
@@ -968,7 +1091,7 @@ class AddServers(QtCore.QThread):
     def remove_temp_dir(self, provider):
         try:
             shutil.rmtree(self.temp_path)
-            self.log.emit(("debug", "Removed temporary directory"))
+            self.log.emit(("debug", "Removed temporary download directory for {}".format(provider)))
 
         except FileNotFoundError:
             pass

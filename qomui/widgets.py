@@ -31,7 +31,7 @@ except AttributeError:
 
 ROOTDIR = "/usr/share/qomui"
 HOMEDIR = "{}/.qomui".format(os.path.expanduser("~"))
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 
 class favouriteButton(QtWidgets.QAbstractButton):
     def __init__(self, parent=None):

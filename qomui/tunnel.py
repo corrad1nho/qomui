@@ -12,7 +12,7 @@ from PyQt5 import QtCore
 from qomui import firewall, dns_manager
 
 ROOTDIR = "/usr/share/qomui"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe", "AzireVPN"]
 
 class TunnelThread(QtCore.QThread):
     log = QtCore.pyqtSignal(tuple)

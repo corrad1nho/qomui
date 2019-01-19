@@ -27,7 +27,7 @@ ROOTDIR = "/usr/share/qomui"
 OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
 BUS_NAME = "org.qomui.service"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 
 class GuiLogHandler(logging.Handler):
     def __init__(self, send_log, parent=None):
