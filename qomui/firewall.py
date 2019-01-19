@@ -73,10 +73,12 @@ def apply_rules(opt, block_lan=0, preserve=0):
     save_existing_rules_6(fw_rules)
 
     for rule in fw_rules["flush"]:
-        add_rule(rule)
+        if opt != 2:
+            add_rule(rule)
 
     for rule in fw_rules["flushv6"]:
-        add_rule_6(rule)
+        if opt != 2:
+            add_rule_6(rule)
 
     logging.info("iptables: flushed existing rules")
 
@@ -210,6 +212,7 @@ def save_iptables():
     outfile.flush()
 
     if save.stderr:
+        print(save.stderr)
         logging.debug("Failed to save current iptables rules")
 
     else:
@@ -217,15 +220,18 @@ def save_iptables():
 
 
 def restore_iptables():
-    infile = open("{}/iptables_before.rules".format(ROOTDIR), "r")
-    restore = Popen(["iptables-restore"], stdin=infile, stderr=PIPE)
-    restore.wait()
+    try:
+        #infile = open("{}/iptables_before.rules".format(ROOTDIR), "r")
+        restore = Popen(["iptables-restore", "{}/iptables_before.rules".format(ROOTDIR)], stderr=PIPE)
 
-    if restore.stderr:
-        logging.debug("Failed to restore iptables rules")
+        if restore.stderr:
+            logging.debug("Failed to restore iptables rules")
 
-    else:
-        logging.debug("restored previous iptables rules")
+        else:
+            logging.debug("Restored previous iptables rules")
+
+    except (CalledProcessError, FileNotFoundError):
+        logging.debug("FileNotFoundError: Failed to restore iptables rules")
 
 
 

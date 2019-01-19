@@ -1154,6 +1154,10 @@ class QomuiGui(QtWidgets.QWidget):
     def shutdown(self):
         self.tray.hide()
         self.kill()
+        self.disconnect_bypass()
+        self.dbus_call("load_firewall", 2)
+        with open ("{}/server.json".format(HOMEDIR), "w") as s:
+            json.dump(self.server_dict, s)
         sys.exit()
 
     def restoreUi(self, reason):
@@ -1191,12 +1195,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.hide()
 
         elif ret == 0:
-            self.tray.hide()
-            self.kill()
-            self.disconnect_bypass()
-            self.dbus_call("load_firewall", 2)
-            with open ("{}/server.json".format(HOMEDIR), "w") as s:
-                json.dump(self.server_dict, s)
+            self.shutdown()
             self.exit_event.accept()
 
     def change_timeout(self):
@@ -1400,7 +1399,7 @@ class QomuiGui(QtWidgets.QWidget):
         try:
             check_call(update_cmd)
             self.logger.info("Configuration changes applied successfully")
-            self.dbus_call("load_firewall", 0)
+            self.dbus_call("load_firewall", 1)
             self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
             self.notify(
                         "Qomui: configuration changed",
@@ -2474,7 +2473,7 @@ class QomuiGui(QtWidgets.QWidget):
 
         if not self.queue:
             self.queue = [p for p in SUPPORTED_PROVIDERS if p in self.provider_list]
-            
+
         provider = self.queue[0]
 
         try:

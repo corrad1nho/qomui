@@ -154,7 +154,7 @@ class QomuiDbus(dbus.service.Object):
 
     #get fw configuration - might be called from gui after config change
     @dbus.service.method(BUS_NAME, in_signature='i', out_signature='')
-    def load_firewall(self, activate):
+    def load_firewall(self, stage):
         try:
             with open('{}/config.json'.format(ROOTDIR), 'r') as c:
                 self.config = json.load(c)
@@ -166,55 +166,34 @@ class QomuiDbus(dbus.service.Object):
 
         try:
             self.logger.setLevel(self.config["log_level"].upper())
-
-        except KeyError:
-            pass
-
-        try:
-            if self.config["fw_gui_only"] == 0:
-                activate = 1
-
-        except KeyError:
-            activate = 1
-
-        try:
-            if self.config["preserve_rules"] == 1:
-                preserve = 1
-            else:
-                preserve = 0
-
-        except KeyError:
-            preserve = 0
-
-        try:
-            if self.config["block_lan"] == 1:
-                block_lan = 1
-            else:
-                block_lan = 0
-
-        except KeyError:
-            block_lan = 0
-
-        try:
-            if activate == 1:
-                firewall.save_iptables()
-                firewall.apply_rules(self.config["firewall"], block_lan=block_lan, preserve=preserve)
-
-            elif activate == 2:
-                if self.config["fw_gui_only"] == 1:
-                    firewall.restore_iptables()
-                    firewall.apply_rules(0, block_lan=0, preserve=preserve)
-
-                    try:
-                        bypass.delete_cgroup(self.default_interface_4, self.default_interface_6)
-
-                    except AttributeError:
-                        pass
-
             self.disable_ipv6(self.config["ipv6_disable"])
+            fw = self.config["firewall"]
+            gui_only = self.config["fw_gui_only"]
+            block_lan=self.config["block_lan"]
+            preserve=self.config["preserve_rules"] 
 
+            if fw == 1 and gui_only == 0:
+                opt = 1
+            elif gui_only == 1 and stage == 1:
+                firewall.save_iptables()
+                opt = fw
+            elif gui_only == 1 and stage == 2:
+                firewall.restore_iptables()
+                opt = 2
+            elif fw == 0 and stage == 1:
+                opt = 0
+                firewall.restore_iptables()
+            else:
+                opt = 2
+
+            if opt < 2:
+                firewall.apply_rules(
+                                    opt,
+                                    block_lan=block_lan, 
+                                    preserve=preserve
+                                    )
         except KeyError:
-            self.logger.warning('Could not read all values from config file')
+            self.logger.warning('Malformed config file')
 
         #default dns is always set to the alternative servers
         self.dns = self.config["alt_dns1"]
