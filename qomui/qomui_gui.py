@@ -1124,7 +1124,7 @@ class QomuiGui(QtWidgets.QWidget):
 
     def pop_tray_menu(self):
         self.trayMenu.clear()
-        self.visibility_action = QtWidgets.QAction()
+        self.visibility_action = QtWidgets.QAction(self)
         self.visibility_action.setText("Hide")
         self.trayMenu.addAction(self.visibility_action)
         self.trayMenu.addSeparator()
