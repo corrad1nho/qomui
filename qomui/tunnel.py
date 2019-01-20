@@ -308,10 +308,8 @@ class TunnelThread(QtCore.QThread):
                     ["-I", "OUTPUT", "2", "-o", "wg_qomui", "-j", "ACCEPT"]
                     ]
 
-        for rule in wg_rules:
-            firewall.add_rule_6(rule)
-            firewall.add_rule(rule)
-
+        firewall.batch_rule_6(wg_rules)
+        firewall.batch_rule(wg_rules)
         time.sleep(1)
 
         try:

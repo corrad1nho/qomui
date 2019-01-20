@@ -246,13 +246,9 @@ class QomuiDbus(dbus.service.Object):
                     ["-D", "INPUT", "-i", "wg_qomui", "-j", "ACCEPT"],
                     ["-D", "OUTPUT", "-o", "wg_qomui", "-j", "ACCEPT"]
                     ]
-
-                for rule in wg_rules:
-                    firewall.add_rule_6(rule)
-                    firewall.add_rule(rule)
-
+                firewall.batch_rule_6(wg_rules)
+                firewall.batch_rule(wg_rules)
                 tunnel.exe_custom_scripts("down", self.wg_provider, self.config)
-
                 self.wg_connect = 0
 
         elif env == "bypass":
