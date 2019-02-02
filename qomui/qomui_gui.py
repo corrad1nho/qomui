@@ -79,6 +79,7 @@ class QomuiGui(QtWidgets.QWidget):
                    "firewall",
                    "autoconnect",
                    "minimize",
+                   "minimize_on_close",
                    "ipv6_disable",
                    "alt_dns",
                    "bypass",
@@ -426,6 +427,16 @@ class QomuiGui(QtWidgets.QWidget):
         self.minimizeOptLabel.setIndent(20)
         self.minimizeOptLabel.setFont(italic_font)
         self.verticalLayout_5.addWidget(self.minimizeOptLabel)
+        self.minimize_on_closeOptCheck = QtWidgets.QCheckBox(self.optionsTab)
+        self.minimize_on_closeOptCheck.setFont(bold_font)
+        self.minimize_on_closeOptCheck.setObjectName(_fromUtf8("minimize_on_closeOptCheck"))
+        self.verticalLayout_5.addWidget(self.minimize_on_closeOptCheck)
+        self.minimize_on_closeOptLabel = QtWidgets.QLabel(self.optionsTab)
+        self.minimize_on_closeOptLabel.setObjectName(_fromUtf8("minimize_on_closeOptLabel"))
+        self.minimize_on_closeOptLabel.setWordWrap(True)
+        self.minimize_on_closeOptLabel.setIndent(20)
+        self.minimize_on_closeOptLabel.setFont(italic_font)
+        self.verticalLayout_5.addWidget(self.minimize_on_closeOptLabel)
         self.auto_updateOptCheck = QtWidgets.QCheckBox(self.optionsTab)
         self.auto_updateOptCheck.setObjectName(_fromUtf8("auto_updateOptCheck"))
         self.auto_updateOptCheck.setFont(bold_font)
@@ -854,6 +865,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.autoconnectOptCheck.setText(_translate("Form", "Autoconnect/reconnect", None))
         self.auto_updateOptCheck.setText(_translate("Form", "Auto-update", None))
         self.minimizeOptCheck.setText(_translate("Form", "Start minimized", None))
+        self.minimize_on_closeOptCheck.setText(_translate("Form", "Minimize to tray on close", None))
         self.firewallOptCheck.setText(_translate("Form", "Activate Firewall     ", None))
         self.bypassOptCheck.setText(_translate("Form", "Allow OpenVPN bypass", None))
         self.pingOptCheck.setText(_translate("Form", "Perform latency check", None))
@@ -912,7 +924,10 @@ class QomuiGui(QtWidgets.QWidget):
                                           "Automatically (re-)connect to last server",
                                           None))
         self.minimizeOptLabel.setText(_translate("Form",
-                                          "Only works if system tray is available",
+                                          "Works only if system tray is available",
+                                          None))
+        self.minimize_on_closeOptLabel.setText(_translate("Form",
+                                          "Works only if system tray is available",
                                           None))
         self.auto_updateOptLabel.setText(_translate("Form",
                                           "Enable automatic updates for supported providers",
@@ -1160,39 +1175,65 @@ class QomuiGui(QtWidgets.QWidget):
             self.showNormal()
 
     def closeEvent(self, event):
-        self.exit_event = event
-        self.confirm = QtWidgets.QMessageBox()
-        self.timeout = 5
-        self.confirm.setText("Do you really want to quit Qomui?")
-        info = "Closing in {} seconds".format(self.timeout)
-        self.confirm.setInformativeText(info)
-        self.confirm.setIcon(QtWidgets.QMessageBox.Question)
-        self.confirm.addButton(QtWidgets.QPushButton("Exit"), QtWidgets.QMessageBox.YesRole)
-        self.confirm.addButton(QtWidgets.QPushButton("Cancel"), QtWidgets.QMessageBox.NoRole)
-        if self.tray.isSystemTrayAvailable() == True:
-            self.confirm.addButton(QtWidgets.QPushButton("Minimize"), QtWidgets.QMessageBox.RejectRole)
-        self.exit_timer = QtCore.QTimer(self)
-        self.exit_timer.setInterval(1000)
-        self.exit_timer.timeout.connect(self.change_timeout)
-        self.exit_timer.start()
+        if self.isHidden() == False and self.config_dict["minimize_on_close"] == 0:
+            self.exit_event = event
+            self.confirm = QtWidgets.QMessageBox()
+            self.timeout = 5
+            self.confirm.setText("Do you really want to quit Qomui?")
+            info = "Closing in {} seconds".format(self.timeout)
+            self.confirm.setInformativeText(info)
+            self.confirm.setIcon(QtWidgets.QMessageBox.Question)
+            self.confirm.addButton(QtWidgets.QPushButton("Exit"), QtWidgets.QMessageBox.YesRole)
+            self.confirm.addButton(QtWidgets.QPushButton("Cancel"), QtWidgets.QMessageBox.NoRole)
+            if self.tray.isSystemTrayAvailable() == True:
+                self.confirm.addButton(QtWidgets.QPushButton("Minimize"), QtWidgets.QMessageBox.RejectRole)
 
-        ret = self.confirm.exec_()
-        self.exit_timer.stop()
+            self.exit_timer = QtCore.QTimer(self)
+            self.exit_timer.setInterval(1000)
+            self.exit_timer.timeout.connect(self.change_timeout)
+            self.exit_timer.start()
 
-        if ret == 1:
-            self.exit_event.ignore()
+            ret = self.confirm.exec_()
+            self.exit_timer.stop()
 
-        elif ret == 2:
+            if ret == 1:
+                self.exit_event.ignore()
+
+            elif ret == 2:
+                if self.config_dict["minimize_on_close"] == 0:
+                    self.confirm = QtWidgets.QMessageBox()
+                    self.confirm.setIcon(QtWidgets.QMessageBox.Question)
+                    self.confirm.setText("Remember choice?")
+                    self.confirm.addButton(QtWidgets.QPushButton("Yes"), QtWidgets.QMessageBox.YesRole)
+                    self.confirm.addButton(QtWidgets.QPushButton("No"), QtWidgets.QMessageBox.NoRole)
+                    
+                    self.timeout = 5
+                    self.confirm.setInformativeText(info)
+                    self.exit_timer = QtCore.QTimer(self)
+                    self.exit_timer.setInterval(1000)
+                    self.exit_timer.timeout.connect(self.change_timeout)
+                    self.exit_timer.start()
+
+                    ret = self.confirm.exec_()
+                    self.exit_timer.stop()
+
+                    if ret == 0:
+                        self.config_dict["minimize_on_close"] = 1
+                        self.save_options(self.config_dict)
+                        
+                self.hide()
+
+            elif ret == 0:
+                self.tray.hide()
+                self.kill()
+                self.disconnect_bypass()
+                self.dbus_call("load_firewall", 2)
+                with open ("{}/server.json".format(HOMEDIR), "w") as s:
+                    json.dump(self.server_dict, s)
+                self.exit_event.accept()
+
+        elif self.config_dict["minimize_on_close"] == 1:
             self.hide()
-
-        elif ret == 0:
-            self.tray.hide()
-            self.kill()
-            self.disconnect_bypass()
-            self.dbus_call("load_firewall", 2)
-            with open ("{}/server.json".format(HOMEDIR), "w") as s:
-                json.dump(self.server_dict, s)
-            self.exit_event.accept()
 
     def change_timeout(self):
         self.timeout -= 1
