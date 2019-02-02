@@ -1,5 +1,22 @@
 ## Changelog
 
+version 0.8.2:
+- [new] added AzireVPN
+- [new] option to specify key for Airvpn
+- [change] fast/random option added to profiles
+- [change] order of latency checks now based on previous results
+- [change] tidied up directory structure
+- [change] checks if ipv6 is available
+- [change] auto-updates for different providers won't run concurrently
+- [change] check if IPv6 is available before setting iptables rules
+- [change] don't generate new WireGuard keys on auto-update
+- [change] allow importing new servers if firewall is active but VPN is not
+- [bugfix] detection of service crashes is not reliable
+- [bugfix] Windscribe auto-update fails because of authentication error
+- [bugfix] compatibility with older Qt5 versions 
+- [bugfix] previous iptables rules not always restored
+- [bugfix] crashes if ipv6 stack not available
+
 version 0.8.1:
 - [change] option to restart qomui-service from gui if it crashes
 - [change] added exceptions for all DBus calls

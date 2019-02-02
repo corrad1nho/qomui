@@ -5,7 +5,7 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.8.1"
+VERSION = "0.8.2"
 data_files = [
         ('/usr/share/qomui', ['resources/countries.json']),
         ('/usr/share/applications/', ['resources/qomui.desktop']),
@@ -19,9 +19,14 @@ data_files = [
                                 'resources/PIA_config',
                                 'resources/ProtonVPN_config',
                                 'resources/Windscribe_config',
+                                'resources/Airvpn_config_old',
+                                'resources/Mullvad_config',
+                                'resources/Mullvad_config_old',
+                                'resources/PIA_config_old',
+                                'resources/ProtonVPN_config_old',
+                                'resources/Windscribe_config_old',
                                 'resources/default_config.json',
                                 'resources/firewall_default.json',
-                                'resources/Mullvad_config',
                                 'resources/ssl_config',
                                 'resources/qomui.png',
                                 'resources/airvpn_api.pem',

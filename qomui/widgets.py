@@ -11,6 +11,7 @@ import psutil
 import configparser
 import requests
 import shlex
+import logging
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 from qomui import update
@@ -864,14 +865,17 @@ class AppSelector(QtWidgets.QDialog):
                             else:
                                 name = c["Desktop Entry"]["Name"]
                                 icon = c["Desktop Entry"]["Icon"]
+                                logging.debug("Adding {} to bypass app list".format(name))
                                 self.bypassAppList.append((name, icon, desktop_file))
 
                         except KeyError:
                             name = c["Desktop Entry"]["Name"]
                             icon = c["Desktop Entry"]["Icon"]
+                            logging.debug("Adding {} to bypass app list".format(name))
                             self.bypassAppList.append((name, icon, desktop_file))
-            except:
-                pass
+            except Exception as e:
+                logging.error(e)
+                logging.error("Failed to add {} to bypass app list".format(name))
 
         self.bypassAppList = sorted(self.bypassAppList)
         self.pop_AppList()
