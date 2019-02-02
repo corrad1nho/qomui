@@ -83,7 +83,7 @@ def apply_rules(opt, block_lan=0, preserve=0):
 
     elif opt == 0:
         batch_rule(fw_rules["unsecure"])
-        batch_rule_6(["unsecurev6"])
+        batch_rule_6(fw_rules["unsecurev6"])
         logging.info("iptables: deactivated firewall")
 
 def batch_rule(rules):
