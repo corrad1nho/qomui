@@ -118,6 +118,7 @@ Qomui has been my first ever programming experience and a practical challenge fo
 - [change] check if IPv6 is available before setting iptables rules
 - [change] don't generate new WireGuard keys on auto-update
 - [change] allow importing new servers if firewall is active but VPN is not
+- [bugfix] firewall not deactivating after gui exit (if the respective option is set)
 - [bugfix] detection of service crashes is not reliable
 - [bugfix] Windscribe auto-update fails because of authentication error
 - [bugfix] compatibility with older Qt5 versions 
