@@ -9,8 +9,8 @@ from collections import Counter
 ROOTDIR = "/usr/share/qomui"
 saved_rules = []
 saved_rules_6 = []
-ip_cmd = ["iptables", "--wait",]
-ip6_cmd = ["ip6tables", "--wait",]
+#ip_cmd = ["iptables", "--wait",]
+#ip6_cmd = ["ip6tables", "--wait",]
 devnull = open(os.devnull, 'w')
 ip6_available = True
 
@@ -30,60 +30,30 @@ def check_ipv6():
         logging.debug("Unable to determine whether ipv6 is available")
         return True
 
-def add_rule(rule):
-    a = 1
-    try:
-        check = rule[:]
-        if "-D" not in check:
-            if check[0] == "-A":
-                check[0] = "-C"
-            elif check[0] == "-I":
-                check[0] = "-C"
-                check.pop(2)
-            elif check[2] == "-A":
-                check[2] = "-C"
-            check_call(ip_cmd + check, stdout=devnull, stderr=devnull)
-            logging.debug("iptables: {} already exists".format(rule))
-            a = 0
-    except (IndexError, CalledProcessError):
-        pass
+def add_rule(rule, check=0, ipt="ip4"):
+    if ipt == "ip4":
+        ip_cmd = ["iptables", "--wait",]
+    else:
+        ip_cmd = ["ip6tables", "--wait",]
 
-    try:
-        if a == 1:
-            check_call(ip_cmd + rule, stdout=devnull, stderr=devnull)
-            logging.debug("iptables: applied {}".format(rule))
-
-    except CalledProcessError:
-        if "-D" not in rule:
-            logging.warning("iptables: failed to apply {}".format(rule))
-
-def add_rule_6(rule, check=0):
-    if check == 1 or check_ipv6() is True:
-        a = 1
+    if ipt == "ip4" or check == 1 or check_ipv6() is True:
+        #check if rule already exists and only set it otherwise
         try:
-            check = rule[:]
-            if "-D" not in check:
-                if check[0] == "-A":
-                    check[0] = "-C"
-                elif check[0] == "-I":
-                    check[0] = "-C"
-                    check.pop(2)
-                elif check[2] == "-A":
-                    check[2] = "-C"
-                check_call(ip6_cmd + check, stdout=devnull, stderr=devnull)
-                logging.debug("ipt6ables: {} already exists".format(rule))
-                a = 0
+            if len(rule) > 3 or "-D" not in rule:
+                check = ["-C" if x == "-A" or x == "-I" else x for x in rule]
+                check_call(ip_cmd + check, stdout=devnull, stderr=devnull)
+                logging.debug("iptables: {} already exists".format(rule))
+
+            else:
+                raise IndexError
+
         except (IndexError, CalledProcessError):
-            pass
+            try:
+                check_call(ip_cmd + rule, stdout=devnull, stderr=devnull)
+                logging.debug("iptables: applied {}".format(rule))
 
-        try:
-            if a == 1:
-                check_call(ip6_cmd + rule, stdout=devnull, stderr=devnull)
-                logging.debug("ip6tables: applied {}".format(rule))
-
-        except CalledProcessError:
-            if "-D" not in rule:
-                logging.warning("ip6tables: failed to apply {}".format(rule))
+            except CalledProcessError:
+                logging.warning("iptables: failed to apply {}".format(rule))
 
 def apply_rules(opt, block_lan=0, preserve=0):
     fw_rules = get_config()
@@ -123,7 +93,7 @@ def batch_rule(rules):
 def batch_rule_6(rules): 
     if check_ipv6() is True:
         for rule in rules:
-            add_rule_6(rule, check=1)
+            add_rule(rule, check=1, ipt="ip6")
 
 def save_existing_rules(fw_rules):
     try:
@@ -173,9 +143,9 @@ def allow_dest_ip(ip, action):
 
         elif len(ip.split(":")) >= 4:
             if check_ipv6() is True:
-                add_rule_6(rule)
+                add_rule(rule, ipt="ip6")
     except:
-        pass
+        logging.error("{} is not a valid ip address".format(ip))
 
 def get_config():
     try:
