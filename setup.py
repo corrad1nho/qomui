@@ -15,6 +15,7 @@ data_files = [
         ('/usr/share/icons/hicolor/scalable/apps/', ['resources/qomui.svg',
                                                      'resources/qomui_off.svg']),
         ('/usr/share/qomui/', [
+                                'resources/AzireVPN_config',
                                 'resources/Airvpn_config',
                                 'resources/PIA_config',
                                 'resources/ProtonVPN_config',
