@@ -105,7 +105,6 @@ class QomuiGui(QtWidgets.QWidget):
 
         try:
             self.qomui_dbus = self.dbus.get_object('org.qomui.service', '/org/qomui/service')
-            self.logger.debug('Successfully connected to qomui-service via DBus')
 
         except dbus.exceptions.DBusException:
             self.logger.error('DBus Error: Qomui-Service is currently not available')
@@ -140,6 +139,7 @@ class QomuiGui(QtWidgets.QWidget):
                                       600, 750
                                       ))
 
+        self.logger.debug('Successfully connected to qomui-service via DBus')
         self.dbus_call("disconnect", "main")
         self.dbus_call("disconnect", "bypass")
         self.dbus_call("save_default_dns")
@@ -170,34 +170,43 @@ class QomuiGui(QtWidgets.QWidget):
             return call
 
         except dbus.exceptions.DBusException as e:
+            print(e)
+            if e.get_dbus_name() == "org.freedesktop.DBus.Error.ServiceUnknown":
+                self.notify("Qomui: Dbus Error", "No reply from qomui-service. It may have crashed.", icon="Warning")
+                ret = self.messageBox(
+                                    "Error: Qomui-service is not available",
+                                    "Do you want restart it or quit Qomui?",
+                                    buttons = [
+                                                ("Quit", "NoRole"),
+                                                ("Restart", "YesRole")
+                                                ],
+                                    icon = "Question"
+                                    )
+
+                if ret == 0:
+                    sys.exit(1)
+
+                elif ret == 1:
+                    self.initialize_service("restart")
+                    time.sleep(3)
+
+                    try:
+                        if self.config_dict["bypass"] == 1:
+                            self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
+
+                    except KeyError:
+                        pass
+
+                    retry = self.dbus_call(cmd, *args)
+                    return retry
+            
+            else:
+                self.logger.error("Dbus Error: {}".format(e))
+                self.notify("Qomui: Dbus Error", "An error occured. See log for details", icon="Warning")
+
+        except Exception as e:
             self.logger.error("Dbus Error: {}".format(e))
-            self.notify("Qomui: Dbus Error", "No reply from qomui-service. It may have crashed.", icon="Warning")
-            ret = self.messageBox(
-                                "Error: Qomui-service is not available",
-                                "Do you want restart it or quit Qomui?",
-                                buttons = [
-                                            ("Quit", "NoRole"),
-                                            ("Restart", "YesRole")
-                                            ],
-                                icon = "Question"
-                                )
-
-            if ret == 0:
-                sys.exit(1)
-
-            elif ret == 1:
-                self.initialize_service("restart")
-                time.sleep(3)
-
-                try:
-                    if self.config_dict["bypass"] == 1:
-                        self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
-
-                except KeyError:
-                    pass
-
-                retry = self.dbus_call(cmd, *args)
-                return retry
+            self.notify("Qomui: Dbus Error", "An unknown error occured. See log for details", icon="Warning")
 
     def initialize_service(self, *args):
         try:
