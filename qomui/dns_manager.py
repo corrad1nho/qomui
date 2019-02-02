@@ -56,12 +56,12 @@ def dns_request_exception(action, dns_1, dns_2, port):
         logging.info("iptables: removing exception for DNS requests")
 
     for p in protocols:
-        rules.append([action, 'OUTPUT', '1', '-p', p, '--dport', port, '-j', 'ACCEPT'])
-        rules.append([action, 'INPUT', '1', '-p', p, '--sport', port, '-j', 'ACCEPT'])
+        rules.append([action, 'OUTPUT',  '-p', p, '--dport', port, '-j', 'ACCEPT'])
+        rules.append([action, 'INPUT', '-p', p, '--sport', port, '-j', 'ACCEPT'])
 
     for rule in rules:
         firewall.add_rule(rule)
-        firewall.add_rule_6(rule)
+        firewall.add_rule(rule, ipt="ip6")
 
     #set_dns(dns_1, server_2=dns_2)
 

@@ -17,6 +17,7 @@ from PyQt5 import QtCore
 from bs4 import BeautifulSoup
 from subprocess import PIPE, Popen, check_output, CalledProcessError, run
 
+from qomui import firewall
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -27,6 +28,7 @@ except AttributeError:
 ROOTDIR = "/usr/share/qomui"
 TEMPDIR = "/usr/share/qomui/temp"
 SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
+ALLOWED_IPS = []
 
 def country_translate(cc):
     try:
@@ -82,6 +84,9 @@ class AddServers(QtCore.QThread):
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.primitives import serialization, hashes, asymmetric, ciphers
 
+        self.log.emit(("info", "Creating temporary rule to access Airvpn API"))
+        firewall.allow_dest_ip("54.93.175.114", "-I")
+        ALLOWED_IPS.append("54.93.175.114")
         self.airvpn_servers = {}
         self.airvpn_protocols = {}
         self.backend = default_backend()
@@ -137,7 +142,6 @@ class AddServers(QtCore.QThread):
             cert_xml = decrypt_user.update(cert_xml.content) + decrypt_user.finalize()
             parser = etree.XMLParser(recover=True)
             cert_xml_root = et.fromstring(cert_xml, parser=parser)
-            self.temp_path = "{}/{}".format(TEMPDIR, self.provider)
 
             for a in cert_xml_root.attrib:
                 if cert_xml_root.attrib[a] == "Wrong login/password.":
@@ -237,7 +241,7 @@ class AddServers(QtCore.QThread):
             self.remove_temp_dir(self.provider)
             self.failed.emit(m)
 
-        
+
         except Exception as e:
             self.log.emit(("debug", e.args))
             self.log.emit(("info", "Airvpn: Request failed - aborting"))
@@ -275,6 +279,7 @@ class AddServers(QtCore.QThread):
             self.failed.emit("Network error&No internet connection&{}".format(self.provider))
 
     def mullvad(self):
+        self.allow_ip(["api.mullvad.net", "mullvad.net", "raw.githubusercontent.com"])
         self.mullvad_servers = {}
         self.password = "m"
         self.log.emit(("info", "Downloading certificates for Mullvad"))
@@ -352,36 +357,35 @@ class AddServers(QtCore.QThread):
                                                                         "tunnel" : "WireGuard"
                                                                         }
 
+                    wg_file = "mullvad_wg.conf"
+                    wg_keys = self.gen_wg_key(wg_file)
+                    if wg_keys is not None:
+                        data = [('account', self.username),
+                                ('pubkey', wg_keys[1])
+                                ]
 
-                    private_key = check_output(["wg", "genkey"]).decode("utf-8").split("\n")[0]
-                    pubgen = run(["wg", "pubkey"], stdout=PIPE, input=private_key, encoding='ascii')
-                    pubkey = pubgen.stdout.split("\n")[0]
-                    data = [('account', self.username),
-                            ('pubkey', pubkey)
-                            ]
+                        pub_up = self.session.post("https://api.mullvad.net/wg/", data=data)
+                        if pub_up.status_code < 400:
+                            wg_address = pub_up.content.decode("utf-8").split("\n")[0]
 
-                    pub_up = self.session.post("https://api.mullvad.net/wg/", data=data)
-                    if pub_up.status_code < 400:
-                        wg_address = pub_up.content.decode("utf-8").split("\n")[0]
+                            wg_conf = [
+                                        "[Interface]\n",
+                                        "DNS = 193.138.219.228\n",
+                                        "\n",
+                                        "[Peer]\n",
+                                        "AllowedIPs = 0.0.0.0/0, ::/0\n"
+                                        ]
 
-                        wg_conf = [
-                                    "[Interface]\n",
-                                    "DNS = 193.138.219.228\n",
-                                    "\n",
-                                    "[Peer]\n",
-                                    "AllowedIPs = 0.0.0.0/0, ::/0\n"
-                                    ]
+                            with open("{}/{}".format(self.temp_path, wg_file), "w") as wg:
+                                wg_conf.insert(1, "PrivateKey = {}\n".format(wg_keys[0]))
+                                wg_conf.insert(2, "Address = {}\n".format(wg_address))
+                                wg.writelines(wg_conf)
 
-                        with open("{}/mullvad_wg.conf".format(self.temp_path), "w") as wg:
-                            wg_conf.insert(1, "PrivateKey = {}\n".format(private_key))
-                            wg_conf.insert(2, "Address = {}\n".format(wg_address))
-                            wg.writelines(wg_conf)
-
-                    else:
-                        m = "Mullvad: Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
-                        self.remove_temp_dir(self.provider)
-                        self.failed.emit(m)
-                        auth = 1
+                        else:
+                            m = "Mullvad: Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
+                            self.remove_temp_dir(self.provider)
+                            self.failed.emit(m)
+                            auth = 1
 
 
                 except (CalledProcessError, FileNotFoundError) as e:
@@ -416,6 +420,7 @@ class AddServers(QtCore.QThread):
         return country
 
     def pia(self):
+        self.allow_ip(["www.privateinternetaccess.com"])
         self.pia_servers = {}
         self.pia_protocols = {}
         self.log.emit(("info", "Downloading PIA config files"))
@@ -489,17 +494,17 @@ class AddServers(QtCore.QThread):
                             "{}/strong/ca.rsa.4096.crt".format(self.temp_path) :"{}/pia_ca.rsa.4096.crt".format(self.temp_path)
                             }
 
-            for orig, dest in certificates:
+            for orig, dest in certificates.items():
                 try:
                     shutil.copyfile(orig, dest)
-                
+
                 except FileNotFoundError as e:
                     self.log.emit(("error", e))
 
             try:
-                shutil.rmtree("{}/ip")
-                shutil.rmtree("{}/strong")
-            
+                shutil.rmtree("{}/ip".format(self.temp_path))
+                shutil.rmtree("{}/strong".format(self.temp_path))
+
             except FileNotFoundError as e:
                 self.log.emit(("error", e))
 
@@ -512,6 +517,7 @@ class AddServers(QtCore.QThread):
             self.failed.emit("Network error&No internet connection&{}".format(self.provider))
 
     def windscribe(self):
+        self.allow_ip(["windscribe.com", "assets.windscribe.com", "res.windscribe.com"])
         self.windscribe_servers = {}
         self.windscribe_protocols = {}
         self.header = {
@@ -645,6 +651,7 @@ class AddServers(QtCore.QThread):
         self.finished.emit(ws_dict)
 
     def protonvpn(self):
+        self.allow_ip(["api.protonmail.ch"])
         self.proton_servers = {}
         self.log.emit(("info", "Downloading ProtonVPN server configs"))
 
@@ -742,6 +749,135 @@ class AddServers(QtCore.QThread):
             self.remove_temp_dir(self.provider)
             self.failed.emit("Network error&No internet connection&{}".format(self.provider))
 
+    def azirevpn(self):
+        self.az_servers = {}
+        self.allow_ip(["azirevpn.net"])
+
+        try:
+
+            try:
+                self.log.emit(("info", "Downloading AzireVPN OpenVPN configs"))
+                az_api_url = "https://api.azirevpn.com/v1/locations"
+                az_servers = json.loads(requests.get(az_api_url, timeout=2).content.decode("utf-8"))
+
+            except requests.exceptions.RequestException as e:
+                az_servers = {"locations" : []}
+                self.log.emit(("error", "Network error: Unable to retrieve data from api.azirevpn.com"))
+                self.remove_temp_dir(self.provider)
+                self.failed.emit("Network error&No internet connection&{}".format(self.provider))
+
+            for s in az_servers["locations"]:
+                name = s["name"] + "-openvpn" + "-azirevpn"
+                wg_name = s["name"] + "-wireguard" + "-azirevpn"
+                country = country_translate(s["iso"])
+                hostname = s["endpoints"]["openvpn"][0]["hostname"]
+                ip = resolve(hostname)[0]
+                self.log.emit(("info", "Importing {}".format(name)))
+
+                if ip != "Failed to resolve":
+                    self.az_servers[name] = {
+                                            "name": name,
+                                            "provider" : self.provider,
+                                            "city" : s["city"],
+                                            "ip" : ip,
+                                            "country" : country,
+                                            "tunnel" : "OpenVPN"
+                                            }
+
+                    crt_url = s["openvpn-ca"]
+                    crt_file = "{}/{}.crt".format(self.temp_path, name)
+                    crt = requests.get(crt_url, timeout=2).content.decode("utf-8")
+                    with open(crt_file, "w") as c:
+                        c.write(crt)
+
+                    tls_url = s["openvpn-tls-key"]
+                    tls_file = "{}/{}.key".format(self.temp_path, name)
+                    tls = requests.get(tls_url, timeout=2).content.decode("utf-8")
+                    with open(tls_file, "w") as t:
+                        t.write(tls)
+
+                else:
+                    self.log.emit(("Error: Could not resolve {} - skipping".format(hostname)))
+
+                try:
+                    wg_file = "{}.conf".format(wg_name)
+                    wg_api_url = s["endpoints"]["wireguard"]
+                    wg_keys = self.gen_wg_key(wg_file)
+
+                    if wg_keys is not None:
+                        data = {
+                                'username' : str(self.username),
+                                'password' : str(self.password),
+                                'pubkey' : wg_keys[1]
+                                }
+
+                        pub_up = requests.post(wg_api_url, data=data, timeout=5)
+                        if pub_up.status_code == 200:
+                            api_resp = json.loads(pub_up.content.decode("utf-8"))
+
+                            if api_resp["status"] != "error":
+                                wg_ip = resolve(api_resp["data"]["Endpoint"].split(":")[0])[0]
+                                wg_conf = [
+                                                "[Interface]\n",
+                                                "PrivateKey = {}\n".format(wg_keys[0]),
+                                                "Address = {}\n".format(api_resp["data"]["Address"]),
+                                                "DNS = {}\n".format(api_resp["data"]["DNS"]),
+                                                "\n",
+                                                "[Peer]\n",
+                                                "PublicKey = {}\n".format(api_resp["data"]["PublicKey"]),
+                                                "Endpoint = {}:51820\n".format(wg_ip),
+                                                "AllowedIPs = 0.0.0.0/0, ::/0\n"
+                                                ]
+
+                                self.az_servers[wg_name] = {
+                                                "name": wg_name,
+                                                "provider" : self.provider,
+                                                "city" : s["city"],
+                                                "ip" : wg_ip,
+                                                "country" : country,
+                                                "tunnel" : "WireGuard",
+                                                "path" : "{}/{}.conf".format(self.provider, wg_name)
+                                                }
+
+                                with open("{}/{}".format(self.temp_path, wg_file), "w") as wg:
+                                    wg.writelines(wg_conf)
+
+                        else:
+                            m = "AzireVPN: Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
+                            self.log.emit(("error", m))
+                            self.remove_temp_dir(self.provider)
+                            self.failed.emit(m)
+
+                except (CalledProcessError, FileNotFoundError) as e:
+                    self.log.emit(("info", "WireGuard is not installed/not found - skipping"))
+
+        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+            self.log.emit(("debug", e))
+            self.log.emit(("info", "Network error: Uploading WireGuard public key failed"))
+
+        except Exception as e:
+            self.log.emit(("debug", e))
+            self.log.emit(("error", "An unexpected error occured: Aborting"))
+            self.remove_temp_dir(self.provider)
+            self.failed.emit("AzireVPN import failed&An unknown error occured&{}".format(self.provider))
+
+        else:
+            az_protocols = {
+                            "protocol_1" : {"protocol": "UDP", "port": "1194"},
+                            "protocol_2" : {"protocol": "TCP", "port": "1194"},
+                            "protocol_3" : {"protocol": "UDP", "port": "443"},
+                            "protocol_4" : {"protocol": "TCP", "port": "443"}
+                            }
+
+            azire_dict = {
+                            "server" : self.az_servers,
+                            "protocol" : az_protocols,
+                            "provider" : "AzireVPN"
+                            }
+
+            self.copy_certs(self.provider)
+            self.finished.emit(azire_dict)
+
     def add_folder(self):
         self.conf_files = [f for f in os.listdir(self.folderpath) if f.endswith('.ovpn') or f.endswith('.conf')]
         self.cert_files = [f for f in os.listdir(self.folderpath) if f.endswith('.ovpn') or f.endswith('.conf')]
@@ -796,7 +932,7 @@ class AddServers(QtCore.QThread):
 
                             else:
                                 server = line.split(" ")[1]
-                                ip = resolve(server)
+                                ip = resolve(server)[0]
 
                                 if ip != "Failed to resolve":
                                     modify[index] = "remote {} {}\n".format(ip, port)
@@ -837,7 +973,7 @@ class AddServers(QtCore.QThread):
                             ip = result.group()
 
                         else:
-                            ip = resolve(server)
+                            ip = resolve(server)[0]
                             if ip != "Failed to resolve":
                                 modify[index] = "Endpoint = {}:{}\n".format(ip, port)
 
@@ -883,134 +1019,6 @@ class AddServers(QtCore.QThread):
         self.copy_certs(self.provider)
         self.finished.emit(custom_dict)
 
-    def azirevpn(self):
-        self.az_servers = {}
-
-        try:
-
-            try:
-                self.log.emit(("info", "Downloading AzireVPN OpenVPN configs"))
-                az_api_url = "https://api.azirevpn.com/v1/locations"
-                az_servers = json.loads(requests.get(az_api_url, timeout=2).content.decode("utf-8"))
-
-            except requests.exceptions.RequestException as e:
-                az_servers = {"locations" : []}
-                self.log.emit(("error", "Network error: Unable to retrieve data from api.azirevpn.com"))
-                self.remove_temp_dir(self.provider)
-                self.failed.emit("Network error&No internet connection&{}".format(self.provider))
-
-            for s in az_servers["locations"]:
-                name = s["name"] + "-openvpn" + "-azirevpn"
-                wg_name = s["name"] + "-wireguard" + "-azirevpn"
-                country = country_translate(s["iso"])
-                hostname = s["endpoints"]["openvpn"][0]["hostname"]
-                ip = resolve(hostname)
-                self.log.emit(("info", "Importing {}".format(name)))
-
-                if ip != "Failed to resolve":
-                    self.az_servers[name] = {
-                                            "name": name,
-                                            "provider" : self.provider,
-                                            "city" : s["city"],
-                                            "ip" : ip,
-                                            "country" : country,
-                                            "tunnel" : "OpenVPN"
-                                            }
-
-                    crt_url = s["openvpn-ca"]
-                    crt_file = "{}/{}.crt".format(self.temp_path, name)
-                    crt = requests.get(crt_url, timeout=2).content.decode("utf-8")
-                    with open(crt_file, "w") as c:
-                        c.write(crt)
-
-                    tls_url = s["openvpn-tls-key"]
-                    tls_file = "{}/{}.key".format(self.temp_path, name)
-                    tls = requests.get(tls_url, timeout=2).content.decode("utf-8")
-                    with open(tls_file, "w") as t:
-                        t.write(tls)
-
-                else:
-                    self.log.emit(("Error: Could not resolve {} - skipping".format(hostname)))
-
-                try:
-                    wg_file = "{}/{}.conf".format(self.temp_path, wg_name)
-                    wg_api_url = s["endpoints"]["wireguard"]
-                    wg_keys = self.gen_wg_key(wg_file)
-
-                    if wg_keys is not None or self.update == "1":
-                        data = {
-                                'username' : str(self.username),
-                                'password' : str(self.password),
-                                'pubkey' : wg_keys[1]
-                                }
-
-                        pub_up = requests.post(wg_api_url, data=data, timeout=5)
-                        if pub_up.status_code == 200:
-                            api_resp = json.loads(pub_up.content.decode("utf-8"))
-
-                            if api_resp["status"] != "error":
-                                wg_ip = resolve(api_resp["data"]["Endpoint"].split(":")[0])
-                                wg_conf = [
-                                                "[Interface]\n",
-                                                "PrivateKey = {}\n".format(wg_keys[0]),
-                                                "Address = {}\n".format(api_resp["data"]["Address"]),
-                                                "DNS = {}\n".format(api_resp["data"]["DNS"]),
-                                                "\n",
-                                                "[Peer]\n",
-                                                "PublicKey = {}\n".format(api_resp["data"]["PublicKey"]),
-                                                "Endpoint = {}:51820\n".format(wg_ip),
-                                                "AllowedIPs = 0.0.0.0/0, ::/0\n"
-                                                ]
-
-                                self.az_servers[wg_name] = {
-                                                "name": wg_name,
-                                                "provider" : self.provider,
-                                                "city" : s["city"],
-                                                "ip" : wg_ip,
-                                                "country" : country,
-                                                "tunnel" : "WireGuard",
-                                                "path" : "{}/{}.conf".format(self.provider, wg_name)
-                                                }
-
-                                with open(wg_file, "w") as wg:
-                                    wg.writelines(wg_conf)
-
-                        else:
-                            m = "AzireVPN: Authentication failed&Perhaps the credentials you entered are wrong&{}".format(self.provider)
-                            self.log.emit(("error", m))
-                            self.remove_temp_dir(self.provider)
-                            self.failed.emit(m)
-
-                except (CalledProcessError, FileNotFoundError) as e:
-                    self.log.emit(("info", "WireGuard is not installed/not found - skipping"))
-
-                except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-                    self.log.emit(("debug", e))
-                    self.log.emit(("info", "Network error: Uploading WireGuard public key failed"))
-
-        except Exception as e:
-            self.log.emit(("debug", e))
-            self.log.emit(("error", "An unexpected error occured: Aborting"))
-            self.remove_temp_dir(self.provider)
-            self.failed.emit("AzireVPN import failed&An unknown error occured&{}".format(self.provider))
-
-        else:
-            az_protocols = {
-                            "protocol_1" : {"protocol": "UDP", "port": "1194"},
-                            "protocol_2" : {"protocol": "TCP", "port": "1194"},
-                            "protocol_3" : {"protocol": "UDP", "port": "443"},
-                            "protocol_4" : {"protocol": "TCP", "port": "443"}
-                            }
-
-            azire_dict = {
-                            "server" : self.az_servers,
-                            "protocol" : az_protocols,
-                            "provider" : "AzireVPN"
-                            }
-            
-            self.copy_certs(self.provider)
-            self.finished.emit(azire_dict)
-
     def sanity_check(self, path):
         unrelated_files = 0
 
@@ -1029,7 +1037,7 @@ class AddServers(QtCore.QThread):
 
     def gen_wg_key(self, config):
         #check if key already exists
-        if os.path.exists(config):
+        if os.path.exists("{}/{}/{}".format(ROOTDIR, self.provider, config)) and self.update == "0":
             self.log.emit(("debug", "WireGuard keys for {} have already been generated".format(config.split("/")[-1])))
             wg_keys = None
 
@@ -1047,7 +1055,19 @@ class AddServers(QtCore.QThread):
 
         return wg_keys
 
+    def allow_ip(self, hosts):
+        for host in hosts:
+            self.log.emit(("info", "Creating temporary rule to access {}".format(host)))
+            ips = resolve(host)
+            for i in ips:
+                if i != "" and i != "Failed to resolve":
+                    firewall.allow_dest_ip(i, "-I")
+                    ALLOWED_IPS.append(i)
+
     def copy_certs(self, provider):
+        for i in ALLOWED_IPS:
+            firewall.allow_dest_ip(i, "-D")
+
         provider_dir = "{}/{}".format(ROOTDIR, provider)
         if not os.path.exists(provider_dir):
             os.makedirs(provider_dir)
@@ -1069,7 +1089,7 @@ class AddServers(QtCore.QThread):
                 if not os.path.exists(openvpn_dest_conf):
                     shutil.copyfile(openvpn_orig_conf, openvpn_dest_conf)
                     Popen(['chmod', '0655', openvpn_dest_conf])
-            
+
             except FileNotFoundError:
                 self.log.emit(("error", "{} does not exist".format(openvpn_orig_conf)))
 
@@ -1117,12 +1137,13 @@ def resolve(host):
     try:
         dig_cmd = ["dig", "+time=2", "+tries=2", "{}".format(host), "+short"]
         ip = check_output(dig_cmd).decode("utf-8")
-        ip = ip.split("\n")[0]
+        ip = ip.split("\n")
 
     except (FileNotFoundError, CalledProcessError):
-        ip = "Failed to resolve"
+        ip = ["Failed to resolve"]
 
     return ip
+
 
 class UpdateCheck(QtCore.QThread):
     release_found = QtCore.pyqtSignal(str)

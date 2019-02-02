@@ -266,7 +266,9 @@ class QomuiDbus(dbus.service.Object):
             except CalledProcessError:
                 self.logger.debug("OS: process {} does not exist anymore".format(i))
 
+    #OBSOLETE - moved to update.py
     #allow downloading from provider api/site even if firewall is activated and no connection is active
+    """
     def allow_provider_ip(self, provider):
         server = []
 
@@ -302,6 +304,7 @@ class QomuiDbus(dbus.service.Object):
 
                 except CalledProcessError as e:
                     self.logger.error("{}: Could not resolve {}".format(e, s))
+    """
 
     #save and restore content of /etc/resolv.conf
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
@@ -336,8 +339,6 @@ class QomuiDbus(dbus.service.Object):
     def import_thread(self, credentials):
         provider = credentials["provider"]
         self.homedir = credentials["homedir"]
-        self.allow_provider_ip(provider)
-
         try:
             if credentials["credentials"] == "unknown":
 

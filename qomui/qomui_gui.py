@@ -692,7 +692,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout_10.addWidget(self.delBypassAppBt)
         self.verticalLayout_8.addLayout(self.horizontalLayout_10)
         self.tabWidget.addWidget(self.bypassTab)
-
+        
         self.aboutTab = QtWidgets.QWidget()
         self.aboutTab.setObjectName(_fromUtf8("aboutTab"))
         self.tabWidget.addWidget(self.aboutTab)
