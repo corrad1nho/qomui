@@ -124,6 +124,7 @@ Qomui has been my first ever programming experience and a practical challenge fo
 - [bugfix] compatibility with older Qt5 versions 
 - [bugfix] previous iptables rules not always restored
 - [bugfix] crashes if ipv6 stack not available
+- [bugfix] OpenVPN config changes overwritten on update
 
 #### version 0.8.1:
 - [change] option to restart qomui-service from gui if it crashes
