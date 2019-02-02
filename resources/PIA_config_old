@@ -1,0 +1,20 @@
+client
+dev tun
+proto 
+remote 
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+cipher aes-256-cbc
+auth sha256
+tls-client
+remote-cert-tls server
+auth-user-pass /usr/share/qomui/PIA/PIA-auth.txt
+comp-lzo no
+verb 3
+reneg-sec 0
+crl-verify /usr/share/qomui/certs/pia_crl.rsa.4096.pem
+ca /usr/share/qomui/certs/pia_ca.rsa.4096.crt
+disable-occ
+

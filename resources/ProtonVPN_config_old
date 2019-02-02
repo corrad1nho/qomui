@@ -1,0 +1,24 @@
+client
+dev tun
+proto 
+remote 
+resolv-retry infinite
+nobind
+cipher AES-256-CBC
+auth SHA512
+comp-lzo
+verb 3
+tun-mtu 1500
+tun-mtu-extra 32
+mssfix 1450
+persist-key
+persist-tun
+reneg-sec 0
+remote-cert-tls server
+pull
+fast-io
+key-direction 1
+
+auth-user-pass /usr/share/qomui/certs/ProtonVPN-auth.txt
+ca /usr/share/qomui/certs/proton_ca.crt
+tls-auth /usr/share/qomui/certs/proton_ta.key

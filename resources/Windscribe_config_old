@@ -1,0 +1,23 @@
+client
+dev tun
+proto 
+remote 
+nobind
+resolv-retry infinite
+auth SHA512
+auth-nocache
+cipher AES-256-GCM
+ncp-ciphers AES-256-GCM:AES-256-CBC:AES-128-GCM
+comp-lzo
+verb 3
+mute-replay-warnings
+remote-cert-tls server
+persist-key
+persist-tun
+key-direction 1
+
+auth-user-pass /usr/share/qomui/certs/Windscribe-auth.txt
+ca /usr/share/qomui/certs/ca_ws.crt
+tls-auth /usr/share/qomui/certs/ta_ws.key
+
+

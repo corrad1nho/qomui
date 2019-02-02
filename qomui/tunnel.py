@@ -100,7 +100,7 @@ class TunnelThread(QtCore.QThread):
                         elif value.startswith("accept") is True:
                             ssl_config[line] = "accept = 127.0.0.1:{}\n".format(self.air_ssl_port)
                     ssl_config.append("verify = 3\n")
-                    ssl_config.append("CAfile = /usr/share/qomui/certs/stunnel.crt")
+                    ssl_config.append("CAfile = /usr/share/qomui/Airvpn/stunnel.crt")
                     with open("{}/temp.ssl".format(ROOTDIR), "w") as ssl_dump:
                         ssl_dump.writelines(ssl_config)
                         ssl_dump.close()
@@ -210,7 +210,7 @@ class TunnelThread(QtCore.QThread):
                 ovpn_file = "{}/{}/openvpn.conf".format(ROOTDIR, provider)
             else:
                 #Ensure compatibility with older versions
-                ovpn_file = "{}/{}_config".format(ROOTDIR, provider)
+                ovpn_file = "{}/{}_config_old".format(ROOTDIR, provider)
                 compat = 0
         else:
             ovpn_file = path
@@ -268,14 +268,14 @@ class TunnelThread(QtCore.QThread):
                 try:
 
                     if ovpn_dict["tlscrypt"] == "on":
-                        config.append("tls-crypt {}/certs/tls-crypt.key \n".format(ROOTDIR))
+                        config.append("tls-crypt {}/Airvpn/tls-crypt.key \n".format(ROOTDIR))
                         config.append("auth sha512")
 
                     else:
-                        config.append("tls-auth {}/certs/ta.key 1 \n".format(ROOTDIR))
+                        config.append("tls-auth {}/Airvpn/ta.key 1 \n".format(ROOTDIR))
 
                 except KeyError:
-                    config.append("tls-auth {}/certs/ta.key 1 \n".format(ROOTDIR))
+                    config.append("tls-auth {}/Airvpn/ta.key 1 \n".format(ROOTDIR))
 
             elif provider == "AzireVPN":
                 ca = "ca {}/{}/{}.crt\n".format(ROOTDIR, provider, ovpn_dict["name"])
@@ -543,7 +543,7 @@ class TunnelThread(QtCore.QThread):
 
     #using pexpect instead of subprocess to accept SHA fingerprint
     def ssh(self, ip, port):
-        cmd_ssh = "ssh -i {}/certs/sshtunnel.key -L 1412:127.0.0.1:2018 sshtunnel@{} -p {} -N -T -v".format(ROOTDIR, ip, port)
+        cmd_ssh = "ssh -i {}/Airvpn/sshtunnel.key -L 1412:127.0.0.1:2018 sshtunnel@{} -p {} -N -T -v".format(ROOTDIR, ip, port)
         ssh_exe = pexpect.spawn(cmd_ssh)
         ssh_newkey = b'Are you sure you want to continue connecting'
         ssh_success = 'Forced command'
