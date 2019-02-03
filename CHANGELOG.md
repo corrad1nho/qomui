@@ -1,5 +1,29 @@
 ## Changelog
 
+version 0.8.2:
+- [new] added AzireVPN
+- [new] option to specify key for Airvpn
+- [change] fast/random option added to profiles
+- [change] order of latency checks now based on previous results
+- [change] tidied up directory structure
+- [change] checks if ipv6 is available
+- [change] auto-updates for different providers won't run concurrently
+- [change] check if IPv6 is available before setting iptables rules
+- [change] don't generate new WireGuard keys on auto-update
+- [change] allow importing new servers if firewall is active but VPN is not
+- [bugfix] firewall not deactivating after gui exit (if the respective option is set)
+- [bugfix] detection of service crashes is not reliable
+- [bugfix] Windscribe auto-update fails because of authentication error
+- [bugfix] compatibility with older Qt5 versions 
+- [bugfix] previous iptables rules not always restored
+- [bugfix] crashes if ipv6 stack not available
+- [bugfix] OpenVPN config changes overwritten on update
+- [bugfix] Debian packages remove /usr/share/qomui directory on update
+
+##### Additional notes:
+- Re-importing config files from supported providers is strongly recommended as they are now saved in a different location. 
+- If you are using Debian/Ubuntu packages Qomui must be removed (sudo apt purge qomui) and then installed again due to a bug in the postrm script. 
+
 version 0.8.1:
 - [change] option to restart qomui-service from gui if it crashes
 - [change] added exceptions for all DBus calls

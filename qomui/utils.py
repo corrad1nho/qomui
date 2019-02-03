@@ -5,7 +5,7 @@ import grp
 import getpass
 import pwd
 
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
 
 def get_user_group():
     username = getpass.getuser()

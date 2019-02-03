@@ -45,12 +45,9 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None)
             rt_tables.write("11 bypass_qomui\n")
         logging.debug("Bypass: Created new routing table")
 
-    for rule in cgroup_iptables:
-        firewall.add_rule(rule)
-
+    firewall.batch_rule(cgroup_iptables)
     if gw_6 != "None" and default_int == interface:
-        for rule in cgroup_iptables:
-            firewall.add_rule_6(rule)
+        firewall.batch_rule_6(cgroup_iptables)
 
     else:
         logging.debug("Blocking ipv6 via bypass_qomui")
@@ -61,9 +58,7 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None)
         cgroup_iptables.insert(2, ["-I", "OUTPUT", "1", "-m", "cgroup", "--cgroup", "0x00110011", "-j", "DROP"])
         cgroup_iptables.pop(3)
         cgroup_iptables.insert(3, ["-I", "INPUT", "1", "-m", "cgroup", "--cgroup", "0x00110011", "-j", "DROP"])
-
-        for rule in cgroup_iptables:
-            firewall.add_rule_6(rule)
+        firewall.batch_rule_6(cgroup_iptables)
 
     try:
         check_call(["ip", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
@@ -126,11 +121,8 @@ def delete_cgroup(interface):
     except CalledProcessError:
         pass
 
-    for rule in cgroup_iptables_del:
-        firewall.add_rule(rule)
-
-    for rule in cgroup_iptables_del:
-        firewall.add_rule_6(rule)
+    firewall.batch_rule(cgroup_iptables_del)
+    firewall.batch_rule_6(cgroup_iptables_del)
 
     try:
         os.rmdir(cgroup_path)
@@ -152,8 +144,7 @@ def set_bypass_vpn(interface, interface_cmd, tun, tun_cmd):
                     "-o", interface, "-j", "MASQUERADE"
                     ]]
 
-    for rule in postroutes:
-        firewall.add_rule(rule)
-        firewall.add_rule_6(rule)
+    firewall.batch_rule(postroutes)
+    firewall.batch_rule_6(postroutes)
 
 

@@ -11,6 +11,7 @@ import psutil
 import configparser
 import requests
 import shlex
+import logging
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 from qomui import update
@@ -31,7 +32,7 @@ except AttributeError:
 
 ROOTDIR = "/usr/share/qomui"
 HOMEDIR = "{}/.qomui".format(os.path.expanduser("~"))
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 
 class favouriteButton(QtWidgets.QAbstractButton):
     def __init__(self, parent=None):
@@ -610,7 +611,7 @@ class TunnelMon(QtCore.QThread):
             time_measure = time.time()
             elapsed = time_measure - start_time
 
-            if int(elapsed) % 3600 == 0:
+            if int(elapsed) % 900 == 0:
                 self.check.emit()
 
             return_time = self.time_format(int(elapsed))
@@ -864,14 +865,17 @@ class AppSelector(QtWidgets.QDialog):
                             else:
                                 name = c["Desktop Entry"]["Name"]
                                 icon = c["Desktop Entry"]["Icon"]
+                                logging.debug("Adding {} to bypass app list".format(name))
                                 self.bypassAppList.append((name, icon, desktop_file))
 
                         except KeyError:
                             name = c["Desktop Entry"]["Name"]
                             icon = c["Desktop Entry"]["Icon"]
+                            logging.debug("Adding {} to bypass app list".format(name))
                             self.bypassAppList.append((name, icon, desktop_file))
-            except:
-                pass
+            except Exception as e:
+                logging.error(e)
+                logging.error("Failed to add {} to bypass app list".format(name))
 
         self.bypassAppList = sorted(self.bypassAppList)
         self.pop_AppList()
@@ -997,7 +1001,7 @@ class ModifyServer(QtWidgets.QDialog):
 
     def display_config(self):
         if self.provider in SUPPORTED_PROVIDERS:
-            config = "{}/{}_config".format(ROOTDIR, self.provider)
+            config = "{}/{}/openvpn.conf".format(ROOTDIR, self.provider)
 
         else:
             config = "{}/{}".format(ROOTDIR, self.server_info["path"])
@@ -1074,3 +1078,4 @@ class ModifyServer(QtWidgets.QDialog):
 
         self.modified.emit(change_dict)
         self.hide()
+

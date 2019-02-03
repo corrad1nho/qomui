@@ -5,7 +5,8 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.8.1"
+VERSION = "0.8.2"
+
 data_files = [
         ('/usr/share/qomui', ['resources/countries.json']),
         ('/usr/share/applications/', ['resources/qomui.desktop']),
@@ -15,23 +16,31 @@ data_files = [
         ('/usr/share/icons/hicolor/scalable/apps/', ['resources/qomui.svg',
                                                      'resources/qomui_off.svg']),
         ('/usr/share/qomui/', [
+                                'resources/AzireVPN_config',
                                 'resources/Airvpn_config',
                                 'resources/PIA_config',
                                 'resources/ProtonVPN_config',
                                 'resources/Windscribe_config',
+                                'resources/Airvpn_config_old',
+                                'resources/Mullvad_config',
+                                'resources/Mullvad_config_old',
+                                'resources/PIA_config_old',
+                                'resources/ProtonVPN_config_old',
+                                'resources/Windscribe_config_old',
                                 'resources/default_config.json',
                                 'resources/firewall_default.json',
-                                'resources/Mullvad_config',
                                 'resources/ssl_config',
                                 'resources/qomui.png',
-                                'resources/hop.sh',
-                                'resources/hop_down.sh',
-                                'resources/bypass_up.sh',
-                                'resources/bypass_route.sh',
                                 'resources/airvpn_api.pem',
                                 'resources/airvpn_cacert.pem',
                                 'VERSION']
                             ),
+        ('/usr/share/qomui/scripts/', [
+                                        'scripts/hop.sh',
+                                        'scripts/hop_down.sh',
+                                        'scripts/bypass_up.sh',
+                                        'scripts/bypass_route.sh'
+                                       ]),
         ('/usr/share/qomui/flags/', glob.glob('resources/flags/*'))
         ]
 

@@ -24,10 +24,11 @@ from dbus.mainloop.pyqt5 import DBusQtMainLoop
 from qomui import firewall, bypass, update, dns_manager, tunnel
 
 ROOTDIR = "/usr/share/qomui"
+LOGDIR = "/usr/share/qomui/logs"
 OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
 BUS_NAME = "org.qomui.service"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 
 class GuiLogHandler(logging.Handler):
     def __init__(self, send_log, parent=None):
@@ -54,6 +55,10 @@ class QomuiDbus(dbus.service.Object):
     interface = "eth0"
 
     def __init__(self):
+        
+        if not os.path.exists(LOGDIR):
+            os.makedirs(LOGDIR)
+
         self.sys_bus = dbus.SystemBus()
         self.bus_name = dbus.service.BusName(BUS_NAME, bus=self.sys_bus)
         dbus.service.Object.__init__(self, self.bus_name, OPATH)
@@ -61,14 +66,14 @@ class QomuiDbus(dbus.service.Object):
         self.gui_handler = GuiLogHandler(self.send_log)
         self.gui_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(self.gui_handler)
-        self.filehandler = logging.handlers.RotatingFileHandler("{}/qomui.log".format(ROOTDIR),
-                                                       maxBytes=2*1024*1024, backupCount=1)
+        self.filehandler = logging.handlers.RotatingFileHandler("{}/qomui.log".format(LOGDIR),
+                                                       maxBytes=2*1024*1024, backupCount=3)
         self.logger.addHandler(self.filehandler)
         self.filehandler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.setLevel(logging.DEBUG)
         self.logger.info("Dbus-service successfully initialized")
-        
-        #Clean slate after (re-)starting 
+
+        #Clean slate after (re-)starting
         try:
             check_call(["killall", "openvpn"])
             self.logger.debug("Killed all running instances of OpenVPN")
@@ -149,7 +154,7 @@ class QomuiDbus(dbus.service.Object):
 
     #get fw configuration - might be called from gui after config change
     @dbus.service.method(BUS_NAME, in_signature='i', out_signature='')
-    def load_firewall(self, activate):
+    def load_firewall(self, stage):
         try:
             with open('{}/config.json'.format(ROOTDIR), 'r') as c:
                 self.config = json.load(c)
@@ -161,55 +166,34 @@ class QomuiDbus(dbus.service.Object):
 
         try:
             self.logger.setLevel(self.config["log_level"].upper())
-
-        except KeyError:
-            pass
-
-        try:
-            if self.config["fw_gui_only"] == 0:
-                activate = 1
-
-        except KeyError:
-            activate = 1
-
-        try:
-            if self.config["preserve_rules"] == 1:
-                preserve = 1
-            else:
-                preserve = 0
-
-        except KeyError:
-            preserve = 0
-
-        try:
-            if self.config["block_lan"] == 1:
-                block_lan = 1
-            else:
-                block_lan = 0
-
-        except KeyError:
-            block_lan = 0
-
-        try:
-            if activate == 1:
-                firewall.save_iptables()
-                firewall.apply_rules(self.config["firewall"], block_lan=block_lan, preserve=preserve)
-
-            elif activate == 2:
-                if self.config["fw_gui_only"] == 1:
-                    firewall.restore_iptables()
-                    firewall.apply_rules(0, block_lan=0, preserve=preserve)
-
-                    try:
-                        bypass.delete_cgroup(self.default_interface_4, self.default_interface_6)
-
-                    except AttributeError:
-                        pass
-
             self.disable_ipv6(self.config["ipv6_disable"])
+            fw = self.config["firewall"]
+            gui_only = self.config["fw_gui_only"]
+            block_lan=self.config["block_lan"]
+            preserve=self.config["preserve_rules"] 
 
+            if fw == 1 and gui_only == 0:
+                opt = 1
+            elif gui_only == 1 and stage == 1:
+                firewall.save_iptables()
+                opt = fw
+            elif gui_only == 1 and stage == 2:
+                firewall.restore_iptables()
+                opt = 2
+            elif fw == 0 and stage == 1:
+                opt = 0
+                firewall.restore_iptables()
+            else:
+                opt = 2
+
+            if opt < 2:
+                firewall.apply_rules(
+                                    opt,
+                                    block_lan=block_lan, 
+                                    preserve=preserve
+                                    )
         except KeyError:
-            self.logger.warning('Could not read all values from config file')
+            self.logger.warning('Malformed config file')
 
         #default dns is always set to the alternative servers
         self.dns = self.config["alt_dns1"]
@@ -262,13 +246,9 @@ class QomuiDbus(dbus.service.Object):
                     ["-D", "INPUT", "-i", "wg_qomui", "-j", "ACCEPT"],
                     ["-D", "OUTPUT", "-o", "wg_qomui", "-j", "ACCEPT"]
                     ]
-
-                for rule in wg_rules:
-                    firewall.add_rule_6(rule)
-                    firewall.add_rule(rule)
-
+                firewall.batch_rule_6(wg_rules)
+                firewall.batch_rule(wg_rules)
                 tunnel.exe_custom_scripts("down", self.wg_provider, self.config)
-
                 self.wg_connect = 0
 
         elif env == "bypass":
@@ -286,7 +266,9 @@ class QomuiDbus(dbus.service.Object):
             except CalledProcessError:
                 self.logger.debug("OS: process {} does not exist anymore".format(i))
 
+    #OBSOLETE - moved to update.py
     #allow downloading from provider api/site even if firewall is activated and no connection is active
+    """
     def allow_provider_ip(self, provider):
         server = []
 
@@ -322,6 +304,7 @@ class QomuiDbus(dbus.service.Object):
 
                 except CalledProcessError as e:
                     self.logger.error("{}: Could not resolve {}".format(e, s))
+    """
 
     #save and restore content of /etc/resolv.conf
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
@@ -345,7 +328,7 @@ class QomuiDbus(dbus.service.Object):
             f_source = "{}/{}".format(certpath, f)
 
             if provider in SUPPORTED_PROVIDERS:
-                f_dest = "{}/{}".format(ROOTDIR, f)
+                f_dest = "{}/{}/openvpn.conf".format(ROOTDIR, provider)
             else:
                 f_dest = "{}/{}/{}".format(ROOTDIR, provider, f)
 
@@ -356,13 +339,11 @@ class QomuiDbus(dbus.service.Object):
     def import_thread(self, credentials):
         provider = credentials["provider"]
         self.homedir = credentials["homedir"]
-        self.allow_provider_ip(provider)
-
         try:
             if credentials["credentials"] == "unknown":
 
                 try:
-                    auth_file = "{}/certs/{}-auth.txt".format(ROOTDIR, provider)
+                    auth_file = "{}/{}/{}-auth.txt".format(ROOTDIR, provider, provider)
 
                     with open(auth_file, "r") as auth:
                         up = auth.read().split("\n")
@@ -371,6 +352,9 @@ class QomuiDbus(dbus.service.Object):
 
                 except FileNotFoundError:
                     self.logger.error("Could not find {} - Aborting update".format(auth_file))
+
+                if provider == "Airvpn":
+                    credentials["key"] = self.config["airvpn_key"]
 
         except KeyError:
             pass
@@ -403,6 +387,8 @@ class QomuiDbus(dbus.service.Object):
         if provider in SUPPORTED_PROVIDERS:
             with open('{}/config.json'.format(ROOTDIR), 'w') as save_config:
                 self.config["{}_last".format(provider)] = str(datetime.utcnow())
+                if provider == "Airvpn":
+                    self.config["airvpn_key"] = content["airvpn_key"]
                 json.dump(self.config, save_config)
 
         with open('{}/{}.json'.format(self.homedir, provider), 'w') as p:

@@ -12,7 +12,6 @@ cipher AES-256-CBC
 comp-lzo no
 auth-nocache
 verb 3
-ca /usr/share/qomui/Airvpn/ca.crt
-cert /usr/share/qomui/Airvpn/user.crt
-key /usr/share/qomui/Airvpn/user.key
-
+ca /usr/share/qomui/certs/ca.crt
+cert /usr/share/qomui/certs/user.crt
+key /usr/share/qomui/certs/user.key

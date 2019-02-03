@@ -38,7 +38,7 @@ except AttributeError:
 
 ROOTDIR = "/usr/share/qomui"
 HOMEDIR = "{}/.qomui".format(os.path.expanduser("~"))
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 JSON_FILE_LIST = [("config_dict", "{}/config.json".format(ROOTDIR)),
                   ("server_dict", "{}/server.json".format(HOMEDIR)),
                   ("protocol_dict", "{}/protocol.json".format(HOMEDIR)),
@@ -74,6 +74,7 @@ class QomuiGui(QtWidgets.QWidget):
     bypass_dict = {}
     config_dict = {}
     packetmanager = None
+    queue = []
     tunnel_list = ["OpenVPN", "WireGuard"]
     config_list = [
                    "firewall",
@@ -86,7 +87,7 @@ class QomuiGui(QtWidgets.QWidget):
                    "auto_update"
                    ]
 
-    routes = {       
+    routes = {
             "gateway" : "None",
             "gateway_6" : "None",
             "interface" : "None",
@@ -104,7 +105,6 @@ class QomuiGui(QtWidgets.QWidget):
 
         try:
             self.qomui_dbus = self.dbus.get_object('org.qomui.service', '/org/qomui/service')
-            self.logger.debug('Successfully connected to qomui-service via DBus')
 
         except dbus.exceptions.DBusException:
             self.logger.error('DBus Error: Qomui-Service is currently not available')
@@ -139,13 +139,13 @@ class QomuiGui(QtWidgets.QWidget):
                                       600, 750
                                       ))
 
+        self.logger.debug('Successfully connected to qomui-service via DBus')
         self.dbus_call("disconnect", "main")
         self.dbus_call("disconnect", "bypass")
         self.dbus_call("save_default_dns")
         self.check_other_instance()
         self.load_saved_files()
         self.systemtray()
-
         self.net_mon_thread = monitor.NetMon()
         self.net_mon_thread.log.connect(self.log_from_thread)
         self.net_mon_thread.net_state_change.connect(self.network_change)
@@ -170,34 +170,43 @@ class QomuiGui(QtWidgets.QWidget):
             return call
 
         except dbus.exceptions.DBusException as e:
+            print(e)
+            if e.get_dbus_name() == "org.freedesktop.DBus.Error.ServiceUnknown":
+                self.notify("Qomui: Dbus Error", "No reply from qomui-service. It may have crashed.", icon="Warning")
+                ret = self.messageBox(
+                                    "Error: Qomui-service is not available",
+                                    "Do you want restart it or quit Qomui?",
+                                    buttons = [
+                                                ("Quit", "NoRole"),
+                                                ("Restart", "YesRole")
+                                                ],
+                                    icon = "Question"
+                                    )
+
+                if ret == 0:
+                    sys.exit(1)
+
+                elif ret == 1:
+                    self.initialize_service("restart")
+                    time.sleep(3)
+
+                    try:
+                        if self.config_dict["bypass"] == 1:
+                            self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
+
+                    except KeyError:
+                        pass
+
+                    retry = self.dbus_call(cmd, *args)
+                    return retry
+            
+            else:
+                self.logger.error("Dbus Error: {}".format(e))
+                self.notify("Qomui: Dbus Error", "An error occured. See log for details", icon="Warning")
+
+        except Exception as e:
             self.logger.error("Dbus Error: {}".format(e))
-            self.notify("Qomui: Dbus Error", "No reply from qomui-service. It may have crashed.", icon="Warning")
-            ret = self.messageBox(
-                                "Error: Qomui-service is not available",
-                                "Do you want restart it or quit Qomui?",
-                                buttons = [
-                                            ("Quit", "NoRole"),
-                                            ("Restart", "YesRole")
-                                            ],
-                                icon = "Question"
-                                )
-
-            if ret == 0:
-                sys.exit(1)
-
-            elif ret == 1:
-                self.initialize_service("restart")
-                time.sleep(3)
-
-                try:
-                    if self.config_dict["bypass"] == 1:
-                        self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
-                
-                except KeyError:
-                    pass
-                    
-                retry = self.dbus_call(cmd, *args)
-                return retry
+            self.notify("Qomui: Dbus Error", "An unknown error occured. See log for details", icon="Warning")
 
     def initialize_service(self, *args):
         try:
@@ -561,6 +570,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.addProviderPassEdit.setEchoMode(QtWidgets.QLineEdit.Password)
         self.addProviderPassEdit.setObjectName(_fromUtf8("addProviderPassEdit"))
         self.gridLayout_3.addWidget(self.addProviderPassEdit, 1, 0, 1, 2)
+        self.airvpnKeyEdit = QtWidgets.QLineEdit(self.providerTab)
+        self.airvpnKeyEdit.setObjectName(_fromUtf8("airvpnKeyEdit"))
+        self.gridLayout_3.addWidget(self.airvpnKeyEdit, 2, 0, 1, 2)
         self.verticalLayout_30.addLayout(self.gridLayout_3)
         self.delProviderLabel = QtWidgets.QLabel(self.providerTab)
         self.delProviderLabel.setFont(bold_font)
@@ -689,7 +701,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.horizontalLayout_10.addWidget(self.delBypassAppBt)
         self.verticalLayout_8.addLayout(self.horizontalLayout_10)
         self.tabWidget.addWidget(self.bypassTab)
-
+        
         self.aboutTab = QtWidgets.QWidget()
         self.aboutTab.setObjectName(_fromUtf8("aboutTab"))
         self.tabWidget.addWidget(self.aboutTab)
@@ -962,7 +974,7 @@ class QomuiGui(QtWidgets.QWidget):
 
         except (CalledProcessError, FileNotFoundError):
             self.logger.warning("Desktop notifications not available")
-            
+
     def messageBox(self, header, text, buttons=[], icon="Question"):
         box = QtWidgets.QMessageBox(self)
         box.setText(header)
@@ -1083,6 +1095,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.tabWidget.setCurrentIndex(3)
         elif button == "Provider":
             self.tabWidget.setCurrentIndex(4)
+            self.providerChosen()
         elif button == "Bypass":
             self.tabWidget.setCurrentIndex(5)
             self.bypassVpnBox.clear()
@@ -1120,7 +1133,7 @@ class QomuiGui(QtWidgets.QWidget):
 
     def pop_tray_menu(self):
         self.trayMenu.clear()
-        self.visibility_action = QtWidgets.QAction()
+        self.visibility_action = QtWidgets.QAction(self)
         self.visibility_action.setText("Hide")
         self.trayMenu.addAction(self.visibility_action)
         self.trayMenu.addSeparator()
@@ -1149,6 +1162,10 @@ class QomuiGui(QtWidgets.QWidget):
     def shutdown(self):
         self.tray.hide()
         self.kill()
+        self.disconnect_bypass()
+        self.dbus_call("load_firewall", 2)
+        with open ("{}/server.json".format(HOMEDIR), "w") as s:
+            json.dump(self.server_dict, s)
         sys.exit()
 
     def restoreUi(self, reason):
@@ -1186,12 +1203,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.hide()
 
         elif ret == 0:
-            self.tray.hide()
-            self.kill()
-            self.disconnect_bypass()
-            self.dbus_call("load_firewall", 2)
-            with open ("{}/server.json".format(HOMEDIR), "w") as s:
-                json.dump(self.server_dict, s)
+            self.shutdown()
             self.exit_event.accept()
 
     def change_timeout(self):
@@ -1235,12 +1247,12 @@ class QomuiGui(QtWidgets.QWidget):
                         try:
                             if self.ovpn_dict["random"] == "on":
                                 self.choose_random_server()
-                        
+
                         except KeyError:
 
                             if "profile" in self.ovpn_dict.keys():
                                 self.connect_profile(self.ovpn_dict["profile"])
-                            
+
                             else:
                                 self.establish_connection(self.ovpn_dict)
 
@@ -1454,11 +1466,13 @@ class QomuiGui(QtWidgets.QWidget):
                 "Airvpn" : ("Username", "Password"),
                 "PIA" : ("Username", "Password"),
                 "Windscribe" : ("Username", "Password"),
+                "AzireVPN" : ("Username", "Password"),
                 "Mullvad" : ("Account Number", "N.A. - Leave empty"),
                 "ProtonVPN" : ("OpenVPN username", "OpenVPN password")
                 }
 
         if provider in SUPPORTED_PROVIDERS:
+            self.airvpnKeyEdit.setVisible(False)
             self.addProviderEdit.setVisible(False)
             self.addProviderUserEdit.setPlaceholderText(_translate("Form", p_txt[provider][0], None))
             self.addProviderPassEdit.setPlaceholderText(_translate("Form", p_txt[provider][1], None))
@@ -1466,8 +1480,12 @@ class QomuiGui(QtWidgets.QWidget):
                 self.addProviderDownloadBt.setText(_translate("Form", "Update", None))
             else:
                 self.addProviderDownloadBt.setText(_translate("Form", "Download", None))
+            if provider == "Airvpn":
+                self.airvpnKeyEdit.setPlaceholderText(_translate("Form", "Key/Device: Default", None))
+                self.airvpnKeyEdit.setVisible(True)
 
         else:
+            self.airvpnKeyEdit.setVisible(False)
             self.addProviderEdit.setVisible(True)
             self.addProviderEdit.setPlaceholderText(_translate("Form",
                                                                "Specify name of provider",
@@ -1517,8 +1535,15 @@ class QomuiGui(QtWidgets.QWidget):
                             "username" : username,
                             "password" : password,
                             "folderpath" : folderpath,
-                            "homedir" : HOMEDIR
+                            "homedir" : HOMEDIR,
+                            "update" : "1"
                             }
+
+            if provider == "Airvpn":
+                if self.airvpnKeyEdit.text() != "":
+                    credentials["key"] = self.airvpnKeyEdit.text()
+                else:
+                    credentials["key"] = "Default"
 
             self.addProviderUserEdit.setText("")
             self.addProviderPassEdit.setText("")
@@ -1610,7 +1635,7 @@ class QomuiGui(QtWidgets.QWidget):
         getattr(self, "{}_widget".format(number)).connect_profile.connect(self.connect_profile)
         self.verticalLayout_58.insertWidget(0, getattr(self, "{}_widget".format(number)))
         name = self.profile_dict[number]["name"]
- 
+
     def connect_profile(self, p):
         result = None
         profile = self.profile_dict[p]
@@ -1643,6 +1668,32 @@ class QomuiGui(QtWidgets.QWidget):
                     if lat <= fastest:
                         fastest = lat
                         result = s
+
+            elif profile["mode"] == "Fast/Random":
+                l_list = []
+                s_list = []
+                counter = {}
+                max_length = int(len(temp_list) * 0.20)
+                for s in temp_list:
+                    country = self.server_dict[s]["country"]
+                    try:
+                        lat = float(self.server_dict[s]["latency"])
+                    except KeyError:
+                        lat = 1000
+
+                    bisect.insort(l_list, lat)
+                    s_list.insert(l_list.index(lat), (s, country))
+
+                s_list = s_list[:max_length + 1]
+                from collections import Counter
+                occs = [v for k, v in Counter(e[1] for e in s_list).items()]
+                max_occ = sum(occs) / len(occs)
+                for s,c in s_list:
+                    counter[c] = counter.get(c, 0) + 1
+                    if counter[c] <= max_occ:
+                       s_list.remove((s,c))
+
+                result = random.choice(s_list)[0]
 
             elif profile["mode"] == "Random":
                 result = random.choice(temp_list)
@@ -2427,31 +2478,38 @@ class QomuiGui(QtWidgets.QWidget):
 
     def update_check(self):
         QtWidgets.QApplication.restoreOverrideCursor()
-        for provider in SUPPORTED_PROVIDERS:
-            if provider in self.provider_list:
 
-                try:
-                    get_last = self.config_dict["{}_last".format(provider)]
-                    last_update = datetime.strptime(get_last, '%Y-%m-%d %H:%M:%S.%f')
-                    time_now = datetime.utcnow()
-                    delta = time_now.date() - last_update.date()
-                    days_since = delta.days
-                    self.logger.info("Last {} update: {} days ago".format(provider, days_since))
+        if not self.queue:
+            self.queue = [p for p in SUPPORTED_PROVIDERS if p in self.provider_list]
 
-                    if days_since >= 5:
-                        credentials = {
-                                        "provider" : provider,
-                                        "credentials" : "unknown",
-                                        "folderpath" : "None",
-                                        "homedir" : HOMEDIR
-                                        }
+        provider = self.queue[0]
 
-                        if self.config_dict["auto_update"] == 1:
-                            self.logger.info("Updating {}".format(provider))
-                            self.dbus_call("import_thread", credentials)
+        try:
+            get_last = self.config_dict["{}_last".format(provider)]
+            last_update = datetime.strptime(get_last, '%Y-%m-%d %H:%M:%S.%f')
+            time_now = datetime.utcnow()
+            delta = time_now.date() - last_update.date()
+            days_since = delta.days
+            self.logger.info("Last {} update: {} days ago".format(provider, days_since))
 
-                except KeyError:
-                    self.logger.debug("Update timestamp for {} not found".format(provider))
+            if days_since >= 5:
+                credentials = {
+                                "provider" : provider,
+                                "credentials" : "unknown",
+                                "folderpath" : "None",
+                                "homedir" : HOMEDIR,
+                                "update" : "0"
+                                }
+
+                if self.config_dict["auto_update"] == 1:
+                    self.logger.info("Updating {}".format(provider))
+                    self.dbus_call("import_thread", credentials)
+
+        except KeyError:
+            self.logger.debug("Update timestamp for {} not found".format(provider))
+
+        finally:
+            self.queue.remove(provider)
 
     def reconnect(self):
         if self.tunnel_active == 1:

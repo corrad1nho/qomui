@@ -12,7 +12,7 @@ from PyQt5 import QtCore
 from qomui import firewall, dns_manager
 
 ROOTDIR = "/usr/share/qomui"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe", "AzireVPN"]
 
 class TunnelThread(QtCore.QThread):
     log = QtCore.pyqtSignal(tuple)
@@ -52,7 +52,7 @@ class TunnelThread(QtCore.QThread):
         oldmask = os.umask(0o077)
         path = "{}/wg_qomui.conf".format(ROOTDIR)
         if self.server_dict["provider"] == "Mullvad":
-            with open("{}/certs/mullvad_wg.conf".format(ROOTDIR), "r") as wg:
+            with open("{}/Mullvad/mullvad_wg.conf".format(ROOTDIR), "r") as wg:
                 conf = wg.readlines()
                 conf.insert(8, "PublicKey = {}\n".format(self.server_dict["public_key"]))
                 conf.insert(9, "Endpoint = {}:{}\n".format(self.server_dict["ip"], self.server_dict["port"]))
@@ -100,7 +100,7 @@ class TunnelThread(QtCore.QThread):
                         elif value.startswith("accept") is True:
                             ssl_config[line] = "accept = 127.0.0.1:{}\n".format(self.air_ssl_port)
                     ssl_config.append("verify = 3\n")
-                    ssl_config.append("CAfile = /usr/share/qomui/certs/stunnel.crt")
+                    ssl_config.append("CAfile = /usr/share/qomui/Airvpn/stunnel.crt")
                     with open("{}/temp.ssl".format(ROOTDIR), "w") as ssl_dump:
                         ssl_dump.writelines(ssl_config)
                         ssl_dump.close()
@@ -149,6 +149,9 @@ class TunnelThread(QtCore.QThread):
             self.write_config(self.server_dict)
 
         elif provider == "ProtonVPN":
+            self.write_config(self.server_dict)
+
+        elif provider == "AzireVPN":
             self.write_config(self.server_dict)
 
         else:
@@ -200,9 +203,15 @@ class TunnelThread(QtCore.QThread):
         ip = ovpn_dict["ip"]
         port = ovpn_dict["port"]
         protocol = ovpn_dict["protocol"]
+        compat = 1
 
         if path is None:
-            ovpn_file = "{}/{}_config".format(ROOTDIR, provider)
+            if os.path.exists("{}/{}/openvpn.conf".format(ROOTDIR, provider)):
+                ovpn_file = "{}/{}/openvpn.conf".format(ROOTDIR, provider)
+            else:
+                #Ensure compatibility with older versions
+                ovpn_file = "{}/{}_config_old".format(ROOTDIR, provider)
+                compat = 0
         else:
             ovpn_file = path
 
@@ -232,9 +241,9 @@ class TunnelThread(QtCore.QThread):
             if "bypass" in ovpn_dict:
                 edit = "bypass"
                 if ovpn_dict["bypass"] == "1":
-                    config.append("iproute /usr/share/qomui/bypass_route.sh\n")
+                    config.append("iproute {}/scripts/bypass_route.sh\n".format(ROOTDIR))
                     config.append("script-security 2\n")
-                    config.append("route-up /usr/share/qomui/bypass_up.sh\n")
+                    config.append("route-up {}/scripts/bypass_up.sh\n".format(ROOTDIR))
 
             for line, value in enumerate(config):
                 if value.startswith("proto ") is True:
@@ -259,14 +268,26 @@ class TunnelThread(QtCore.QThread):
                 try:
 
                     if ovpn_dict["tlscrypt"] == "on":
-                        config.append("tls-crypt {}/certs/tls-crypt.key \n".format(ROOTDIR))
+                        config.append("tls-crypt {}/Airvpn/tls-crypt.key \n".format(ROOTDIR))
                         config.append("auth sha512")
 
                     else:
-                        config.append("tls-auth {}/certs/ta.key 1 \n".format(ROOTDIR))
+                        config.append("tls-auth {}/Airvpn/ta.key 1 \n".format(ROOTDIR))
 
                 except KeyError:
-                    config.append("tls-auth {}/certs/ta.key 1 \n".format(ROOTDIR))
+                    config.append("tls-auth {}/Airvpn/ta.key 1 \n".format(ROOTDIR))
+
+            elif provider == "AzireVPN":
+                ca = "ca {}/{}/{}.crt\n".format(ROOTDIR, provider, ovpn_dict["name"])
+                tls = "tls-auth {}/{}/{}.key 1\n".format(ROOTDIR, provider, ovpn_dict["name"])
+                config.append(ca)
+                config.append(tls)
+
+            #Ensure compatibility with older versions:
+            if compat == 0:
+                for i, l in enumerate(config):
+                    config[i] = l.replace("{}/".format(provider), "certs/")
+
 
             with open("{}/{}.ovpn".format(ROOTDIR, edit), "w") as ovpn_dump:
                     ovpn_dump.writelines(config)
@@ -287,10 +308,8 @@ class TunnelThread(QtCore.QThread):
                     ["-I", "OUTPUT", "2", "-o", "wg_qomui", "-j", "ACCEPT"]
                     ]
 
-        for rule in wg_rules:
-            firewall.add_rule_6(rule)
-            firewall.add_rule(rule)
-
+        firewall.batch_rule_6(wg_rules)
+        firewall.batch_rule(wg_rules)
         time.sleep(1)
 
         try:
@@ -363,10 +382,12 @@ class TunnelThread(QtCore.QThread):
                         '--config', '{}'.format(ovpn_file),
                         '--route-nopull',
                         '--script-security', '2',
-                        '--up', '/usr/share/qomui/hop.sh -f {} {}'.format(self.hop_dict["ip"],
-                                                                     self.server_dict["ip"]
+                        '--up', '{}/scripts/hop.sh -f {} {}'.format(
+                                                                    ROOTDIR,
+                                                                    self.hop_dict["ip"],
+                                                                    self.server_dict["ip"]
                                                                      ),
-                        '--down', '/usr/share/qomui/hop_down.sh {}'.format(self.hop_dict["ip"])
+                        '--down', '{}/scripts/hop_down.sh {}'.format(ROOTDIR, self.hop_dict["ip"])
                         ]
 
         elif h == "2":
@@ -522,7 +543,7 @@ class TunnelThread(QtCore.QThread):
 
     #using pexpect instead of subprocess to accept SHA fingerprint
     def ssh(self, ip, port):
-        cmd_ssh = "ssh -i {}/certs/sshtunnel.key -L 1412:127.0.0.1:2018 sshtunnel@{} -p {} -N -T -v".format(ROOTDIR, ip, port)
+        cmd_ssh = "ssh -i {}/Airvpn/sshtunnel.key -L 1412:127.0.0.1:2018 sshtunnel@{} -p {} -N -T -v".format(ROOTDIR, ip, port)
         ssh_exe = pexpect.spawn(cmd_ssh)
         ssh_newkey = b'Are you sure you want to continue connecting'
         ssh_success = 'Forced command'
