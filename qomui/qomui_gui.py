@@ -627,7 +627,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.scriptLabel.setFont(bold_font)
         self.scriptLabel.setObjectName("scriptLabel")
         self.verticalLayout_30.addWidget(self.scriptLabel)
-        self.gridLayout10 = QtWidgets.QGridLayout(Form)
+        self.gridLayout10 = QtWidgets.QGridLayout()
         self.gridLayout10.setObjectName("gridLayout")
         self.preCheck = QtWidgets.QLabel(Form)
         self.preCheck.setObjectName("preCheck")
