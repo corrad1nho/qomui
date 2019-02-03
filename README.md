@@ -125,6 +125,11 @@ Qomui has been my first ever programming experience and a practical challenge fo
 - [bugfix] previous iptables rules not always restored
 - [bugfix] crashes if ipv6 stack not available
 - [bugfix] OpenVPN config changes overwritten on update
+- [bugfix] Debian packages remove /usr/share/qomui directory on update
+
+##### Additional notes:
+- Re-importing config files from supported providers is strongly recommended as they are now saved in a different location. 
+- If you are using Debian/Ubuntu packages Qomui must be removed (sudo apt purge qomui) and then installed again due to a bug in the postrm script. 
 
 #### version 0.8.1:
 - [change] option to restart qomui-service from gui if it crashes
