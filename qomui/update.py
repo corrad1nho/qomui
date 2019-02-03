@@ -28,7 +28,6 @@ except AttributeError:
 ROOTDIR = "/usr/share/qomui"
 TEMPDIR = "/usr/share/qomui/temp"
 SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
-ALLOWED_IPS = []
 
 def country_translate(cc):
     try:
@@ -57,6 +56,7 @@ class AddServers(QtCore.QThread):
         self.folderpath = credentials["folderpath"]
         self.update = credentials["update"]
         self.temp_path = "{}/{}".format(TEMPDIR, self.provider)
+        self.allowed_ips = []
 
         try:
             self.key = credentials["key"]
@@ -86,7 +86,7 @@ class AddServers(QtCore.QThread):
 
         self.log.emit(("info", "Creating temporary rule to access Airvpn API"))
         firewall.allow_dest_ip("54.93.175.114", "-I")
-        ALLOWED_IPS.append("54.93.175.114")
+        self.allowed_ips.append("54.93.175.114")
         self.airvpn_servers = {}
         self.airvpn_protocols = {}
         self.backend = default_backend()
@@ -811,7 +811,7 @@ class AddServers(QtCore.QThread):
                                 'pubkey' : wg_keys[1]
                                 }
 
-                        pub_up = requests.post(wg_api_url, data=data, timeout=5)
+                        pub_up = requests.post(wg_api_url, data=data, timeout=10)
                         if pub_up.status_code == 200:
                             api_resp = json.loads(pub_up.content.decode("utf-8"))
 
@@ -851,9 +851,9 @@ class AddServers(QtCore.QThread):
                 except (CalledProcessError, FileNotFoundError) as e:
                     self.log.emit(("info", "WireGuard is not installed/not found - skipping"))
 
-        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-            self.log.emit(("debug", e))
-            self.log.emit(("info", "Network error: Uploading WireGuard public key failed"))
+                except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+                    self.log.emit(("debug", e))
+                    self.log.emit(("info", "Network error: Uploading WireGuard public key failed"))
 
         except Exception as e:
             self.log.emit(("debug", e))
@@ -1062,10 +1062,10 @@ class AddServers(QtCore.QThread):
             for i in ips:
                 if i != "" and i != "Failed to resolve":
                     firewall.allow_dest_ip(i, "-I")
-                    ALLOWED_IPS.append(i)
+                    self.allowed_ips.append(i)
 
     def copy_certs(self, provider):
-        for i in ALLOWED_IPS:
+        for i in self.allowed_ips:
             firewall.allow_dest_ip(i, "-D")
 
         provider_dir = "{}/{}".format(ROOTDIR, provider)
