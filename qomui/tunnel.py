@@ -403,7 +403,6 @@ class TunnelThread(QtCore.QThread):
         #keep this thread as long as openvpn process has not been terminated
         #disconnection from gui will kill the openvpn process and break the loop
         while line.find("SIGTERM[hard,] received, process exiting") == -1:
-            time_measure = time.time()
             line_format = ("OpenVPN:" + line.replace('{}'.format(time.asctime()), '').replace('\n', ''))
             self.log.emit(("info", line_format))
 

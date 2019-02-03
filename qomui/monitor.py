@@ -16,7 +16,6 @@ class NetMon(QtCore.QThread):
     def run(self):
         net_iface_dir = "/sys/class/net/"
         net_check = 0
-        i = "None"
 
         while True:
             prior = net_check
