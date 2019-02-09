@@ -16,7 +16,7 @@ persist-key
 persist-tun
 key-direction 1
 
-auth-user-pass /usr/share/qomui/Windscribe/Windscribe-auth.txt
+auth-user-pass /usr/share/qomui/Windscribe/windscribe_userpass.txt
 ca /usr/share/qomui/Windscribe/ca.crt
 tls-auth /usr/share/qomui/Windscribe/ta.key
 
