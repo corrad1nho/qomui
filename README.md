@@ -43,7 +43,7 @@ Current configurations for AirVPN, Mullvad, ProtonVPN, PIA and Windscribe can be
 Once you added server configurations, you can browse and filter them in the server tab. Furthermore, you can mark servers as favourites and connect to one of them randomly. To see a list of all favourited servers click on the star in the upper right. There is also an option to create connection profiles in the respective tab. Profiles will select a server automatically based on the criteria you set. Criteria include protocol (OpenVPN or WireGuard), countries, providers and one of the following selection modes:
 - ***Random:*** Chooses a random server among all servers matching the profile
 - ***Fastest:*** Chooses the fastest server matching the profile based on latency. For this option to work properly the "Perform latency checks" option needs to be ticked.
-- ***Fast/Random:*** Chooses a random server among the fastest twenty percent. If you profile includes more than one country, the algorithm also increases the chance to select a server from a different country next. 
+- ***Fast/Random:*** Chooses a random server among the fastest twenty percent. If your profile includes more than one country, the algorithm also increases the chance to select a server from a different country next. 
 
 ### Options
 - ***Autoconnect/reconnect:*** Automatically connect to the last server/last profile once a new internet connection has been detected or after the OpenVPN process has died unexpectedly.
