@@ -2,23 +2,19 @@ import json
 import shlex
 import os
 import logging
-from subprocess import check_call, check_output, CalledProcessError, Popen, PIPE, STDOUT
-from PyQt5 import QtCore, QtGui, Qt, QtWidgets
+from subprocess import check_call, check_output, CalledProcessError, Popen, PIPE
 from collections import Counter
 
 ROOTDIR = "/usr/share/qomui"
 saved_rules = []
 saved_rules_6 = []
-#ip_cmd = ["iptables", "--wait",]
-#ip6_cmd = ["ip6tables", "--wait",]
 devnull = open(os.devnull, 'w')
 ip6_available = True
 
 
-
 def check_ipv6():
     try:
-        ipv6_info = open("/proc/net/if_inet6" , "r").read()
+        ipv6_info = open("/proc/net/if_inet6", "r").read()
         if ipv6_info:
             return True
 
@@ -30,14 +26,15 @@ def check_ipv6():
         logging.debug("Unable to determine whether ipv6 is available")
         return True
 
+
 def add_rule(rule, check=0, ipt="ip4"):
     if ipt == "ip4":
-        ip_cmd = ["iptables", "--wait",]
+        ip_cmd = ["iptables", "--wait", ]
     else:
-        ip_cmd = ["ip6tables", "--wait",]
+        ip_cmd = ["ip6tables", "--wait", ]
 
     if ipt == "ip4" or check == 1 or check_ipv6() is True:
-        #check if rule already exists and only set it otherwise
+        # check if rule already exists and only set it otherwise
         try:
             if len(rule) > 3 or "-D" not in rule:
                 check = ["-C" if x == "-A" or x == "-I" else x for x in rule]
@@ -54,6 +51,7 @@ def add_rule(rule, check=0, ipt="ip4"):
 
             except CalledProcessError:
                 logging.warning("iptables: failed to apply {}".format(rule))
+
 
 def apply_rules(opt, block_lan=0, preserve=0):
     fw_rules = get_config()
@@ -86,14 +84,17 @@ def apply_rules(opt, block_lan=0, preserve=0):
         batch_rule_6(fw_rules["unsecurev6"])
         logging.info("iptables: deactivated firewall")
 
+
 def batch_rule(rules):
     for rule in rules:
         add_rule(rule)
-    
-def batch_rule_6(rules): 
+
+
+def batch_rule_6(rules):
     if check_ipv6() is True:
         for rule in rules:
             add_rule(rule, check=1, ipt="ip6")
+
 
 def save_existing_rules(fw_rules):
     try:
@@ -114,6 +115,7 @@ def save_existing_rules(fw_rules):
     except (CalledProcessError, FileNotFoundError) as e:
         logging.error("ip4tables: Could not read active rules - {}".format(e))
 
+
 def save_existing_rules_6(fw_rules):
     if check_ipv6() is True:
         try:
@@ -123,7 +125,8 @@ def save_existing_rules_6(fw_rules):
                 rule = shlex.split(rpl)
                 if len(rule) != 0:
                     match = 0
-                    omit = fw_rules["ipv6rules"] + fw_rules["flushv6"] + fw_rules["ipv6local"]
+                    omit = fw_rules["ipv6rules"] + \
+                        fw_rules["flushv6"] + fw_rules["ipv6local"]
                     for x in omit:
                         if Counter(x) == Counter(rule):
                             match = 1
@@ -132,7 +135,9 @@ def save_existing_rules_6(fw_rules):
                     match = 0
 
         except (CalledProcessError, FileNotFoundError) as e:
-            logging.error("ip6tables: Could not read active rules - {}".format(e))
+            logging.error(
+                "ip6tables: Could not read active rules - {}".format(e))
+
 
 def allow_dest_ip(ip, action):
     rule = [action, 'OUTPUT', '-d', ip, '-j', 'ACCEPT']
@@ -144,8 +149,9 @@ def allow_dest_ip(ip, action):
         elif len(ip.split(":")) >= 4:
             if check_ipv6() is True:
                 add_rule(rule, ipt="ip6")
-    except:
+    except BaseException:
         logging.error("{} is not a valid ip address".format(ip))
+
 
 def get_config():
     try:
@@ -160,6 +166,7 @@ def get_config():
             logging.debug("Failed to load firewall configuration")
             return None
 
+
 def check_firewall_services():
     firewall_services = ["ufw", "firewalld"]
     detected_firewall = []
@@ -167,19 +174,24 @@ def check_firewall_services():
     for fw in firewall_services:
 
         try:
-            result = check_output(["systemctl", "is-enabled", fw], stderr=devnull).decode("utf-8")
+            result = check_output(
+                ["systemctl", "is-enabled", fw],
+                stderr=devnull).decode("utf-8")
 
             if result == "enabled\n":
                 detected_firewall.append(fw)
-                logging.warning("Detected enable firewall service: {}".format(fw))
+                logging.warning(
+                    "Detected enable firewall service: {}".format(fw))
 
             else:
                 logging.debug("{}.service is not enabled".format(fw))
 
         except (FileNotFoundError, CalledProcessError) as e:
-            logging.debug("{}.service does either not exist or is not enabled".format(fw))
+            logging.debug(
+                "{}.service does either not exist or is not enabled".format(fw))
 
     return detected_firewall
+
 
 def save_iptables():
     try:
@@ -204,10 +216,12 @@ def save_iptables():
         except (CalledProcessError, FileNotFoundError):
             logging.debug("Failed to save current ip6tables rules")
 
+
 def restore_iptables():
     try:
-        #infile = open("{}/iptables_before.rules".format(ROOTDIR), "r")
-        restore = Popen(["iptables-restore", "{}/iptables_before.rules".format(ROOTDIR)], stderr=PIPE)
+        restore = Popen(
+            ["iptables-restore", "{}/iptables_before.rules".format(ROOTDIR)],
+            stderr=PIPE)
         logging.debug("Restored previous iptables rules")
 
     except (CalledProcessError, FileNotFoundError):
@@ -216,13 +230,11 @@ def restore_iptables():
     if check_ipv6() is True:
 
         try:
-            #infile = open("{}/iptables_before.rules".format(ROOTDIR), "r")
-            restore = Popen(["ip6tables-restore", "{}/ip6tables_before.rules".format(ROOTDIR)], stderr=PIPE)
+            restore = Popen(["ip6tables-restore",
+                             "{}/ip6tables_before.rules".format(ROOTDIR)],
+                            stderr=PIPE)
             logging.debug("Restored previous ip6tables rules")
 
         except (CalledProcessError, FileNotFoundError):
-            logging.debug("FileNotFoundError: Failed to restore ip6tables rules")
-
-
-
-
+            logging.debug(
+                "FileNotFoundError: Failed to restore ip6tables rules")

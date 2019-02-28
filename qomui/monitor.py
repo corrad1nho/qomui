@@ -6,6 +6,7 @@ import time
 from subprocess import CalledProcessError, check_output
 from PyQt5 import QtCore
 
+
 class NetMon(QtCore.QThread):
     net_state_change = QtCore.pyqtSignal(int, dict)
     log = QtCore.pyqtSignal(tuple)
@@ -22,12 +23,12 @@ class NetMon(QtCore.QThread):
             prior = net_check
             i = "None"
             net_check = 0
-            routes = {       
-                        "gateway" : "None",
-                        "gateway_6" : "None",
-                        "interface" : "None",
-                        "interface_6" : "None"
-                        }
+            routes = {
+                "gateway": "None",
+                "gateway_6": "None",
+                "interface": "None",
+                "interface_6": "None"
+            }
 
             try:
                 for iface in os.listdir(net_iface_dir):
@@ -65,7 +66,8 @@ class NetMon(QtCore.QThread):
             default_interface_4 = parse_route[4]
 
         except (CalledProcessError, IndexError):
-            self.log.emit(('info', 'Could not identify default gateway - no network connectivity'))
+            self.log.emit(
+                ('info', 'Could not identify default gateway - no network connectivity'))
             default_gateway_4 = "None"
             default_interface_4 = "None"
 
@@ -77,18 +79,24 @@ class NetMon(QtCore.QThread):
             default_interface_6 = parse_route[4]
 
         except (CalledProcessError, IndexError):
-            self.log.emit(('error', 'Could not identify default gateway for ipv6 - no network connectivity'))
+            self.log.emit(
+                ('error',
+                 'Could not identify default gateway for ipv6 - no network connectivity'))
             default_gateway_6 = "None"
             default_interface_6 = "None"
 
-        self.log.emit(("debug", "Network interface - ipv4: {}".format(default_interface_4)))
-        self.log.emit(("debug","Default gateway - ipv4: {}".format(default_gateway_4)))
-        self.log.emit(("debug","Network interface - ipv6: {}".format(default_interface_6)))
-        self.log.emit(("debug","Default gateway - ipv6: {}".format(default_gateway_6)))
+        self.log.emit(
+            ("debug", "Network interface - ipv4: {}".format(default_interface_4)))
+        self.log.emit(
+            ("debug", "Default gateway - ipv4: {}".format(default_gateway_4)))
+        self.log.emit(
+            ("debug", "Network interface - ipv6: {}".format(default_interface_6)))
+        self.log.emit(
+            ("debug", "Default gateway - ipv6: {}".format(default_gateway_6)))
 
         return {
-            "gateway" : default_gateway_4,
-            "gateway_6" : default_gateway_6,
-            "interface" : default_interface_4,
-            "interface_6" : default_interface_6
-            }
+            "gateway": default_gateway_4,
+            "gateway_6": default_gateway_6,
+            "interface": default_interface_4,
+            "interface_6": default_interface_6
+        }
