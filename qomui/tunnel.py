@@ -396,7 +396,7 @@ class TunnelThread(QtCore.QThread):
                         '--config', '{}'.format(ovpn_file),
                         '--route-nopull',
                         '--script-security', '2',
-                        '--up', '{}/hop.sh -s'.format(ROOTDIR)
+                        '--up', '{}/scripts/hop.sh -s'.format(ROOTDIR)
                         ]
 
         else:
