@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 try:
@@ -12,6 +11,7 @@ except AttributeError:
 
 try:
     _encoding = QtWidgets.QApplication.UnicodeUTF8
+
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
@@ -20,9 +20,10 @@ except AttributeError:
 
 ROOTDIR = "/usr/share/qomui"
 
+
 class ComboCheckBox(QtWidgets.QComboBox):
 
-    def __init__ (self, parent=None):
+    def __init__(self, parent=None):
         super(ComboCheckBox, self).__init__(parent)
         self.view().pressed.connect(self.itemPressed)
         self.setModel(QtGui.QStandardItemModel(self))
@@ -34,12 +35,13 @@ class ComboCheckBox(QtWidgets.QComboBox):
         else:
             item.setCheckState(QtCore.Qt.Checked)
 
+
 class EditProfile(QtWidgets.QDialog):
     save_profile = QtCore.pyqtSignal(dict)
     providers_selected = []
     countries_selected = []
 
-    def __init__ (self, protocols=None, countries=None, providers=None, selected=0, parent=None):
+    def __init__(self, protocols=None, countries=None, providers=None, selected=0, parent=None):
         super(EditProfile, self).__init__(parent)
         self.protocols = protocols
         self.countries = countries
@@ -78,7 +80,7 @@ class EditProfile(QtWidgets.QDialog):
         spacerItem = QtWidgets.QSpacerItem(595, 17, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem)
         self.buttonBox = QtWidgets.QDialogButtonBox(profileEdit)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.horizontalLayout.addWidget(self.buttonBox)
         self.verticalLayout.addLayout(self.horizontalLayout)
@@ -112,7 +114,6 @@ class EditProfile(QtWidgets.QDialog):
             if self.selected["filters"]:
                 self.filterLine.setText(";".join(self.selected["filters"]))
 
-
         self.popchoiceTable()
 
     def popchoiceTable(self):
@@ -126,7 +127,7 @@ class EditProfile(QtWidgets.QDialog):
             cols = 1
 
         n = n + len(self.providers)
-        rows = int(n / cols) + (n % cols> 0) + int(np / cols) + (np % cols> 0) + 3
+        rows = int(n / cols) + (n % cols > 0) + int(np / cols) + (np % cols > 0) + 3
         self.choiceTable.setRowCount(rows)
         self.choiceTable.setColumnCount(cols)
         self.choiceTable.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
@@ -138,8 +139,8 @@ class EditProfile(QtWidgets.QDialog):
         item.setFont(font)
         item.setText("Choose providers:")
         if cols >= 1:
-            self.choiceTable.setSpan(0,0,1,cols)
-        self.choiceTable.setItem(0,0,item)
+            self.choiceTable.setSpan(0, 0, 1, cols)
+        self.choiceTable.setItem(0, 0, item)
         r+=1
         for provider in self.providers:
             item = QtWidgets.QTableWidgetItem()
@@ -150,7 +151,7 @@ class EditProfile(QtWidgets.QDialog):
                 item.setCheckState(QtCore.Qt.Checked)
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
-            self.choiceTable.setItem(r,c,item)
+            self.choiceTable.setItem(r, c, item)
             if c == cols-1:
                 r += 1
                 c = 0
@@ -163,9 +164,9 @@ class EditProfile(QtWidgets.QDialog):
         item.setFont(font)
         item.setText("Choose countries:")
         if cols >= 1:
-            self.choiceTable.setSpan(r,0,1,cols)
-        self.choiceTable.setItem(r,0,item)
-        r+=1
+            self.choiceTable.setSpan(r, 0, 1, cols)
+        self.choiceTable.setItem(r, 0, item)
+        r += 1
 
         for country in sorted(self.countries):
             item = QtWidgets.QTableWidgetItem()
@@ -176,7 +177,7 @@ class EditProfile(QtWidgets.QDialog):
                 item.setCheckState(QtCore.Qt.Checked)
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
-            self.choiceTable.setItem(r,c,item)
+            self.choiceTable.setItem(r, c, item)
             if c == cols-1:
                 r += 1
                 c = 0
@@ -210,7 +211,7 @@ class EditProfile(QtWidgets.QDialog):
         profile_dict["filters"] = self.filterLine.text().split(";")[:-1]
 
         if self.selected != 0:
-             profile_dict["number"] = self.selected["number"]
+            profile_dict["number"] = self.selected["number"]
 
         if profile_dict["name"] == "" or len(self.providers_selected) == 0 or len(self.countries_selected) == 0:
             err = QtWidgets.QMessageBox.warning(
@@ -226,12 +227,13 @@ class EditProfile(QtWidgets.QDialog):
     def cancel(self):
         self.hide()
 
+
 class ProfileWidget(QtWidgets.QWidget):
     del_profile = QtCore.pyqtSignal(str)
     edit_profile = QtCore.pyqtSignal(str)
     connect_profile = QtCore.pyqtSignal(str)
 
-    def __init__ (self, profile, parent=None):
+    def __init__(self, profile, parent=None):
         super(ProfileWidget, self).__init__(parent)
         self.profile = profile
         self.setupUi(self)
@@ -304,7 +306,6 @@ class ProfileWidget(QtWidgets.QWidget):
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
         Form.setWindowTitle(_translate("Form", "Form"))
-
 
     def setText(self, profile):
         self.profileName.setText(profile["name"])
