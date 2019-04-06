@@ -264,6 +264,13 @@ class QomuiGui(QtWidgets.QWidget):
         #Tab section
         self.tabButtonGroup = QtWidgets.QButtonGroup(Form)
         self.tabButtonGroup.setExclusive(True)
+        self.statusTabBt = QtWidgets.QCommandLinkButton(Form)
+        self.statusTabBt.setMinimumSize(QtCore.QSize(100, 0))
+        self.statusTabBt.setMaximumSize(QtCore.QSize(100, 100))
+        self.statusTabBt.setCheckable(True)
+        self.tabButtonGroup.addButton(self.statusTabBt)
+        self.statusTabBt.setObjectName(_fromUtf8("statusTabBt"))
+        self.vLayoutMain_2.addWidget(self.statusTabBt)
         self.serverTabBt = QtWidgets.QCommandLinkButton(Form)
         self.serverTabBt.setMinimumSize(QtCore.QSize(100, 0))
         self.serverTabBt.setMaximumSize(QtCore.QSize(100, 100))
@@ -318,6 +325,31 @@ class QomuiGui(QtWidgets.QWidget):
         self.gLayoutMain.addLayout(self.vLayoutMain_2, 2, 0, 1, 1)
         self.tabWidget = QtWidgets.QStackedWidget(Form)
         self.tabWidget.setObjectName(_fromUtf8("tabWidget"))
+
+        #Status tab
+        self.statusTab = QtWidgets.QWidget()
+        self.statusTab.setObjectName(_fromUtf8("statusTab"))
+        self.vLayoutStatus = QtWidgets.QVBoxLayout(self.statusTab)
+        self.statusOffWidget = widgets.StatusOffWidget(self.statusTab)
+        self.statusOnWidget = widgets.StatusOnWidget(self.statusTab)
+        self.statusOnWidget.setVisible(False)
+        self.vLayoutStatus.addWidget(self.statusOffWidget)
+        self.vLayoutStatus.addWidget(self.statusOnWidget)
+        self.hLayoutStatus = QtWidgets.QHBoxLayout(self.statusTab)
+        self.versionLabel = QtWidgets.QLabel(self.statusTab)
+        self.versionLabel.setObjectName(_fromUtf8("versionLabel"))
+        self.updateQomuiBt = QtWidgets.QPushButton(self.statusTab)
+        self.updateQomuiBt.setObjectName("updateQomuiBt")
+        self.updateQomuiBt.setVisible(False)
+        self.hLayoutStatus.addWidget(self.versionLabel)
+        self.hLayoutStatus.addWidget(self.updateQomuiBt)
+        self.hLayoutStatus.addStretch()
+        self.homepageLabel = QtWidgets.QLabel(self.statusTab)
+        self.homepageLabel.setObjectName(_fromUtf8("homepageLabel"))
+        self.vLayoutStatus.addWidget(self.homepageLabel)
+        self.vLayoutStatus.addLayout(self.hLayoutStatus)
+        self.vLayoutStatus.addStretch()
+        self.tabWidget.addWidget(self.statusTab)
 
         #Server tab
         self.serverTab = QtWidgets.QWidget()
@@ -720,6 +752,7 @@ class QomuiGui(QtWidgets.QWidget):
         
         #About
         self.aboutTab = QtWidgets.QWidget()
+        """
         self.aboutTab.setObjectName(_fromUtf8("aboutTab"))
         self.tabWidget.addWidget(self.aboutTab)
 
@@ -822,6 +855,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.aboutGLayout.addLayout(self.aboutVLayout, 4, 1, 1, 1)
         spacerItem6 = QtWidgets.QSpacerItem(17, 191, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.aboutGLayout.addItem(spacerItem6, 5, 1, 1, 1)
+        """
 
         self.gLayoutMain.addWidget(self.tabWidget, 2, 1, 1, 1)
         self.retranslateUi(Form)
@@ -833,6 +867,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.countryBox.activated[str].connect(self.filter_servers)
         self.providerBox.activated[str].connect(self.filter_servers)
         self.tunnelBox.activated[str].connect(self.filter_servers)
+        self.statusTabBt.clicked.connect(self.tab_switch)
         self.serverTabBt.clicked.connect(self.tab_switch)
         self.bypassTabBt.clicked.connect(self.tab_switch)
         self.aboutTabBt.clicked.connect(self.tab_switch)
@@ -861,10 +896,16 @@ class QomuiGui(QtWidgets.QWidget):
         self.addProfileBt.clicked.connect(self.add_profile)
         self.confirmScripts.accepted.connect(self.save_scripts)
         self.confirmScripts.rejected.connect(self.clear_scripts)
+        self.showActive.disconnect.connect(self.kill)
+        self.showActive.reconnect.connect(self.reconnect)
+        self.showActive.check_update.connect(self.update_check)
+
+        self.tabWidget.setCurrentIndex(1)
 
     def retranslateUi(self, Form):
         s = ""
         Form.setWindowTitle(_translate("Form", "Qomui", None))
+        self.statusTabBt.setText(_translate("Form", "Status", None))
         self.serverTabBt.setText(_translate("Form", "Server", None))
         self.logTabBt.setText(_translate("Form", "Log", None))
         self.profileTabBt.setText(_translate("Form", "Profiles", None))
@@ -916,16 +957,8 @@ class QomuiGui(QtWidgets.QWidget):
         self.addProviderDownloadBt.setText(_translate("Form", "Download", None))
         self.addProviderDownloadBt.setIcon(QtGui.QIcon.fromTheme("list-add"))
         self.addProviderPassEdit.setPlaceholderText(_translate("Form", "Password", None))
-        icon = QtGui.QIcon.fromTheme("qomui")
-        self.qIconLabel.setPixmap(icon.pixmap(60,60))
-        self.qomuiLabel.setText(_translate("Form", "QOMUI", None))
-        self.qomuiInfo.setText(_translate("Form", "Easy-to-use OpenVPN Gui", None))
         self.versionLabel.setText(_translate("Form", "Version:", None))
-        self.urlLabel.setText(_translate("Form", "Homepage:", None))
-        self.homepageInfo.setText(_translate("Form", "https://github.com/corrad1nho/qomui", None))
-        self.licenseLabel.setText(_translate("Form", "License:", None))
-        self.licenseInfo.setText(_translate("Form", "GPLv3", None))
-        self.newVersionLabel.setText(_translate("Form", "A new version is available!", None))
+        self.homepageLabel.setText(_translate("Form", "<b>Homepage:</b> https://github.com/corrad1nho/qomui", None))
         self.searchLine.setPlaceholderText(_translate("Form", "Search", None))
         self.preCheck.setText(_translate("Form", "Pre:", None))
         self.upCheck.setText(_translate("Form", "Up:", None))
@@ -1015,8 +1048,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.stop_progress_bar("upgrade")
 
         if new_version != "failed":
-            self.versionInfo.setText(new_version)
-            self.newVersionLabel.setVisible(False)
+            self.versionLabel.setText("<b>Version:</b>: {}".format(new_version))
             self.updateQomuiBt.setVisible(False)
             ret = self.messageBox(
                                   "Qomui has been upgraded",
@@ -1083,11 +1115,11 @@ class QomuiGui(QtWidgets.QWidget):
             if (latest > installed) is True:
                 self.updateQomuiBt.setText("Upgrade to {}".format(self.release))
                 self.updateQomuiBt.setVisible(True)
-                self.newVersionLabel.setVisible(True)
+                self.versionLabel.setText("<b>Version:</b> {} ({} is available)".format(self.installed, self.release))
 
                 self.notify(
                             'Qomui: Update available',
-                            'Download version {} via "About" tab'.format(self.release),
+                            'Download version {} via "Status" tab'.format(self.release),
                             icon="Information"
                             )
 
@@ -1100,21 +1132,23 @@ class QomuiGui(QtWidgets.QWidget):
 
     def tab_switch(self):
         button = self.sender().text().replace("&", "")
-        if button == "Server":
+        if button == "Status":
             self.tabWidget.setCurrentIndex(0)
-        elif button == "Profiles":
+        elif button == "Server":
             self.tabWidget.setCurrentIndex(1)
-        elif button == "Log":
+        elif button == "Profiles":
             self.tabWidget.setCurrentIndex(2)
+        elif button == "Log":
+            self.tabWidget.setCurrentIndex(3)
             self.logText.verticalScrollBar().setValue(self.logText.verticalScrollBar().maximum())
         elif button == "Options":
             self.setOptiontab(self.config_dict)
-            self.tabWidget.setCurrentIndex(3)
-        elif button == "Provider":
             self.tabWidget.setCurrentIndex(4)
+        elif button == "Provider":
+            self.tabWidget.setCurrentIndex(5)
             self.providerChosen()
         elif button == "Bypass":
-            self.tabWidget.setCurrentIndex(5)
+            self.tabWidget.setCurrentIndex(6)
             self.bypassVpnBox.clear()
 
             for k, v in self.server_dict.items():
@@ -1123,7 +1157,7 @@ class QomuiGui(QtWidgets.QWidget):
                         self.bypassVpnBox.addItem(k)
 
         elif button == "About":
-            self.tabWidget.setCurrentIndex(6)
+            self.tabWidget.setCurrentIndex(7)
             self.check_update()
 
     def switch_providerTab(self):
@@ -1310,7 +1344,7 @@ class QomuiGui(QtWidgets.QWidget):
                     self.logger.info("Restarting qomui-gui and qomui-service")
                     self.restart_qomui()
 
-                self.versionInfo.setText(self.installed)
+                self.versionLabel.setText("<b>Version:</b> {}".format(self.installed))
 
                 try:
                     pm_check = version[1]
@@ -1324,7 +1358,7 @@ class QomuiGui(QtWidgets.QWidget):
 
         except FileNotFoundError:
             self.logger.warning("{}/VERSION does not exist".format(ROOTDIR))
-            self.versionInfo.setText("N.A.")
+            self.versionInfo.setText("<b>Version:</b> N.A.")
 
         for saved_file in JSON_FILE_LIST:
             setattr(self, saved_file[0], self.load_json(saved_file[1]))
@@ -2378,12 +2412,13 @@ class QomuiGui(QtWidgets.QWidget):
 
         tun = self.dbus_call("return_tun_device", "tun")
         self.tray.setToolTip("Connected to {}".format(self.ovpn_dict["name"]))
+        self.statusOffWidget.setVisible(False)
+        self.statusOnWidget.setVisible(True)
+        self.tabWidget.setCurrentIndex(0)
+        self.statusOnWidget.monitor_conn(tun, self.ovpn_dict["name"])
         self.gLayoutMain.addWidget(self.showActive, 0, 0, 1, 3)
         self.showActive.setVisible(True)
         self.showActive.setText(self.ovpn_dict, self.hop_server_dict, tun, tun_hop=self.tun_hop, bypass=None)
-        self.showActive.disconnect.connect(self.kill)
-        self.showActive.reconnect.connect(self.reconnect)
-        self.showActive.check_update.connect(self.update_check)
 
     def connection_established_hop(self):
         self.tunnel_hop_active = 1
@@ -2418,7 +2453,7 @@ class QomuiGui(QtWidgets.QWidget):
         except AttributeError:
             pass
 
-        self.BypassActive = widgets.ActiveWidget("Secondary Connection")
+        self.BypassActive = widgets.ActiveWidget("Bypass Connection")
         self.vLayoutMain.addWidget(self.BypassActive)
         self.BypassActive.setVisible(True)
         self.BypassActive.setText(self.bypass_ovpn_dict, None, tun, tun_hop=None, bypass="1")
@@ -2535,6 +2570,9 @@ class QomuiGui(QtWidgets.QWidget):
             self.connect_last_server()
 
     def kill(self):
+        self.tabWidget.setCurrentIndex(1)
+        self.statusOnWidget.setVisible(False)
+        self.statusOffWidget.setVisible(True)
         self.tunnel_active = 0
         self.tunnel_hop_active = 0
         self.dbus_call("disconnect", "main")

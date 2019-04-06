@@ -12,9 +12,9 @@ import configparser
 import requests
 import shlex
 import logging
-from PyQt5 import QtCore, QtWidgets, QtGui
+from PyQt5 import QtCore, QtWidgets, QtGui, QtWebEngineWidgets
 
-from qomui import update
+from qomui import update, monitor, plotter
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -332,10 +332,10 @@ class ActiveWidget(QtWidgets.QWidget):
 
     def setupUi(self, ConnectionWidget):
         ConnectionWidget.setObjectName(_fromUtf8("ConnectionWidget"))
-        self.verticalLayout = QtWidgets.QVBoxLayout(ConnectionWidget)
-        self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
-        self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_3.setObjectName(_fromUtf8("horizontalLayout_3"))
+        self.vLayoutActive = QtWidgets.QVBoxLayout(ConnectionWidget)
+        self.vLayoutActive.setObjectName(_fromUtf8("vLayoutActive"))
+        self.hLayoutActive = QtWidgets.QHBoxLayout()
+        self.hLayoutActive.setObjectName(_fromUtf8("hLayoutActive"))
         self.statusLabel = QtWidgets.QLabel(ConnectionWidget)
         bold_font = QtGui.QFont()
         bold_font.setPointSize(12)
@@ -343,77 +343,27 @@ class ActiveWidget(QtWidgets.QWidget):
         bold_font.setWeight(75)
         self.statusLabel.setFont(bold_font)
         self.statusLabel.setObjectName(_fromUtf8("statusLabel"))
-        self.horizontalLayout_3.addWidget(self.statusLabel)
-        self.ipExtLabel = QtWidgets.QLabel(ConnectionWidget)
-        self.ipExtLabel.setObjectName(_fromUtf8("ipExtLabel"))
-        self.horizontalLayout_3.addWidget(self.ipExtLabel)
-        self.horizontalLayout_3.addStretch()
-        self.verticalLayout.addLayout(self.horizontalLayout_3)
+        self.vLayoutActive.addWidget(self.statusLabel)
+        bold_font.setPointSize(11)
+        self.hopCountryLabel = QtWidgets.QLabel(ConnectionWidget)
+        self.hopCountryLabel.setFixedSize(30,30)
+        self.hopCountryLabel.setLayoutDirection(QtCore.Qt.RightToLeft)
+        self.hopCountryLabel.setVisible(False)
+        self.hLayoutActive.addWidget(self.hopCountryLabel)
+        self.hopNameLabel = QtWidgets.QLabel(ConnectionWidget)
+        self.hopNameLabel.setLayoutDirection(QtCore.Qt.RightToLeft)
+        self.hopNameLabel.setFont(bold_font)
+        self.hopNameLabel.setVisible(False)
+        self.hLayoutActive.addWidget(self.hopNameLabel)
         self.ServerWidget = ServerWidget(show=True, parent=ConnectionWidget)
-        self.verticalLayout.addWidget(self.ServerWidget)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
-        self.downloadLabel = QtWidgets.QLabel(ConnectionWidget)
-        bold_font = QtGui.QFont()
-        bold_font.setBold(True)
-        bold_font.setWeight(75)
-        self.downloadLabel.setFont(bold_font)
-        self.downloadLabel.setObjectName(_fromUtf8("downloadLabel"))
-        self.horizontalLayout.addWidget(self.downloadLabel)
-        self.downStatLabel = QtWidgets.QLabel(ConnectionWidget)
-        self.downStatLabel.setObjectName(_fromUtf8("downStatLabel"))
-        self.horizontalLayout.addWidget(self.downStatLabel)
-        self.uploadLabel = QtWidgets.QLabel(ConnectionWidget)
-        bold_font = QtGui.QFont()
-        bold_font.setBold(True)
-        bold_font.setWeight(75)
-        self.uploadLabel.setFont(bold_font)
-        self.uploadLabel.setObjectName(_fromUtf8("uploadLabel"))
-        self.horizontalLayout.addWidget(self.uploadLabel)
-        self.upStatLabel = QtWidgets.QLabel(ConnectionWidget)
-        self.upStatLabel.setObjectName(_fromUtf8("upStatLabel"))
-        self.horizontalLayout.addWidget(self.upStatLabel)
-        self.timeLabel = QtWidgets.QLabel(ConnectionWidget)
-        self.timeLabel.setObjectName(_fromUtf8("timeLabel"))
-        self.timeLabel.setFont(bold_font)
-        self.horizontalLayout.addWidget(self.timeLabel)
-        self.timeStatLabel = QtWidgets.QLabel(ConnectionWidget)
-        self.timeStatLabel.setObjectName(_fromUtf8("timeStatLabel"))
-        self.horizontalLayout.addWidget(self.timeStatLabel)
-        self.horizontalLayout.addStretch()
-        self.verticalLayout.addLayout(self.horizontalLayout)
-        self.horizontalLayout_4 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_4.setObjectName(_fromUtf8("horizontalLayout_4"))
-        self.hopActiveLabel = QtWidgets.QLabel(ConnectionWidget)
-        bold_font = QtGui.QFont()
-        bold_font.setPointSize(13)
-        bold_font.setBold(True)
-        bold_font.setWeight(75)
-        self.hopActiveLabel.setFont(bold_font)
-        self.hopActiveLabel.setObjectName(_fromUtf8("hopActiveLabel"))
-        self.hopActiveLabel.setMinimumSize(QtCore.QSize(30, 30))
-        self.hopActiveLabel.setMaximumSize(QtCore.QSize(30, 30))
-        self.hopActiveLabel.setVisible(False)
-        self.horizontalLayout_4.addWidget(self.hopActiveLabel)
-        self.activeHopWidget = ServerWidget(ConnectionWidget)
-        self.activeHopWidget.setVisible(False)
-        self.horizontalLayout_4.addWidget(self.activeHopWidget)
-        self.verticalLayout.addLayout(self.horizontalLayout_4)
-        self.line = LineWidget(ConnectionWidget)
-        self.line.setObjectName(_fromUtf8("line"))
-        self.verticalLayout.addWidget(self.line)
-        self.retranslateUi(ConnectionWidget)
-        QtCore.QMetaObject.connectSlotsByName(ConnectionWidget)
-        self.ServerWidget.server_chosen.connect(self.signal)
+        self.hLayoutActive.addWidget(self.ServerWidget)
+        self.vLayoutActive.addLayout(self.hLayoutActive)
 
-    def retranslateUi(self, ConnectionWidget):
-        ConnectionWidget.setWindowTitle(_translate("ConnectionWidget", "Form", None))
-        #self.statusLabel.setText(_translate("ConnectionWidget", "", None))
-        self.downloadLabel.setText(_translate("ConnectionWidget", "Download:", None))
-        self.uploadLabel.setText(_translate("ConnectionWidget", "Upload:", None))
-        self.timeLabel.setText(_translate("ConnectionWidget", "Time:", None))
+        self.ServerWidget.server_chosen.connect(self.signal)
+        QtCore.QMetaObject.connectSlotsByName(ConnectionWidget)
 
     def setText(self, server_dict, hop_dict, tun, tun_hop=None, bypass=None):
+        self.statusLabel.setText(self.text)
         self.tun = tun
         self.tun_hop = tun_hop
         self.bypass = bypass
@@ -423,30 +373,23 @@ class ActiveWidget(QtWidgets.QWidget):
                                server_dict["country"], city, button="disconnect")
 
         if hop_dict is not None:
-            self.activeHopWidget.setVisible(True)
-            self.hopActiveLabel.setVisible(True)
-            self.hopActiveLabel.setText(_translate("HopWidget", "via", None))
-            hop_city = self.city_port_label(hop_dict)
-            self.activeHopWidget.setText(hop_dict["name"], hop_dict["provider"],
-                               hop_dict["country"], hop_city)
-            self.activeHopWidget.hide_button(1)
+            flag = '{}/flags/{}.png'.format(ROOTDIR, hop_dict["country"])
+            if not os.path.isfile(flag):
+                flag = '{}/flags/Unknown.png'.format(ROOTDIR)
+            pixmap = QtGui.QPixmap(flag).scaled(25, 25,
+                                                transformMode=QtCore.Qt.SmoothTransformation
+                                                )
+            self.hopCountryLabel.setPixmap(pixmap)
+            hop_text = hop_dict["name"] + "    " + chr(10145)
+            self.hopNameLabel.setText(hop_text)
+            self.hopCountryLabel.setVisible(True)
+            self.hopNameLabel.setVisible(True)
+
         else:
             self.activeHopWidget.setVisible(False)
             self.hopActiveLabel.setVisible(False)
 
         self.ServerWidget.hide_button(0)
-        self.calcThread = TunnelMon(self.tun, self.bypass, tun_hop=self.tun_hop)
-        self.calcThread.stat.connect(self.show_stats)
-        self.calcThread.ip.connect(self.show_ip)
-        self.calcThread.log.connect(self.log_from_thread)
-        self.calcThread.time.connect(self.update_time)
-        self.calcThread.check.connect(self.check_for_update)
-        self.calcThread.lost.connect(self.reconnect_signal)
-        self.calcThread.start()
-        logging.debug("Monitoring thread initialized")
-
-    def log_from_thread(self, msg):
-        getattr(logging, msg[0])(msg[1])
 
     def reconnect_signal(self):
         self.reconnect.emit()
@@ -470,64 +413,6 @@ class ActiveWidget(QtWidgets.QWidget):
 
         return "{} {} {}".format(city, protocol, port)
 
-    def show_ip(self, ips):
-        if ips[0] is None:
-            self.ipExtLabel.setText("")
-
-        elif ips[1] is None:
-            self.ipExtLabel.setText("IP: {}".format(ips[0]))
-
-        elif ips[0] == ips[1]:
-            self.ipExtLabel.setText("IP: {}".format(ips[0]))
-
-        else:
-            self.ipExtLabel.setText("IP: {} - {}".format(ips[0], ips[1]))
-
-    def update_time(self, t):
-        self.timeStatLabel.setText(t)
-
-    def check_for_update(self):
-        self.check_update.emit()
-
-    def show_stats(self, update):
-        DLrate = update[0]
-        DLacc = update[1]
-        ULrate = update[2]
-        ULacc = update[3]
-        unit_dl = "kB/s"
-        unit_ul = "kB/s"
-        unit_acc_up = "MB"
-        unit_acc_down = "MB"
-
-        if ULrate / 1024 >= 1:
-            ULrate = ULrate / 1024
-            unit_ul = "MB/s"
-
-        if DLrate / 1024 >= 1:
-            DLrate = DLrate / 1024
-            unit_dl = "MB/s"
-
-        if DLacc / 1024 >= 1:
-            DLacc = DLacc / 1024
-            unit_acc_down = "GB"
-
-        if ULacc / 1024 >= 1:
-            ULacc = ULacc / 1024
-            unit_acc_up = "GB"
-
-        self.upStatLabel.setText("{} {}- {} {}".format(
-                                                        round(ULrate, 1),
-                                                        unit_ul,
-                                                        round(ULacc, 1),
-                                                        unit_acc_up)
-                                                        )
-        self.downStatLabel.setText("{} {} - {} {}".format(
-                                                        round(DLrate, 1),
-                                                        unit_dl,
-                                                        round(DLacc, 1),
-                                                        unit_acc_down)
-                                                        )
-
     def signal(self):
         self.disconnect.emit()
 
@@ -542,115 +427,238 @@ class LineWidget(QtWidgets.QWidget):
         self.setFixedHeight(1)
         #self.setBackgroundRole(self.palette().Highlight)
 
-class TunnelMon(QtCore.QThread):
-    stat = QtCore.pyqtSignal(list)
-    ip = QtCore.pyqtSignal(tuple)
-    time = QtCore.pyqtSignal(str)
-    check = QtCore.pyqtSignal()
-    lost = QtCore.pyqtSignal()
-    log = QtCore.pyqtSignal(tuple)
+class StatusOffWidget(QtWidgets.QWidget):
+    def __init__ (self, parent=None):
+        super(StatusOffWidget, self).__init__(parent=None)
+        self.setupUi(self)
 
-    def __init__(self, tun, bypass, tun_hop=None):
-        QtCore.QThread.__init__(self)
-        self.tun = tun
-        self.bypass = bypass
-        self.tun_hop = tun_hop
+    def setupUi(self, Form):
+        Form.setObjectName("Form")
+        self.vLayoutStatus = QtWidgets.QVBoxLayout(Form)
+        self.vLayoutStatus.setObjectName("vLayoutStatus")
+        font = QtGui.QFont()
+        font.setPointSize(11)
+        font.setBold(True)
+        font.setWeight(75)
+        self.offLabel = QtWidgets.QLabel(Form)
+        self.offLabel.setObjectName("offLabel")
+        self.offLabel.setFont(font)
+        self.vLayoutStatus.addWidget(self.offLabel)
+        self.vLayoutStatus.addSpacing(40)
+        self.qIconLabel = QtWidgets.QLabel(Form)
+        self.qIconLabel.setObjectName("qIconLabel")
+        self.qIconLabel.setMinimumSize(300,300)
+        self.qIconLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.vLayoutStatus.addWidget(self.qIconLabel)
+        self.vLayoutStatus.addSpacing(40)
 
-    def run(self):
-        connected = True
-        check_url = "https://ipv4.ipleak.net/json"
-        check_url_6 = "https://ipv6.ipleak.net/json"
-        check_url_alt = "https://ipv4.icanhazip.com/"
-        check_url_alt_6 = "https://ipv6.icanhazip.com/"
+        self.retranslateUi(Form)
+        QtCore.QMetaObject.connectSlotsByName(Form)
 
-        if self.bypass is None:
+    def retranslateUi(self, Form):
+        _translate = QtCore.QCoreApplication.translate
+        Form.setWindowTitle(_translate("Form", "Form"))
+        self.offLabel.setText(_translate("Form", "You are currently not connected to any VPN server "))
+        icon = QtGui.QIcon.fromTheme("qomui_off")
+        self.qIconLabel.setPixmap(icon.pixmap(300,300))
+    
+class ColoredRect(QtWidgets.QFrame):
+    def __init__ (self, color, parent=None):
+        super(ColoredRect, self).__init__(parent)
+        palette = QtGui.QPalette()
+        brush = QtGui.QBrush(color)
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Window, brush)
+        self.setPalette(palette)
+        self.setFixedSize(10,10)
+        self.setAutoFillBackground(True)
 
-            try:
-                query = requests.get(check_url, timeout=1).content.decode("utf-8")
-                ip = json.loads(query)["ip"]
+class StatusOnWidget(QtWidgets.QWidget):
+    reconnect = QtCore.pyqtSignal()
+    check_update = QtCore.pyqtSignal()
 
-            except (KeyError, requests.exceptions.RequestException, json.decoder.JSONDecodeError):
+    def __init__ (self, parent=None):
+        super(StatusOnWidget, self).__init__(parent=None)
+        self.setupUi(self)
 
-                try:
-                    ip = requests.get(check_url_alt, timeout=1).content.decode("utf-8").replace("\n", "")
+    def setupUi(self, Form):
+        Form.setObjectName("Form")
+        self.vLayoutStatus = QtWidgets.QVBoxLayout(Form)
+        self.vLayoutStatus.setObjectName("vLayoutStatus")
+        self.ipv4Label = QtWidgets.QLabel(Form)
+        self.ipv4Label.setObjectName("ipv4Label")
+        self.vLayoutStatus.addWidget(self.ipv4Label)
+        self.ipv6Label = QtWidgets.QLabel(Form)
+        self.ipv6Label.setObjectName("ipv6Label")
+        self.vLayoutStatus.addWidget(self.ipv6Label)
+        self.vLayoutStatus.addSpacing(10)
+        self.webView = QtWebEngineWidgets.QWebEngineView(Form)
+        self.webView.setUrl(QtCore.QUrl("about:blank"))
+        self.webView.setObjectName("webView")
+        self.webView.setMinimumSize(300,300)
+        self.vLayoutStatus.addWidget(self.webView)
+        self.hLayoutStatus = QtWidgets.QHBoxLayout()
+        self.hLayoutStatus.setObjectName("hLayoutStatus")
+        self.locButton = QtWidgets.QPushButton(Form)
+        self.locButton.setObjectName("locButton")
+        self.hLayoutStatus.addWidget(self.locButton)
+        self.ipleakButton = QtWidgets.QPushButton(Form)
+        self.ipleakButton.setObjectName("ipleakButton")
+        self.hLayoutStatus.addWidget(self.ipleakButton)
+        self.vLayoutStatus.addLayout(self.hLayoutStatus)
+        self.vLayoutStatus.addSpacing(25)
+        self.netHeader = QtWidgets.QLabel(Form)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        font.setBold(True)
+        font.setWeight(75)
+        self.netHeader.setFont(font)
+        self.netHeader.setObjectName("netHeader")
+        self.netHeader.setVisible(False)
+        self.vLayoutStatus.addWidget(self.netHeader)
+        self.hLayoutStatus_2 = QtWidgets.QHBoxLayout()
+        self.hLayoutStatus_2.setObjectName("hLayoutStatus_2")
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.hLayoutStatus_2.addItem(spacerItem)
+        font.setPointSize(9)
+        font.setBold(False)
+        self.intLabel = QtWidgets.QLabel(Form)
+        self.intLabel.setObjectName("intLabel")
+        self.intLabel.setFont(font)
+        self.hLayoutStatus_2.addWidget(self.intLabel)
+        self.timeLabel = QtWidgets.QLabel(Form)
+        self.timeLabel.setAlignment(QtCore.Qt.AlignCenter)
+        self.timeLabel.setObjectName("timeLabel")
+        self.timeLabel.setFont(font)
+        self.hLayoutStatus_2.addWidget(self.timeLabel)
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.hLayoutStatus_2.addItem(spacerItem1)
+        self.vLayoutStatus.addLayout(self.hLayoutStatus_2)
+        self.netGraph = plotter.PlotArea(Form)
+        self.netGraph.setObjectName("netGraph")
+        self.netGraph.setMinimumSize(100,100)
+        self.vLayoutStatus.addWidget(self.netGraph)
+        self.hLayoutStatus_3 = QtWidgets.QHBoxLayout()
+        self.hLayoutStatus_3.setObjectName("hLayoutStatus_3")
+        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.hLayoutStatus_3.addItem(spacerItem2)
+        self.downRect = ColoredRect(QtGui.QColor(44,142,216,255), parent=Form)
+        self.hLayoutStatus_3.addWidget(self.downRect)
+        self.downLabel = QtWidgets.QLabel(Form)
+        self.downLabel.setObjectName("downLabel")
+        self.downLabel.setFont(font)
+        self.hLayoutStatus_3.addWidget(self.downLabel)
+        self.upRect = ColoredRect(QtGui.QColor(255,127,42,255), parent=Form)
+        self.hLayoutStatus_3.addWidget(self.upRect)
+        self.upLabel = QtWidgets.QLabel(Form)
+        self.upLabel.setObjectName("upLabel")
+        self.upLabel.setFont(font)
+        self.hLayoutStatus_3.addWidget(self.upLabel)
+        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.hLayoutStatus_3.addItem(spacerItem3)
+        self.vLayoutStatus.addLayout(self.hLayoutStatus_3)
+        self.vLayoutStatus.addSpacing(25)
 
-                except requests.exceptions.RequestException:
-                    self.log.emit(("info", "Could not determine external ipv4 address"))
-                    ip = None
+        self.locButton.clicked.connect(self.show_location)
+        self.ipleakButton.clicked.connect(self.show_ipleak)
+        self.retranslateUi(Form)
+        QtCore.QMetaObject.connectSlotsByName(Form)
 
-            try:
-                query = requests.get(check_url_6, timeout=1).content.decode("utf-8")
-                ip_6 = json.loads(query)["ip"]
+    def retranslateUi(self, Form):
+        _translate = QtCore.QCoreApplication.translate
+        Form.setWindowTitle(_translate("Form", "Form"))
+        self.ipv4Label.setText(_translate("Form", "<b>External IPv4 address:</b> "))
+        self.ipv6Label.setText(_translate("Form", "<b>External IPv6 address:</b> "))
+        self.locButton.setText(_translate("Form", "Location"))
+        self.ipleakButton.setText(_translate("Form", "ipleak.net"))
+        self.netHeader.setText(_translate("Form", "Network statistics"))
+        self.intLabel.setText(_translate("Form", "<b>Network Inferface:</b> "))
+        self.timeLabel.setText(_translate("Form", "<b>Uptime:</b> "))
+        self.downLabel.setText(_translate("Form", "<b>Download:</b>"))
+        self.upLabel.setText(_translate("Form", "<b>Upload:</b>"))
 
-            except (KeyError, requests.exceptions.RequestException, json.decoder.JSONDecodeError):
+    def monitor_conn(self, interface, server):
+        self.server = server
+        self.intLabel.setText("<b>Network Inferface:</b> {}".format(interface))
+        self.calcThread = monitor.TunnelMon(interface, None, tun_hop=None)
+        self.calcThread.time.connect(self.update_time)
+        self.calcThread.stat.connect(self.update_chart)
+        self.calcThread.ip.connect(self.show_ext_ip)
+        self.calcThread.start()
 
-                try:
-                    ip_6 = requests.get(check_url_alt_6, timeout=1).content.decode("utf-8").replace("\n", "")
+    def show_ext_ip(self, ip_data):
+        self.ip_data = ip_data
+        self.ipv4Label.setText("<b>External IPv4 address:</b> {}".format(self.ip_data["ip4"]))
+        self.ipv6Label.setText("<b>External IPv6 address:</b> {}".format(self.ip_data["ip6"]))
+        self.show_location()
 
-                except requests.exceptions.RequestException:
-                    self.log.emit(("info", "Could not determine external ipv6 address"))
-                    ip_6 = None
+    def show_location(self):
+        formatting = {"lat":self.ip_data["lat"], "lon":self.ip_data["lon"], "server":self.server}
+        loc_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Location</title>
+            <link rel = "stylesheet" href = "https://unpkg.com/leaflet@1.4.0/dist/leaflet.css"/>
+            <script src = "https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"></script>
+        </head>
+        <body>
+            <div id = "map" style = "width: 98w; height: 98vh"></div>
+            <script>
+                var lat = {lat}
+                var lon = {lon}
+                var mapOptions = {{
+                    center: [lat, lon],
+                    zoom: 6
+                }}
+                var map = new L.map('map', mapOptions);
+                var marker = L.marker([lat, lon]).addTo(map);
+                marker.bindPopup("<b>{server}</b><br>lat: {lat} lon: {lon}");
+                var osmAttrib='Map data © <a href="https://openstreetmap.org">OpenStreetMap</a>'
+                var layer = new L.TileLayer(
+                    'http://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+                    attribution: osmAttrib,
+                    maxZoom: 18
+                    }});
+                map.addLayer(layer);
+            </script>
+        </body>
+        </html>
+        """.format(**formatting)
+        self.webView.setVisible(True)
+        self.webView.setHtml(loc_html)
 
-            self.log.emit(("info", "External ip = {} - {}".format(ip, ip_6)))
-            self.ip.emit((ip, ip_6))
+    def show_ipleak(self):
+        self.webView.setUrl(QtCore.QUrl("https://ipleak.net/#dnsdetection_title"))
 
-        t0 = time.time()
-        accum = (0, 0)
-        start_time = time.time()
+    def update_time(self, t):
+        self.timeLabel.setText("<b>Uptime:</b> {}".format(t))
 
-        try:
-            counter = psutil.net_io_counters(pernic=True)[self.tun]
-            stat = (counter.bytes_recv, counter.bytes_sent)
+    def update_chart(self, update):
+        self.netGraph.addPoint(update[2], update[0])
+        DLrate = round(update[0] / 128, 2)
+        DLacc = update[1]
+        ULrate = round(update[2] / 128, 2)
+        ULacc = update[3]
+        unit_acc_up = "Mb"
+        unit_acc_down = "Mb"
 
-        except KeyError:
-            stat = (0,0)
+        if DLacc / 1024 >= 1:
+            DLacc = DLacc / 1024
+            unit_acc_down = "Gb"
 
-        while connected is True:
-            last_stat = stat
-            time.sleep(1)
-            time_measure = time.time()
-            elapsed = time_measure - start_time
+        if ULacc / 1024 >= 1:
+            ULacc = ULacc / 1024
+            unit_acc_up = "Gb"
 
-            if int(elapsed) % 900 == 0:
-                self.check.emit()
+        self.downLabel.setText("<b>Download:</b> {} {} - {} Mbps".format(round(DLacc, 2), unit_acc_down, DLrate))
+        self.upLabel.setText("<b>Upload:</b> {} {} - {} Mbps".format(round(ULacc, 2), unit_acc_up, ULrate))
 
-            return_time = self.time_format(int(elapsed))
-            self.time.emit(return_time)
+    def reconnect_signal(self):
+        self.reconnect.emit()
 
-            try:
-                counter = psutil.net_io_counters(pernic=True)[self.tun]
-                if self.tun_hop is not None:
-                    tun_hop_test = psutil.net_io_counters(pernic=True)[self.tun_hop]
-                t1 = time.time()
-                stat = (counter.bytes_recv, counter.bytes_sent)
-                DLrate, ULrate = [(now - last) / (t1 - t0) / 1024.0 for now, last in zip(stat, last_stat)]
-                DLacc, ULacc = [(now + last) / (1024*1024) for now, last in zip(stat, last_stat)]
-                t0 = time.time()
-                self.stat.emit([DLrate, DLacc, ULrate, ULacc])
-
-            except (KeyError, OSError):
-                break
-
-        connected = False
-        self.log.emit(("info", "Interface {} does not exist anymore".format(self.tun)))
-        self.lost.emit()
-
-    def time_format(self, e):
-        calc = '{:02d}d {:02d}h {:02d}m {:02d}s'.format(e // 86400,
-                                                        (e % 86400 // 3600),
-                                                        (e % 3600 // 60),
-                                                        e % 60
-                                                        )
-        split = calc.split(" ")
-
-        if split[0] == "00d" and split[1] == "00h":
-            return ("{} {}".format(split[2], split[3]))
-
-        elif split[0] == "00d" and split[1] != "00h":
-            return ("{} {}".format(split[1], split[2]))
-
-        else:
-            return ("{} {}".format(split[0], split[1]))
+    def check_for_update(self):
+        self.check_update.emit()
 
 class FirewallEditor(QtWidgets.QDialog):
     fw_change = QtCore.pyqtSignal(dict)
