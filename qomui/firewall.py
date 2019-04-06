@@ -5,7 +5,8 @@ import logging
 from subprocess import check_call, check_output, CalledProcessError, Popen, PIPE
 from collections import Counter
 
-ROOTDIR = "/usr/share/qomui"
+from qomui import config
+
 saved_rules = []
 saved_rules_6 = []
 devnull = open(os.devnull, 'w')
@@ -155,12 +156,12 @@ def allow_dest_ip(ip, action):
 
 def get_config():
     try:
-        with open("{}/firewall.json".format(ROOTDIR), "r") as f:
+        with open("{}/firewall.json".format(config.ROOTDIR), "r") as f:
             return json.load(f)
     except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
         logging.info("Loading default firewall configuration")
         try:
-            with open("{}/firewall_default.json".format(ROOTDIR), "r") as f:
+            with open("{}/firewall_default.json".format(config.ROOTDIR), "r") as f:
                 return json.load(f)
         except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
             logging.debug("Failed to load firewall configuration")
@@ -195,7 +196,7 @@ def check_firewall_services():
 
 def save_iptables():
     try:
-        outfile = open("{}/iptables_before.rules".format(ROOTDIR), "w")
+        outfile = open("{}/iptables_before.rules".format(config.ROOTDIR), "w")
         save = Popen(["iptables-save"], stdout=outfile, stderr=PIPE)
         save.wait()
         outfile.flush()
@@ -207,7 +208,7 @@ def save_iptables():
     if check_ipv6() is True:
 
         try:
-            outfile6 = open("{}/ip6tables_before.rules".format(ROOTDIR), "w")
+            outfile6 = open("{}/ip6tables_before.rules".format(config.ROOTDIR), "w")
             save6 = Popen(["ip6tables-save"], stdout=outfile, stderr=PIPE)
             save6.wait()
             outfile6.flush()
@@ -220,7 +221,7 @@ def save_iptables():
 def restore_iptables():
     try:
         restore = Popen(
-            ["iptables-restore", "{}/iptables_before.rules".format(ROOTDIR)],
+            ["iptables-restore", "{}/iptables_before.rules".format(config.ROOTDIR)],
             stderr=PIPE)
         logging.debug("Restored previous iptables rules")
 
@@ -231,7 +232,7 @@ def restore_iptables():
 
         try:
             restore = Popen(["ip6tables-restore",
-                             "{}/ip6tables_before.rules".format(ROOTDIR)],
+                             "{}/ip6tables_before.rules".format(config.ROOTDIR)],
                             stderr=PIPE)
             logging.debug("Restored previous ip6tables rules")
 

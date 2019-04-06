@@ -21,14 +21,12 @@ import dbus
 import dbus.service
 from dbus.mainloop.pyqt5 import DBusQtMainLoop
 
-from qomui import firewall, bypass, update, dns_manager, tunnel
+from qomui import config, firewall, bypass, update, dns_manager, tunnel
 
-ROOTDIR = "/usr/share/qomui"
 LOGDIR = "/usr/share/qomui/logs"
 OPATH = "/org/qomui/service"
 IFACE = "org.qomui.service"
 BUS_NAME = "org.qomui.service"
-SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 
 class GuiLogHandler(logging.Handler):
     def __init__(self, send_log, parent=None):
@@ -87,12 +85,12 @@ class QomuiDbus(dbus.service.Object):
     #after upgrade: gui and service might be running different versions
     def check_version(self):
         try:
-            with open("{}/VERSION".format(ROOTDIR), "r") as v:
+            with open("{}/VERSION".format(config.ROOTDIR), "r") as v:
                 version = v.read().split("\n")
                 self.version = version[0]
 
         except FileNotFoundError:
-            self.logger.warning("{}/VERSION does not exist".format(ROOTDIR))
+            self.logger.warning("{}/VERSION does not exist".format(config.ROOTDIR))
 
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='s')
     def get_version(self):
@@ -123,10 +121,10 @@ class QomuiDbus(dbus.service.Object):
     @dbus.service.method(BUS_NAME, in_signature='s', out_signature='')
     def log_level_change(self, level):
         self.logger.setLevel(getattr(logging, level.upper()))
-        self.config["log_level"] = level
+        config.settings["log_level"] = level
 
-        with open('{}/config.json'.format(ROOTDIR), 'w') as save_config:
-            json.dump(self.config, save_config)
+        with open('{}/config.json'.format(config.ROOTDIR), 'w') as save_config:
+            json.dump(config.settings, save_config)
 
     @dbus.service.method(BUS_NAME, in_signature='a{ss}', out_signature='')
     def connect_to_server(self, ovpn_dict):
@@ -135,7 +133,7 @@ class QomuiDbus(dbus.service.Object):
             self.wg_connect = 1
             self.wg_provider = ovpn_dict["provider"]
 
-        setattr(self, "{}_dict".format(name), tunnel.TunnelThread(ovpn_dict, self.hop_dict, self.config))
+        setattr(self, "{}_dict".format(name), tunnel.TunnelThread(ovpn_dict, self.hop_dict, config.settings))
         getattr(self, "{}_dict".format(name)).log.connect(self.log_thread)
         getattr(self, "{}_dict".format(name)).status.connect(self.reply)
         getattr(self, "{}_dict".format(name)).dev.connect(self.set_tun)
@@ -155,22 +153,15 @@ class QomuiDbus(dbus.service.Object):
     #get fw configuration - might be called from gui after config change
     @dbus.service.method(BUS_NAME, in_signature='i', out_signature='')
     def load_firewall(self, stage):
-        try:
-            with open('{}/config.json'.format(ROOTDIR), 'r') as c:
-                self.config = json.load(c)
-
-        except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
-            self.logger.error('{}: Could not open config.json - loading default configuration'.format(e))
-            with open('{}/default_config.json'.format(ROOTDIR), 'r') as c:
-                self.config = json.load(c)
+        config.load_config()
 
         try:
-            self.logger.setLevel(self.config["log_level"].upper())
-            self.disable_ipv6(self.config["ipv6_disable"])
-            fw = self.config["firewall"]
-            gui_only = self.config["fw_gui_only"]
-            block_lan=self.config["block_lan"]
-            preserve=self.config["preserve_rules"] 
+            self.logger.setLevel(config.settings["log_level"].upper())
+            self.disable_ipv6(config.settings["ipv6_disable"])
+            fw = config.settings["firewall"]
+            gui_only = config.settings["fw_gui_only"]
+            block_lan=config.settings["block_lan"]
+            preserve=config.settings["preserve_rules"] 
 
             if fw == 1 and gui_only == 0:
                 opt = 1
@@ -196,10 +187,10 @@ class QomuiDbus(dbus.service.Object):
             self.logger.warning('Malformed config file')
 
         #default dns is always set to the alternative servers
-        self.dns = self.config["alt_dns1"]
-        self.dns_2 = self.config["alt_dns2"]
-        self.dns_bypass = self.config["alt_dns1"]
-        self.dns_2_bypass = self.config["alt_dns2"]
+        self.dns = config.settings["alt_dns1"]
+        self.dns_2 = config.settings["alt_dns2"]
+        self.dns_bypass = config.settings["alt_dns1"]
+        self.dns_2_bypass = config.settings["alt_dns2"]
 
     @dbus.service.method(BUS_NAME, in_signature='i', out_signature='')
     def disable_ipv6(self, i):
@@ -234,7 +225,7 @@ class QomuiDbus(dbus.service.Object):
 
             if self.wg_connect == 1:
                 try:
-                    wg_down = Popen(["wg-quick", "down", "{}/wg_qomui.conf".format(ROOTDIR)], stdout=PIPE, stderr=STDOUT)
+                    wg_down = Popen(["wg-quick", "down", "{}/wg_qomui.conf".format(config.ROOTDIR)], stdout=PIPE, stderr=STDOUT)
                     for line in wg_down.stdout:
                         self.logger.info("WireGuard: " + line.decode("utf-8").replace("\n", ""))
 
@@ -248,7 +239,7 @@ class QomuiDbus(dbus.service.Object):
                     ]
                 firewall.batch_rule_6(wg_rules)
                 firewall.batch_rule(wg_rules)
-                tunnel.exe_custom_scripts("down", self.wg_provider, self.config)
+                tunnel.exe_custom_scripts("down", self.wg_provider, config.settings)
                 self.wg_connect = 0
 
         elif env == "bypass":
@@ -289,7 +280,7 @@ class QomuiDbus(dbus.service.Object):
         elif provider == "ProtonVPN":
             server.append("api.protonmail.ch")
 
-        dns_manager.dns_request_exception("-I", self.config["alt_dns1"], self.config["alt_dns2"], "53")
+        dns_manager.dns_request_exception("-I", config.settings["alt_dns1"], config.settings["alt_dns2"], "53")
 
         if len(server) > 0:
             for s in server:
@@ -327,10 +318,10 @@ class QomuiDbus(dbus.service.Object):
         for f in os.listdir(certpath):
             f_source = "{}/{}".format(certpath, f)
 
-            if provider in SUPPORTED_PROVIDERS:
-                f_dest = "{}/{}/openvpn.conf".format(ROOTDIR, provider)
+            if provider in config.SUPPORTED_PROVIDERS:
+                f_dest = "{}/{}/openvpn.conf".format(config.ROOTDIR, provider)
             else:
-                f_dest = "{}/{}/{}".format(ROOTDIR, provider, f)
+                f_dest = "{}/{}/{}".format(config.ROOTDIR, provider, f)
 
             shutil.copyfile(f_source, f_dest)
             self.logger.debug("copied {} to {}".format(f, f_dest))
@@ -343,7 +334,7 @@ class QomuiDbus(dbus.service.Object):
             if credentials["credentials"] == "unknown":
 
                 try:
-                    auth_file = "{}/{}/{}-auth.txt".format(ROOTDIR, provider, provider)
+                    auth_file = "{}/{}/{}-auth.txt".format(config.ROOTDIR, provider, provider)
 
                     with open(auth_file, "r") as auth:
                         up = auth.read().split("\n")
@@ -354,7 +345,7 @@ class QomuiDbus(dbus.service.Object):
                     self.logger.error("Could not find {} - Aborting update".format(auth_file))
 
                 if provider == "Airvpn":
-                    credentials["key"] = self.config["airvpn_key"]
+                    credentials["key"] = config.settings["airvpn_key"]
 
         except KeyError:
             pass
@@ -382,14 +373,14 @@ class QomuiDbus(dbus.service.Object):
         provider = content["provider"]
 
         #dns requests must be allowed to resolve hostnames in config files
-        dns_manager.dns_request_exception("-D", self.config["alt_dns1"], self.config["alt_dns2"], "53")
+        dns_manager.dns_request_exception("-D", config.settings["alt_dns1"], config.settings["alt_dns2"], "53")
 
-        if provider in SUPPORTED_PROVIDERS:
-            with open('{}/config.json'.format(ROOTDIR), 'w') as save_config:
-                self.config["{}_last".format(provider)] = str(datetime.utcnow())
+        if provider in config.SUPPORTED_PROVIDERS:
+            with open('{}/config.json'.format(config.ROOTDIR), 'w') as save_config:
+                config.settings["{}_last".format(provider)] = str(datetime.utcnow())
                 if provider == "Airvpn":
-                    self.config["airvpn_key"] = content["airvpn_key"]
-                json.dump(self.config, save_config)
+                    config.settings["airvpn_key"] = content["airvpn_key"]
+                json.dump(config.settings, save_config)
 
         with open('{}/{}.json'.format(self.homedir, provider), 'w') as p:
             Popen(['chmod', '0666', '{}/{}.json'.format(self.homedir, provider)])
@@ -407,11 +398,11 @@ class QomuiDbus(dbus.service.Object):
 
     @dbus.service.method(BUS_NAME, in_signature='s', out_signature='')
     def delete_provider(self, provider):
-        path = "{}/{}".format(ROOTDIR, provider)
+        path = "{}/{}".format(config.ROOTDIR, provider)
         if os.path.exists(path):
             shutil.rmtree(path)
             try:
-                os.remove("{}/certs/{}-auth.txt".format(ROOTDIR, provider))
+                os.remove("{}/certs/{}-auth.txt".format(config.ROOTDIR, provider))
             except FileNotFoundError:
                 pass
 
@@ -436,7 +427,7 @@ class QomuiDbus(dbus.service.Object):
                 else:
                     self.interface = "None"
 
-                if self.config["bypass"] == 1:
+                if config.settings["bypass"] == 1:
                     bypass.create_cgroup(
                         self.net["user"],
                         self.net["group"],
@@ -452,12 +443,12 @@ class QomuiDbus(dbus.service.Object):
                     dns_manager.dnsmasq(
                                         self.interface,
                                         "5354",
-                                        self.config["alt_dns1"],
-                                        self.config["alt_dns2"],
+                                        config.settings["alt_dns1"],
+                                        config.settings["alt_dns2"],
                                         "_bypass"
                                         )
 
-                elif self.config["bypass"] == 0:
+                elif config.settings["bypass"] == 0:
 
                     try:
                         bypass.delete_cgroup(self.interface)
@@ -538,7 +529,7 @@ class QomuiDbus(dbus.service.Object):
             dev_bypass = self.interface
             dns_manager.set_dns(self.dns, self.dns_2)
 
-        if self.config["bypass"] == 1:
+        if config.settings["bypass"] == 1:
             dns_manager.dnsmasq(
                                 dev_bypass,
                                 "5354",
@@ -590,19 +581,19 @@ class QomuiDbus(dbus.service.Object):
                 deb_pack = "qomui-{}-amd64.deb".format(self.version[1:])
                 deb_url = "{}releases/download/v{}/{}".format(base_url, self.version[1:], deb_pack)
                 deb_down = requests.get(deb_url, stream=True, timeout=2)
-                with open('{}/{}'.format(ROOTDIR, deb_pack), 'wb') as deb:
+                with open('{}/{}'.format(config.ROOTDIR, deb_pack), 'wb') as deb:
                     shutil.copyfileobj(deb_down.raw, deb)
 
-                upgrade_cmd = ["dpkg", "-i", "{}/{}".format(ROOTDIR, deb_pack)]
+                upgrade_cmd = ["dpkg", "-i", "{}/{}".format(config.ROOTDIR, deb_pack)]
 
             elif self.packetmanager == "RPM":
                 rpm_pack = "qomui-{}-1.x86_64.rpm".format(self.version[1:])
                 rpm_url = "{}releases/download/v{}/{}".format(base_url, self.version[1:], rpm_pack)
                 rpm_down = requests.get(rpm_url, stream=True, timeout=2)
-                with open('{}/{}'.format(ROOTDIR, rpm_pack), 'wb') as rpm:
+                with open('{}/{}'.format(config.ROOTDIR, rpm_pack), 'wb') as rpm:
                     shutil.copyfileobj(rpm_down.raw, rpm)
 
-                upgrade_cmd = ["rpm", "-i", "{}/{}".format(ROOTDIR, rpm_pack)]
+                upgrade_cmd = ["rpm", "-i", "{}/{}".format(config.ROOTDIR, rpm_pack)]
 
             else:
                 url = "{}archive/{}.zip".format(base_url, self.version)
@@ -616,8 +607,8 @@ class QomuiDbus(dbus.service.Object):
                     "--no-deps"
                     ]
 
-            check_output(upgrade_cmd, cwd=ROOTDIR)
-            with open("{}/VERSION".format(ROOTDIR), "w") as vfile:
+            check_output(upgrade_cmd, cwd=config.ROOTDIR)
+            with open("{}/VERSION".format(config.ROOTDIR), "w") as vfile:
                 if self.packetmanager != "None":
                     vfile.write("{}\n{}".format(self.version[1:], self.packetmanager))
                 else:

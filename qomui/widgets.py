@@ -14,7 +14,7 @@ import shlex
 import logging
 from PyQt5 import QtCore, QtWidgets, QtGui, QtWebEngineWidgets
 
-from qomui import update, monitor, plotter
+from qomui import config, update, monitor, plotter
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -29,10 +29,6 @@ try:
 except AttributeError:
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig)
-
-ROOTDIR = "/usr/share/qomui"
-HOMEDIR = "{}/.qomui".format(os.path.expanduser("~"))
-SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 
 class favouriteButton(QtWidgets.QAbstractButton):
     def __init__(self, parent=None):
@@ -128,9 +124,9 @@ class ServerWidget(QtWidgets.QWidget):
                 self.iconLabel.setPixmap(country)
 
             except TypeError:
-                flag = '{}/flags/{}.png'.format(ROOTDIR, country)
+                flag = '{}/flags/{}.png'.format(config.ROOTDIR, country)
                 if not os.path.isfile(flag):
-                    flag = '{}/flags/Unknown.png'.format(ROOTDIR)
+                    flag = '{}/flags/Unknown.png'.format(config.ROOTDIR)
                 pixmap = QtGui.QPixmap(flag).scaled(25, 25,
                                                     transformMode=QtCore.Qt.SmoothTransformation
                                                     )
@@ -373,9 +369,9 @@ class ActiveWidget(QtWidgets.QWidget):
                                server_dict["country"], city, button="disconnect")
 
         if hop_dict is not None:
-            flag = '{}/flags/{}.png'.format(ROOTDIR, hop_dict["country"])
+            flag = '{}/flags/{}.png'.format(config.ROOTDIR, hop_dict["country"])
             if not os.path.isfile(flag):
-                flag = '{}/flags/Unknown.png'.format(ROOTDIR)
+                flag = '{}/flags/Unknown.png'.format(config.ROOTDIR)
             pixmap = QtGui.QPixmap(flag).scaled(25, 25,
                                                 transformMode=QtCore.Qt.SmoothTransformation
                                                 )
@@ -672,10 +668,10 @@ class FirewallEditor(QtWidgets.QDialog):
     def __init__ (self, config, parent=None):
         super(FirewallEditor, self).__init__(parent)
         try:
-            with open('{}/firewall.json'.format(ROOTDIR), 'r') as fload:
+            with open('{}/firewall.json'.format(config.ROOTDIR), 'r') as fload:
                 self.firewall_dict = json.load(fload)
         except FileNotFoundError:
-            with open('{}/firewall_default.json'.format(ROOTDIR), 'r') as fload:
+            with open('{}/firewall_default.json'.format(config.ROOTDIR), 'r') as fload:
                 self.firewall_dict = json.load(fload)
 
         self.config_dict = config
@@ -790,7 +786,7 @@ class FirewallEditor(QtWidgets.QDialog):
         self.ipv4Edit.clear()
         self.ipv6Edit.clear()
 
-        with open('{}/firewall_default.json'.format(ROOTDIR), 'r') as fload:
+        with open('{}/firewall_default.json'.format(config.ROOTDIR), 'r') as fload:
             self.firewall_dict = json.load(fload)
 
         self.display_rules()
@@ -808,7 +804,7 @@ class FirewallEditor(QtWidgets.QDialog):
         self.firewall_dict["ipv4rules"] = new_ipv4_rules
         self.firewall_dict["ipv6rules"] = new_ipv6_rules
 
-        with open ("{}/firewall_temp.json".format(HOMEDIR), "w") as firedump:
+        with open ("{}/firewall_temp.json".format(config.HOMEDIR), "w") as firedump:
                 json.dump(self.firewall_dict, firedump)
 
         for option in self.options:
@@ -991,7 +987,7 @@ class ModifyServer(QtWidgets.QDialog):
                                              "Apply changes to all configuration files of {}".format(self.provider)))
 
     def block_option(self, state):
-        if self.provider in SUPPORTED_PROVIDERS and state is False:
+        if self.provider in config.SUPPORTED_PROVIDERS and state is False:
             self.changeAllBox.setChecked(True)
 
     def load_config_file(self):
@@ -1009,11 +1005,11 @@ class ModifyServer(QtWidgets.QDialog):
             self.display_config()
 
     def display_config(self):
-        if self.provider in SUPPORTED_PROVIDERS:
-            config = "{}/{}/openvpn.conf".format(ROOTDIR, self.provider)
+        if self.provider in config.SUPPORTED_PROVIDERS:
+            config = "{}/{}/openvpn.conf".format(config.ROOTDIR, self.provider)
 
         else:
-            config = "{}/{}".format(ROOTDIR, self.server_info["path"])
+            config = "{}/{}".format(config.ROOTDIR, self.server_info["path"])
 
         splt = os.path.splitext(config)
         mod = "{}_MOD.{}".format(splt[0], splt[1])
@@ -1059,13 +1055,13 @@ class ModifyServer(QtWidgets.QDialog):
                 new_config[index] = line_format
             if new_config != self.old_config:
 
-                if self.provider in SUPPORTED_PROVIDERS:
+                if self.provider in config.SUPPORTED_PROVIDERS:
                     temp_file = "{}_config".format(self.provider)
 
                 else:
                     temp_file = self.server_info["path"].split("/")[1]
 
-                temp_folder = "{}/temp".format(HOMEDIR)
+                temp_folder = "{}/temp".format(config.HOMEDIR)
 
                 if not os.path.exists(temp_folder):
                     os.makedirs(temp_folder)

@@ -18,7 +18,7 @@ from dbus.mainloop.pyqt5 import DBusQtMainLoop
 import bisect
 import signal
 
-from qomui import update, latency, utils, firewall, widgets, profiles, monitor
+from qomui import config, update, latency, utils, firewall, widgets, profiles, monitor
 
 
 try:
@@ -35,15 +35,11 @@ except AttributeError:
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig)
 
-
-ROOTDIR = "/usr/share/qomui"
-HOMEDIR = "{}/.qomui".format(os.path.expanduser("~"))
-SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
-JSON_FILE_LIST = [("config_dict", "{}/config.json".format(ROOTDIR)),
-                  ("server_dict", "{}/server.json".format(HOMEDIR)),
-                  ("protocol_dict", "{}/protocol.json".format(HOMEDIR)),
-                  ("bypass_dict", "{}/bypass_apps.json".format(HOMEDIR)),
-                  ("profile_dict", "{}/profile.json".format(HOMEDIR))
+JSON_FILE_LIST = [
+                  ("server_dict", "{}/server.json".format(config.HOMEDIR)),
+                  ("protocol_dict", "{}/protocol.json".format(config.HOMEDIR)),
+                  ("bypass_dict", "{}/bypass_apps.json".format(config.HOMEDIR)),
+                  ("profile_dict", "{}/profile.json".format(config.HOMEDIR))
                   ]
 
 class DbusLogHandler(logging.Handler):
@@ -191,7 +187,7 @@ class QomuiGui(QtWidgets.QWidget):
                     time.sleep(3)
 
                     try:
-                        if self.config_dict["bypass"] == 1:
+                        if config.settings["bypass"] == 1:
                             self.dbus_call("bypass", {**self.routes, **utils.get_user_group()})
 
                     except KeyError:
@@ -222,7 +218,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.notify("Qomui: Systemd not available", "Starting qomui-service directly", icon="Info")
 
             try:
-                temp_bash = "{}/start_service.sh".format(HOMEDIR)
+                temp_bash = "{}/start_service.sh".format(config.HOMEDIR)
                 with open (temp_bash, "w") as temp_sh:
                     lines = ["#!/bin/bash \n", "nohup qomui-service & \n"]
                     temp_sh.writelines(lines)
@@ -895,7 +891,7 @@ class QomuiGui(QtWidgets.QWidget):
                                           s.join(text.replace("    ", "")),
                                           None))
 
-        for provider in SUPPORTED_PROVIDERS:
+        for provider in config.SUPPORTED_PROVIDERS:
             self.addProviderBox.addItem(provider)
         self.addProviderBox.addItem("Manually add config file folder")
 
@@ -1027,7 +1023,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.tabWidget.setCurrentIndex(3)
             self.logText.verticalScrollBar().setValue(self.logText.verticalScrollBar().maximum())
         elif button == "Options":
-            self.setOptiontab(self.config_dict)
+            self.setOptiontab(config.settings)
             self.tabWidget.setCurrentIndex(4)
         elif button == "Provider":
             self.tabWidget.setCurrentIndex(5)
@@ -1096,7 +1092,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.kill()
         self.disconnect_bypass()
         self.dbus_call("load_firewall", 2)
-        with open ("{}/server.json".format(HOMEDIR), "w") as s:
+        with open ("{}/server.json".format(config.HOMEDIR), "w") as s:
             json.dump(self.server_dict, s)
         sys.exit()
 
@@ -1109,7 +1105,6 @@ class QomuiGui(QtWidgets.QWidget):
             self.showNormal()
 
     def closeEvent(self, event):
-        print(event.spontaneous())
         self.exit_event = event
         self.confirm = QtWidgets.QMessageBox()
         self.timeout = 5
@@ -1162,10 +1157,10 @@ class QomuiGui(QtWidgets.QWidget):
 
     def connect_last_server(self):
         try:
-            if self.config_dict["autoconnect"] == 1:
+            if config.settings["autoconnect"] == 1:
                 self.kill()
                 self.disconnect_bypass()
-                last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
+                last_server_dict = self.load_json("{}/last_server.json".format(config.HOMEDIR))
 
                 if self.network_state == 1:
 
@@ -1204,8 +1199,10 @@ class QomuiGui(QtWidgets.QWidget):
             pass
 
     def load_saved_files(self):
+        config.load_config()
+        
         try:
-            with open("{}/VERSION".format(ROOTDIR), "r") as v:
+            with open("{}/VERSION".format(config.ROOTDIR), "r") as v:
                 version = v.read().split("\n")
                 self.installed = version[0]
                 self.logger.info("Qomui version {}".format(self.installed))
@@ -1238,40 +1235,36 @@ class QomuiGui(QtWidgets.QWidget):
                     pass
 
         except FileNotFoundError:
-            self.logger.warning("{}/VERSION does not exist".format(ROOTDIR))
+            self.logger.warning("{}/VERSION does not exist".format(config.ROOTDIR))
             self.versionInfo.setText("<b>Version:</b> N.A.")
 
         for saved_file in JSON_FILE_LIST:
             setattr(self, saved_file[0], self.load_json(saved_file[1]))
 
-        if not bool(self.config_dict):
-            setattr(self, "config_dict", self.load_json('{}/default_config.json'.format(ROOTDIR)))
-            self.logger.info('Loading default configuration')
-
         try:
-            if self.config_dict["minimize"] == 0:
+            if config.settings["minimize"] == 0:
                 self.setWindowState(QtCore.Qt.WindowActive)
 
         except KeyError:
             pass
 
         try:
-            if self.config_dict["firewall"] == 1 and self.config_dict["fw_gui_only"] == 1:
+            if config.settings["firewall"] == 1 and config.settings["fw_gui_only"] == 1:
                 self.dbus_call("load_firewall", 1)
 
         except KeyError:
             pass
 
         try:
-            self.logger.setLevel(getattr(logging, self.config_dict["log_level"].upper()))
-            if self.config_dict["log_level"] == "Debug":
+            self.logger.setLevel(getattr(logging, config.settings["log_level"].upper()))
+            if config.settings["log_level"] == "Debug":
                 self.logBox.setCurrentIndex(1)
 
         except KeyError:
             pass
 
         try:
-            if self.config_dict["bypass"] == 1:
+            if config.settings["bypass"] == 1:
                 self.bypassTabBt.setVisible(True)
 
         except KeyError:
@@ -1280,7 +1273,7 @@ class QomuiGui(QtWidgets.QWidget):
         for p in self.profile_dict.keys():
             self.display_profile(p)
 
-        self.setOptiontab(self.config_dict)
+        self.setOptiontab(config.settings)
         self.pop_boxes(country='All countries')
         self.pop_bypassAppList()
         #self.connect_last_server()
@@ -1303,11 +1296,11 @@ class QomuiGui(QtWidgets.QWidget):
                 pass
 
     def restoreDefaults(self):
-        default_config_dict = self.load_json('{}/default_config.json'.format(ROOTDIR))
+        default_config_dict = self.load_json('{}/default_config.json'.format(config.ROOTDIR))
         self.setOptiontab(default_config_dict)
 
     def cancelOptions(self):
-        self.setOptiontab(self.config_dict)
+        self.setOptiontab(config.settings)
 
     def read_option_change(self):
         temp_config_dict = {}
@@ -1324,15 +1317,15 @@ class QomuiGui(QtWidgets.QWidget):
 
     def save_options(self, temp_config, firewall=None):
 
-        for k, v in self.config_dict.items():
+        for k, v in config.settings.items():
             if k not in temp_config:
                 temp_config[k] = v
 
-        with open ('{}/config_temp.json'.format(HOMEDIR), 'w') as config:
+        with open ('{}/config_temp.json'.format(config.HOMEDIR), 'w') as config:
             json.dump(temp_config, config)
 
         update_cmd = ['pkexec', sys.executable, '-m', 'qomui.mv_config',
-                      '-d', '{}'.format(HOMEDIR)]
+                      '-d', '{}'.format(config.HOMEDIR)]
 
         if firewall is not None:
             update_cmd.append('-f')
@@ -1356,7 +1349,7 @@ class QomuiGui(QtWidgets.QWidget):
             else:
                 self.bypassTabBt.setVisible(False)
 
-            self.config_dict = temp_config
+            config.settings = temp_config
 
             return "updated"
 
@@ -1378,7 +1371,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.routes = routes
             self.logger.info("Detected new network connection")
             self.dbus_call("save_default_dns")
-            if self.config_dict["ping"] == 1:
+            if config.settings["ping"] == 1:
                 self.get_latencies()
             self.kill()
             self.disconnect_bypass()
@@ -1404,7 +1397,7 @@ class QomuiGui(QtWidgets.QWidget):
                 "ProtonVPN" : ("OpenVPN username", "OpenVPN password")
                 }
 
-        if provider in SUPPORTED_PROVIDERS:
+        if provider in config.SUPPORTED_PROVIDERS:
             self.airvpnKeyEdit.setVisible(False)
             self.addProviderEdit.setVisible(False)
             self.addProviderUserEdit.setPlaceholderText(_translate("Form", p_txt[provider][0], None))
@@ -1429,15 +1422,15 @@ class QomuiGui(QtWidgets.QWidget):
             self.addProviderDownloadBt.setText(_translate("Form", "Add Folder", None))
 
     def add_server_configs(self):
-        if not os.path.exists("{}/temp".format(HOMEDIR)):
-            os.makedirs("{}/temp".format(HOMEDIR))
+        if not os.path.exists("{}/temp".format(config.HOMEDIR)):
+            os.makedirs("{}/temp".format(config.HOMEDIR))
 
         folderpath = "None"
         provider = self.addProviderBox.currentText()
         username = self.addProviderUserEdit.text()
         password = self.addProviderPassEdit.text()
 
-        if provider not in SUPPORTED_PROVIDERS:
+        if provider not in config.SUPPORTED_PROVIDERS:
             provider = self.addProviderEdit.text()
 
             if provider == "":
@@ -1468,7 +1461,7 @@ class QomuiGui(QtWidgets.QWidget):
                             "username" : username,
                             "password" : password,
                             "folderpath" : folderpath,
-                            "homedir" : HOMEDIR,
+                            "config.HOMEDIR" : config.HOMEDIR,
                             "update" : "1"
                             }
 
@@ -1510,7 +1503,7 @@ class QomuiGui(QtWidgets.QWidget):
 
             self.dbus_call("delete_provider", provider)
 
-            with open ("{}/server.json".format(HOMEDIR), "w") as s:
+            with open ("{}/server.json".format(config.HOMEDIR), "w") as s:
                 json.dump(self.server_dict, s)
 
             self.notify(
@@ -1532,7 +1525,7 @@ class QomuiGui(QtWidgets.QWidget):
 
     def del_profile(self, number):
         self.profile_dict.pop(number)
-        with open ("{}/profile.json".format(HOMEDIR), "w") as s:
+        with open ("{}/profile.json".format(config.HOMEDIR), "w") as s:
                 json.dump(self.profile_dict, s)
         getattr(self, "{}_widget".format(number)).deleteLater()
         self.vLayoutProfile_2.removeWidget(getattr(self, "{}_widget".format(number)))
@@ -1558,7 +1551,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.profile_dict[number] = profile_dict
             getattr(self, "{}_widget".format(number)).setText(self.profile_dict[number])
 
-        with open ("{}/profile.json".format(HOMEDIR), "w") as s:
+        with open ("{}/profile.json".format(config.HOMEDIR), "w") as s:
                     json.dump(self.profile_dict, s)
 
     def display_profile(self, number):
@@ -1703,9 +1696,9 @@ class QomuiGui(QtWidgets.QWidget):
             self.notify(split[0], split[1], icon="Error")
 
         else:
-            self.config_dict = self.load_json("{}/config.json".format(ROOTDIR))
+            config.settings = self.load_json("{}/config.json".format(config.ROOTDIR))
 
-            with open("{}/{}.json".format(HOMEDIR, msg), "r") as p:
+            with open("{}/{}.json".format(config.HOMEDIR, msg), "r") as p:
                 content = json.load(p)
 
             provider = content["provider"]
@@ -1731,7 +1724,7 @@ class QomuiGui(QtWidgets.QWidget):
                 except KeyError:
                     pass
 
-            if provider in SUPPORTED_PROVIDERS:
+            if provider in config.SUPPORTED_PROVIDERS:
                 del_list = []
 
                 for k, v in self.server_dict.items():
@@ -1758,13 +1751,13 @@ class QomuiGui(QtWidgets.QWidget):
             except KeyError:
                 pass
 
-            with open ("{}/server.json".format(HOMEDIR), "w") as s:
+            with open ("{}/server.json".format(config.HOMEDIR), "w") as s:
                 json.dump(self.server_dict, s)
 
-            with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
+            with open ("{}/protocol.json".format(config.HOMEDIR), "w") as p:
                 json.dump(self.protocol_dict, p)
 
-            os.remove("{}/{}.json".format(HOMEDIR, msg))
+            os.remove("{}/{}.json".format(config.HOMEDIR, msg))
             self.pop_boxes()
 
     def del_single_server(self):
@@ -1779,14 +1772,14 @@ class QomuiGui(QtWidgets.QWidget):
             except KeyError:
                 pass
 
-        with open ("{}/server.json".format(HOMEDIR), "w") as s:
+        with open ("{}/server.json".format(config.HOMEDIR), "w") as s:
             json.dump(self.server_dict, s)
 
     def set_flag(self, country):
-        flag = '{}/flags/{}.png'.format(ROOTDIR, country)
+        flag = '{}/flags/{}.png'.format(config.ROOTDIR, country)
 
         if not os.path.isfile(flag):
-            flag = '{}/flags/Unknown.png'.format(ROOTDIR)
+            flag = '{}/flags/Unknown.png'.format(config.ROOTDIR)
 
         pixmap = QtGui.QPixmap(flag).scaled(25, 25,
                                             transformMode=QtCore.Qt.SmoothTransformation
@@ -1866,7 +1859,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.add_server_widget(key, val)
 
         try:
-            if self.config_dict["ping"] == 1:
+            if config.settings["ping"] == 1:
                 self.get_latencies()
 
         except KeyError:
@@ -2047,7 +2040,7 @@ class QomuiGui(QtWidgets.QWidget):
                 self.pop_ProtocolListWidget(self.providerProtocolBox.currentText())
 
     def pop_ProtocolListWidget(self, provider):
-        if provider in SUPPORTED_PROVIDERS:
+        if provider in config.SUPPORTED_PROVIDERS:
             self.protocolListWidget.setVisible(True)
             self.overrideCheck.setVisible(False)
             self.portOverrideLabel.setVisible(False)
@@ -2104,10 +2097,10 @@ class QomuiGui(QtWidgets.QWidget):
 
     def protocol_change(self, selection):
         provider = self.providerProtocolBox.currentText()
-        if provider in SUPPORTED_PROVIDERS:
+        if provider in config.SUPPORTED_PROVIDERS:
             self.protocol_dict[provider]["selected"] = selection.data(QtCore.Qt.UserRole)
 
-            with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
+            with open ("{}/protocol.json".format(config.HOMEDIR), "w") as p:
                 json.dump(self.protocol_dict, p)
 
             for item in range(self.protocolListWidget.count()):
@@ -2132,7 +2125,7 @@ class QomuiGui(QtWidgets.QWidget):
         elif state == False:
             try:
                 self.protocol_dict.pop(self.providerProtocolBox.currentText(), None)
-                with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
+                with open ("{}/protocol.json".format(config.HOMEDIR), "w") as p:
                     json.dump(self.protocol_dict, p)
             except KeyError:
                 pass
@@ -2144,7 +2137,7 @@ class QomuiGui(QtWidgets.QWidget):
 
         if self.overrideCheck.checkState() == 2:
             self.protocol_dict[provider] = {"protocol" : protocol, "port": port}
-            with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
+            with open ("{}/protocol.json".format(config.HOMEDIR), "w") as p:
                 json.dump(self.protocol_dict, p)
 
     def pop_delProviderBox(self):
@@ -2160,7 +2153,7 @@ class QomuiGui(QtWidgets.QWidget):
             self.server_dict[change[0]].update({"favourite" : "off"})
             if self.favouriteButton.isChecked() == True:
                 self.show_favourite_servers(True)
-        with open ("{}/server.json".format(HOMEDIR), "w") as s:
+        with open ("{}/server.json".format(config.HOMEDIR), "w") as s:
             json.dump(self.server_dict, s)
 
     def set_hop(self, server):
@@ -2277,15 +2270,15 @@ class QomuiGui(QtWidgets.QWidget):
         self.tunnel_active = 1
         QtWidgets.QApplication.restoreOverrideCursor()
         self.stop_progress_bar("connection", server=self.ovpn_dict["name"])
-        self.set_tray_icon('{}/flags/{}.png'.format(ROOTDIR, self.ovpn_dict["country"]))
+        self.set_tray_icon('{}/flags/{}.png'.format(config.ROOTDIR, self.ovpn_dict["country"]))
         self.notify(
                     "Qomui",
                     "Connection to {} successfully established".format(self.ovpn_dict["name"]),
                     icon="Information"
                     )
 
-        last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
-        with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
+        last_server_dict = self.load_json("{}/last_server.json".format(config.HOMEDIR))
+        with open('{}/last_server.json'.format(config.HOMEDIR), 'w') as lserver:
             last_server_dict["last"] = self.ovpn_dict
             last_server_dict["hop"] = self.hop_server_dict
             json.dump(last_server_dict, lserver)
@@ -2321,8 +2314,8 @@ class QomuiGui(QtWidgets.QWidget):
                     icon="Information"
                     )
 
-        last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
-        with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
+        last_server_dict = self.load_json("{}/last_server.json".format(config.HOMEDIR))
+        with open('{}/last_server.json'.format(config.HOMEDIR), 'w') as lserver:
             last_server_dict["bypass"] = self.bypass_ovpn_dict
             json.dump(last_server_dict, lserver)
             lserver.close()
@@ -2414,12 +2407,12 @@ class QomuiGui(QtWidgets.QWidget):
         QtWidgets.QApplication.restoreOverrideCursor()
 
         if not self.queue:
-            self.queue = [p for p in SUPPORTED_PROVIDERS if p in self.provider_list]
+            self.queue = [p for p in config.SUPPORTED_PROVIDERS if p in self.provider_list]
 
         provider = self.queue[0]
 
         try:
-            get_last = self.config_dict["{}_last".format(provider)]
+            get_last = config.settings["{}_last".format(provider)]
             last_update = datetime.strptime(get_last, '%Y-%m-%d %H:%M:%S.%f')
             time_now = datetime.utcnow()
             delta = time_now.date() - last_update.date()
@@ -2431,11 +2424,11 @@ class QomuiGui(QtWidgets.QWidget):
                                 "provider" : provider,
                                 "credentials" : "unknown",
                                 "folderpath" : "None",
-                                "homedir" : HOMEDIR,
+                                "config.HOMEDIR" : config.HOMEDIR,
                                 "update" : "0"
                                 }
 
-                if self.config_dict["auto_update"] == 1:
+                if config.settings["auto_update"] == 1:
                     self.logger.info("Updating {}".format(provider))
                     self.dbus_call("import_thread", credentials)
 
@@ -2477,12 +2470,12 @@ class QomuiGui(QtWidgets.QWidget):
         pass
 
     def kill_bypass(self):
-        last_server_dict = self.load_json("{}/last_server.json".format(HOMEDIR))
+        last_server_dict = self.load_json("{}/last_server.json".format(config.HOMEDIR))
 
         if "bypass" in last_server_dict.keys():
             last_server_dict.pop("bypass")
 
-        with open('{}/last_server.json'.format(HOMEDIR), 'w') as lserver:
+        with open('{}/last_server.json'.format(config.HOMEDIR), 'w') as lserver:
             json.dump(last_server_dict, lserver)
             lserver.close()
 
@@ -2529,9 +2522,9 @@ class QomuiGui(QtWidgets.QWidget):
         events = ["pre", "up", "down"]
         for e in events:
             try:
-                if e in self.config_dict["{}_scripts".format(provider)].keys():
+                if e in config.settings["{}_scripts".format(provider)].keys():
                     getattr(self, "{}Edit".format(e)).setText(
-                        self.config_dict["{}_scripts".format(provider)][e]
+                        config.settings["{}_scripts".format(provider)][e]
                         )
                 else:
                     getattr(self, "{}Edit".format(e)).clear()
@@ -2549,7 +2542,7 @@ class QomuiGui(QtWidgets.QWidget):
                             icon="Warning"
                             )
 
-        editor = widgets.FirewallEditor(self.config_dict)
+        editor = widgets.FirewallEditor(config.settings)
         editor.fw_change.connect(self.firewall_update)
         editor.exec_()
 
@@ -2564,7 +2557,7 @@ class QomuiGui(QtWidgets.QWidget):
     def add_bypass_app(self, app_info):
         self.bypass_dict[app_info[0]] = [app_info[1], app_info[2]]
 
-        with open ("{}/bypass_apps.json".format(HOMEDIR), "w") as save_bypass:
+        with open ("{}/bypass_apps.json".format(config.HOMEDIR), "w") as save_bypass:
             json.dump(self.bypass_dict, save_bypass)
 
         self.pop_bypassAppList()
@@ -2580,7 +2573,7 @@ class QomuiGui(QtWidgets.QWidget):
             except KeyError:
                 pass
 
-        with open ("{}/bypass_apps.json".format(HOMEDIR), "w") as save_bypass:
+        with open ("{}/bypass_apps.json".format(config.HOMEDIR), "w") as save_bypass:
             json.dump(self.bypass_dict, save_bypass)
 
         self.pop_bypassAppList()
@@ -2613,7 +2606,7 @@ class QomuiGui(QtWidgets.QWidget):
                         cmd = re.sub(r"%[\w]", "", cmd)
                         found = 1
 
-            temp_bash = "{}/bypass_temp.sh".format(HOMEDIR)
+            temp_bash = "{}/bypass_temp.sh".format(config.HOMEDIR)
 
             with open (temp_bash, "w") as temp_sh:
                 lines = ["#!/bin/bash \n",
@@ -2695,22 +2688,22 @@ class QomuiGui(QtWidgets.QWidget):
                 self.countryBox.addItem(country)
                 self.countryBox.setItemText(index+1, country)
 
-        with open ("{}/server.json".format(HOMEDIR), "w") as s:
+        with open ("{}/server.json".format(config.HOMEDIR), "w") as s:
             json.dump(self.server_dict, s)
 
         if len(new_config) != 0:
             try:
-                if provider in SUPPORTED_PROVIDERS:
-                    temp_file = "{}/temp/{}_config".format(HOMEDIR, provider)
+                if provider in config.SUPPORTED_PROVIDERS:
+                    temp_file = "{}/temp/{}_config".format(config.HOMEDIR, provider)
                     with open(temp_file, "w") as config_change:
                         config_change.writelines(new_config)
 
                 else:
-                    temp_file = "{}/temp/{}".format(HOMEDIR, val["path"].split("/")[1])
+                    temp_file = "{}/temp/{}".format(config.HOMEDIR, val["path"].split("/")[1])
                     if modifications["apply_all"] == 1:
                         for k, v in self.server_dict.items():
                             if v["provider"] == provider:
-                                path = "{}/temp/{}".format(HOMEDIR, v["path"].split("/")[1])
+                                path = "{}/temp/{}".format(config.HOMEDIR, v["path"].split("/")[1])
                                 with open(path, "w") as config_change:
                                     index = modifications["index"]
                                     rpl = new_config[index].split(" ")
@@ -2718,7 +2711,7 @@ class QomuiGui(QtWidgets.QWidget):
                                     new_config[index] = ip_insert
                                     config_change.writelines(new_config)
 
-                self.dbus_call("change_ovpn_config", provider, "{}/temp".format(HOMEDIR))
+                self.dbus_call("change_ovpn_config", provider, "{}/temp".format(config.HOMEDIR))
 
             except FileNotFoundError:
                 pass

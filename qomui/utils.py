@@ -5,7 +5,7 @@ import grp
 import getpass
 import pwd
 
-SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+from qomui import config
 
 def get_user_group():
     username = getpass.getuser()
@@ -14,7 +14,7 @@ def get_user_group():
 
 def create_server_dict(current_dict, protocol_dict):
     provider = current_dict["provider"]
-    if provider in SUPPORTED_PROVIDERS:
+    if provider in config.SUPPORTED_PROVIDERS:
 
         try:
             mode = protocol_dict[provider]["selected"]
