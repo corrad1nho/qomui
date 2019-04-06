@@ -56,18 +56,18 @@ class PlotArea(QtWidgets.QWidget):
         legend_painter.drawText(self.wmax-55, self.hmax, "{} Mbps".format("0"))
 
         up_painter = QtGui.QPainter(self)
-        pen = QtGui.QPen(QtGui.QColor(255,127,42,255))
+        pen = QtGui.QPen(QtGui.QColor(44,162,216,255))
         pen.setWidth(2)
         up_painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
         up_painter.setPen(pen)
-        up_painter.drawPath(self.down_path)
+        up_painter.drawPath(self.up_path)
 
         down_painter = QtGui.QPainter(self)
-        pen = QtGui.QPen(QtGui.QColor(44,142,216,255))
+        pen = QtGui.QPen(QtGui.QColor(255,127,42,255))
         pen.setWidth(2)
         down_painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
         down_painter.setPen(pen)
-        down_painter.drawPath(self.up_path)
+        down_painter.drawPath(self.down_path)
 
     def addPoint(self, up, down):
         self.up_path = QtGui.QPainterPath()
