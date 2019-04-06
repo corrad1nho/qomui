@@ -330,7 +330,8 @@ class TunnelThread(QtCore.QThread):
                         except IndexError:
                             self.dns_2 = None
 
-                dns_manager.set_dns(self.dns, self.dns_2)
+                if self.config["dns_off"] == 0:
+                    dns_manager.set_dns(self.dns, self.dns_2)
                 self.dnsserver.emit(("", self.dns, self.dns_2))
 
             #Necessary, otherwise bypass mode breaks - need to investigate
@@ -455,7 +456,8 @@ class TunnelThread(QtCore.QThread):
                     else:
                         setattr(self, "dns_2{}".format(add), None)
 
-                dns_manager.set_dns(getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add)))
+                if self.config["dns_off"] == 0:
+                    dns_manager.set_dns(getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add)))
                 self.dnsserver.emit((add, getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add))))
 
             #might be redundant as gui checks for timeout anyway

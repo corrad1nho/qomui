@@ -516,7 +516,8 @@ class QomuiDbus(dbus.service.Object):
                 interface = self.interface
 
             interface_bypass = self.tun_bypass
-            dns_manager.set_dns("127.0.0.1")
+            if config.settings["dns_off"] == 0:
+                dns_manager.set_dns("127.0.0.1")
             dns_manager.dnsmasq(
                                 interface,
                                 "53",
@@ -527,7 +528,8 @@ class QomuiDbus(dbus.service.Object):
 
         else:
             dev_bypass = self.interface
-            dns_manager.set_dns(self.dns, self.dns_2)
+            if config.settings["dns_off"] == 0:
+                dns_manager.set_dns(self.dns, self.dns_2)
 
         if config.settings["bypass"] == 1:
             dns_manager.dnsmasq(
