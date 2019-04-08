@@ -17,7 +17,7 @@ from PyQt5 import QtCore
 from bs4 import BeautifulSoup
 from subprocess import PIPE, Popen, check_output, CalledProcessError, run
 
-from qomui import firewall
+from qomui import config, firewall
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -908,8 +908,8 @@ class AddServers(QtCore.QThread):
             ip = 0
             protocol_found = 0
 
-            with open(conf_copy, "r") as config:
-                modify = config.readlines()
+            with open(conf_copy, "r") as conf_file:
+                modify = conf_file.readlines()
 
                 for index, line in enumerate(modify):
                     if line.startswith("remote "):
@@ -981,7 +981,7 @@ class AddServers(QtCore.QThread):
                 if protocol_found == 0:
                     modify.insert(0, "proto {}".format(protocol.lower()))
 
-                config.close()
+                conf_file.close()
 
                 with open (conf_copy, "w") as file_edit:
                     file_edit.writelines(modify)
@@ -1033,14 +1033,14 @@ class AddServers(QtCore.QThread):
 
         return unrelated_files
 
-    def gen_wg_key(self, config):
+    def gen_wg_key(self, conf_file):
         #check if key already exists
-        if os.path.exists("{}/{}/{}".format(config.ROOTDIR, self.provider, config)) and self.update == "0":
-            self.log.emit(("debug", "WireGuard keys for {} have already been generated".format(config.split("/")[-1])))
+        if os.path.exists("{}/{}/{}".format(config.ROOTDIR, self.provider, conf_file)) and self.update == "0":
+            self.log.emit(("debug", "WireGuard keys for {} have already been generated".format(conf_file.split("/")[-1])))
             wg_keys = None
 
         else:
-            self.log.emit(("info", "Generating WireGuard keys for {}".format(config.split("/")[-1])))
+            self.log.emit(("info", "Generating WireGuard keys for {}".format(conf_file.split("/")[-1])))
 
             try:
                 private_key = check_output(["wg", "genkey"]).decode("utf-8").split("\n")[0]

@@ -80,7 +80,9 @@ class QomuiGui(QtWidgets.QWidget):
                    "alt_dns",
                    "bypass",
                    "ping",
-                   "auto_update"
+                   "auto_update",
+                   "no_dnsmasq",
+                   "dns_off"
                    ]
 
     routes = {
@@ -195,7 +197,7 @@ class QomuiGui(QtWidgets.QWidget):
 
                     retry = self.dbus_call(cmd, *args)
                     return retry
-            
+
             else:
                 self.logger.error("Dbus Error: {}".format(e))
                 self.notify("Qomui: Dbus Error", "An error occured. See log for details", icon="Warning")
@@ -537,10 +539,14 @@ class QomuiGui(QtWidgets.QWidget):
         self.alt_dnsOptLabel.setFont(bold_font)
         self.alt_dnsOptLabel.setObjectName(_fromUtf8("alt_dnsOptLabel"))
         self.vLayoutOption_2.addWidget(self.alt_dnsOptLabel)
-        self.dns_offOptCheckCheck = QtWidgets.QCheckBox(self.optionsScroll)
-        self.dns_offOptCheckCheck.setFont(bold_font)
-        self.dns_offOptCheckCheck.setObjectName(_fromUtf8("dns_offOptCheckCheck"))
-        self.vLayoutOption_2.addWidget(self.dns_offOptCheckCheck)
+        self.dns_offOptCheck = QtWidgets.QCheckBox(self.optionsScroll)
+        self.dns_offOptCheck.setFont(bold_font)
+        self.dns_offOptCheck.setObjectName(_fromUtf8("dns_offOptCheck"))
+        self.vLayoutOption_2.addWidget(self.dns_offOptCheck)
+        self.no_dnsmasqOptCheck = QtWidgets.QCheckBox(self.optionsScroll)
+        self.no_dnsmasqOptCheck.setFont(bold_font)
+        self.no_dnsmasqOptCheck.setObjectName(_fromUtf8("no_dnsmasqOptCheck"))
+        self.vLayoutOption_2.addWidget(self.no_dnsmasqOptCheck)
         self.alt_dnsOptCheck = QtWidgets.QCheckBox(self.optionsScroll)
         self.alt_dnsOptCheck.setFont(bold_font)
         self.alt_dnsOptCheck.setObjectName(_fromUtf8("alt_dnsOptCheck"))
@@ -614,6 +620,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.airvpnKeyEdit.setObjectName(_fromUtf8("airvpnKeyEdit"))
         self.gLayoutProvider.addWidget(self.airvpnKeyEdit, 2, 0, 1, 2)
         self.vLayoutProvider.addLayout(self.gLayoutProvider)
+        self.vLayoutProvider.addSpacing(10)
         self.delProviderLabel = QtWidgets.QLabel(self.providerTab)
         self.delProviderLabel.setFont(bold_font)
         self.delProviderLabel.setObjectName("delProviderLabel")
@@ -628,6 +635,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.hLayoutProvider2.addWidget(self.delProviderBt)
         self.hLayoutProvider2.addStretch()
         self.vLayoutProvider.addLayout(self.hLayoutProvider2)
+        self.vLayoutProvider.addSpacing(10)
         self.protocolLabel = QtWidgets.QLabel(self.providerTab)
         self.protocolLabel.setFont(bold_font)
         self.protocolLabel.setObjectName("protocolLabel")
@@ -664,6 +672,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.savePortButton.setVisible(False)
         self.hLayoutProvider.addWidget(self.savePortButton)
         self.hLayoutProvider.addStretch()
+        self.vLayoutProvider.addSpacing(10)
         self.scriptLabel = QtWidgets.QLabel(self.providerTab)
         self.scriptLabel.setFont(bold_font)
         self.scriptLabel.setObjectName("scriptLabel")
@@ -814,8 +823,9 @@ class QomuiGui(QtWidgets.QWidget):
         self.pingOptCheck.setText(_translate("Form", "Perform latency check", None))
         self.ipv6_disableOptCheck.setText(_translate("Form", "Disable IPv6", None))
         self.alt_dnsOptCheck.setText(_translate("Form", "Use always", None))
-        self.dns_offOptCheckCheck.setText(_translate("Form", "Never change DNS servers", None))
-        self.alt_dnsOptLabel.setText(_translate("Form", "Alternative DNS Servers:", None))
+        self.dns_offOptCheck.setText(_translate("Form", "Never change DNS servers", None))
+        self.no_dnsmasqOptCheck.setText(_translate("Form", "Use same DNS servers for bypass", None))
+        self.alt_dnsOptLabel.setText(_translate("Form", "DNS settings and alternative servers", None))
         self.restoreDefaultOptBt.setText(_translate("Form", "Restore defaults", None))
         self.restoreDefaultOptBt.setIcon(QtGui.QIcon.fromTheme("document-revert"))
         self.applyOptBt.setText(_translate("Form", "Apply", None))
@@ -1205,7 +1215,8 @@ class QomuiGui(QtWidgets.QWidget):
 
     def load_saved_files(self):
         config.load_config()
-        
+        self.logger.debug("Current configuration: {}".format(config.settings))
+
         try:
             with open("{}/VERSION".format(config.ROOTDIR), "r") as v:
                 version = v.read().split("\n")
@@ -1301,7 +1312,7 @@ class QomuiGui(QtWidgets.QWidget):
                 pass
 
     def restoreDefaults(self):
-        default_config_dict = self.load_json('{}/default_config.json'.format(config.ROOTDIR))
+        default_config_dict = config.default_settings
         self.setOptiontab(default_config_dict)
 
     def cancelOptions(self):
@@ -1311,7 +1322,7 @@ class QomuiGui(QtWidgets.QWidget):
         temp_config_dict = {}
         temp_config_dict["alt_dns1"] = self.altDnsEdit1.text().replace("\n", "")
         temp_config_dict["alt_dns2"] = self.altDnsEdit2.text().replace("\n", "")
-
+        print(self.config_list)
         for option in self.config_list:
             if getattr(self, "{}OptCheck".format(option)).checkState() == 2:
                 temp_config_dict[option] = 1
@@ -1322,12 +1333,12 @@ class QomuiGui(QtWidgets.QWidget):
 
     def save_options(self, temp_config, firewall=None):
 
-        for k, v in config.settings.items():
+        for k, v in self.config_dict.items():
             if k not in temp_config:
                 temp_config[k] = v
 
-        with open ('{}/config_temp.json'.format(config.HOMEDIR), 'w') as config:
-            json.dump(temp_config, config)
+        with open ('{}/config_temp.json'.format(config.HOMEDIR), 'w') as c:
+            json.dump(temp_config, c)
 
         update_cmd = ['pkexec', sys.executable, '-m', 'qomui.mv_config',
                       '-d', '{}'.format(config.HOMEDIR)]
@@ -1466,7 +1477,7 @@ class QomuiGui(QtWidgets.QWidget):
                             "username" : username,
                             "password" : password,
                             "folderpath" : folderpath,
-                            "config.HOMEDIR" : config.HOMEDIR,
+                            "homedir" : config.HOMEDIR,
                             "update" : "1"
                             }
 
@@ -2164,7 +2175,7 @@ class QomuiGui(QtWidgets.QWidget):
     def set_hop(self, server):
         try:
             current_dict = self.server_dict[server].copy()
-            self.hop_server_dict = utils.create_server_dict(current_dict, self.protocol_dict)
+            self.hop_server_dict = utils.create_server_dict(current_dict, self.protocol_dict, config.SUPPORTED_PROVIDERS)
             self.show_hop_widget()
 
         except KeyError:
@@ -2210,7 +2221,7 @@ class QomuiGui(QtWidgets.QWidget):
 
             if bypass == 1:
                 self.disconnect_bypass()
-                self.bypass_ovpn_dict = utils.create_server_dict(current_dict, self.protocol_dict)
+                self.bypass_ovpn_dict = utils.create_server_dict(current_dict, self.protocol_dict, config.SUPPORTED_PROVIDERS)
                 self.bypass_ovpn_dict.update({"bypass":"1", "hop":"0"})
 
                 try:
@@ -2228,7 +2239,7 @@ class QomuiGui(QtWidgets.QWidget):
 
             else:
                 self.kill()
-                self.ovpn_dict = utils.create_server_dict(current_dict, self.protocol_dict)
+                self.ovpn_dict = utils.create_server_dict(current_dict, self.protocol_dict, config.SUPPORTED_PROVIDERS)
 
                 try:
                     if self.ovpn_dict["tunnel"] == "WireGuard":
@@ -2452,6 +2463,7 @@ class QomuiGui(QtWidgets.QWidget):
         self.tabWidget.setCurrentIndex(1)
         self.statusOnWidget.setVisible(False)
         self.statusOffWidget.setVisible(True)
+        self.statusOnWidget.reset_html()
         self.tunnel_active = 0
         self.tunnel_hop_active = 0
         self.dbus_call("disconnect", "main")

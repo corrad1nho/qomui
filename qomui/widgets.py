@@ -12,7 +12,14 @@ import configparser
 import requests
 import shlex
 import logging
-from PyQt5 import QtCore, QtWidgets, QtGui, QtWebEngineWidgets
+from PyQt5 import QtCore, QtWidgets, QtGui
+
+try:
+    from PyQt5 import QtWebEngineWidgetsas
+    webengine_available = 1
+
+except ImportError:
+    webengine_available = 0
 
 from qomui import config, update, monitor, plotter
 
@@ -382,8 +389,8 @@ class ActiveWidget(QtWidgets.QWidget):
             self.hopNameLabel.setVisible(True)
 
         else:
-            self.activeHopWidget.setVisible(False)
-            self.hopActiveLabel.setVisible(False)
+            self.hopCountryLabel.setVisible(False)
+            self.hopNameLabel.setVisible(False)
 
         self.ServerWidget.hide_button(0)
 
@@ -457,7 +464,7 @@ class StatusOffWidget(QtWidgets.QWidget):
         self.offLabel.setText(_translate("Form", "You are currently not connected to any VPN server "))
         icon = QtGui.QIcon.fromTheme("qomui_off")
         self.qIconLabel.setPixmap(icon.pixmap(300,300))
-    
+
 class ColoredRect(QtWidgets.QFrame):
     def __init__ (self, color, parent=None):
         super(ColoredRect, self).__init__(parent)
@@ -488,22 +495,26 @@ class StatusOnWidget(QtWidgets.QWidget):
         self.ipv6Label.setObjectName("ipv6Label")
         self.vLayoutStatus.addWidget(self.ipv6Label)
         self.vLayoutStatus.addSpacing(10)
-        self.webView = QtWebEngineWidgets.QWebEngineView(Form)
-        self.webView.setUrl(QtCore.QUrl("about:blank"))
-        self.webView.setObjectName("webView")
-        self.webView.setMinimumSize(300,300)
-        self.webView.setMaximumSize(16000, 16000)
-        self.vLayoutStatus.addWidget(self.webView)
-        self.hLayoutStatus = QtWidgets.QHBoxLayout()
-        self.hLayoutStatus.setObjectName("hLayoutStatus")
-        self.locButton = QtWidgets.QPushButton(Form)
-        self.locButton.setObjectName("locButton")
-        self.hLayoutStatus.addWidget(self.locButton)
-        self.ipleakButton = QtWidgets.QPushButton(Form)
-        self.ipleakButton.setObjectName("ipleakButton")
-        self.hLayoutStatus.addWidget(self.ipleakButton)
-        self.vLayoutStatus.addLayout(self.hLayoutStatus)
-        self.vLayoutStatus.addSpacing(25)
+        if webengine_available == 1:
+            self.webView = QtWebEngineWidgets.QWebEngineView(Form)
+            self.webView.setUrl(QtCore.QUrl("about:blank"))
+            self.webView.setObjectName("webView")
+            self.webView.setMinimumSize(300,300)
+            self.webView.setMaximumSize(16000, 16000)
+            self.vLayoutStatus.addWidget(self.webView)
+            self.hLayoutStatus = QtWidgets.QHBoxLayout()
+            self.hLayoutStatus.setObjectName("hLayoutStatus")
+            self.locButton = QtWidgets.QPushButton(Form)
+            self.locButton.setObjectName("locButton")
+            self.hLayoutStatus.addWidget(self.locButton)
+            self.ipleakButton = QtWidgets.QPushButton(Form)
+            self.ipleakButton.setObjectName("ipleakButton")
+            self.hLayoutStatus.addWidget(self.ipleakButton)
+            self.vLayoutStatus.addLayout(self.hLayoutStatus)
+            self.vLayoutStatus.addSpacing(25)
+            self.locButton.clicked.connect(self.show_location)
+            self.ipleakButton.clicked.connect(self.show_ipleak)
+
         self.netHeader = QtWidgets.QLabel(Form)
         font = QtGui.QFont()
         font.setPointSize(10)
@@ -556,8 +567,6 @@ class StatusOnWidget(QtWidgets.QWidget):
         self.vLayoutStatus.addLayout(self.hLayoutStatus_3)
         self.vLayoutStatus.addSpacing(25)
 
-        self.locButton.clicked.connect(self.show_location)
-        self.ipleakButton.clicked.connect(self.show_ipleak)
         self.retranslateUi(Form)
         QtCore.QMetaObject.connectSlotsByName(Form)
 
@@ -566,13 +575,15 @@ class StatusOnWidget(QtWidgets.QWidget):
         Form.setWindowTitle(_translate("Form", "Form"))
         self.ipv4Label.setText(_translate("Form", "<b>External IPv4 address:</b> "))
         self.ipv6Label.setText(_translate("Form", "<b>External IPv6 address:</b> "))
-        self.locButton.setText(_translate("Form", "Location"))
-        self.ipleakButton.setText(_translate("Form", "ipleak.net"))
         self.netHeader.setText(_translate("Form", "Network statistics"))
         self.intLabel.setText(_translate("Form", "<b>Network Inferface:</b> "))
         self.timeLabel.setText(_translate("Form", "<b>Uptime:</b> "))
         self.downLabel.setText(_translate("Form", "<b>Download:</b>"))
         self.upLabel.setText(_translate("Form", "<b>Upload:</b>"))
+
+        if webengine_available == 1:
+            self.locButton.setText(_translate("Form", "Location"))
+            self.ipleakButton.setText(_translate("Form", "ipleak.net"))
 
     def monitor_conn(self, interface, server):
         self.server = server
@@ -587,7 +598,15 @@ class StatusOnWidget(QtWidgets.QWidget):
         self.ip_data = ip_data
         self.ipv4Label.setText("<b>External IPv4 address:</b> {}".format(self.ip_data["ip4"]))
         self.ipv6Label.setText("<b>External IPv6 address:</b> {}".format(self.ip_data["ip6"]))
-        self.show_location()
+
+        if webengine_available == 1:
+            if self.ip_data["lon"] == 0 and self.ip_data["lat"] == 0:
+                self.show_location_failed()
+            else:
+                self.show_location()
+
+        else:
+            logging.error("Import Error: QtWebEngine is not available")
 
     def show_location(self):
         formatting = {"lat":self.ip_data["lat"], "lon":self.ip_data["lon"], "server":self.server}
@@ -625,8 +644,23 @@ class StatusOnWidget(QtWidgets.QWidget):
         self.webView.setVisible(True)
         self.webView.setHtml(loc_html)
 
+    def show_location_failed(self):
+        loc_html = """
+        <html>
+        <body>
+            <h1>Sorry, failed to determine location :(</h1>
+        </body>
+        </html>
+        """
+        self.webView.setVisible(True)
+        self.webView.setHtml(loc_html)
+
     def show_ipleak(self):
         self.webView.setUrl(QtCore.QUrl("https://ipleak.net/#dnsdetection_title"))
+
+    def reset_html(self):
+        if webengine_available == 1:
+            self.webView.setHtml(None)
 
     def update_time(self, t):
         self.timeLabel.setText("<b>Uptime:</b> {}".format(t))
@@ -665,7 +699,7 @@ class FirewallEditor(QtWidgets.QDialog):
             "fw_gui_only"
             ]
 
-    def __init__ (self, config, parent=None):
+    def __init__ (self, settings, parent=None):
         super(FirewallEditor, self).__init__(parent)
         try:
             with open('{}/firewall.json'.format(config.ROOTDIR), 'r') as fload:
@@ -674,7 +708,7 @@ class FirewallEditor(QtWidgets.QDialog):
             with open('{}/firewall_default.json'.format(config.ROOTDIR), 'r') as fload:
                 self.firewall_dict = json.load(fload)
 
-        self.config_dict = config
+        self.config_dict = settings
         self.setupUi(self)
         self.display_rules()
 
@@ -1006,17 +1040,17 @@ class ModifyServer(QtWidgets.QDialog):
 
     def display_config(self):
         if self.provider in config.SUPPORTED_PROVIDERS:
-            config = "{}/{}/openvpn.conf".format(config.ROOTDIR, self.provider)
+            conf = "{}/{}/openvpn.conf".format(config.ROOTDIR, self.provider)
 
         else:
-            config = "{}/{}".format(config.ROOTDIR, self.server_info["path"])
+            conf = "{}/{}".format(config.ROOTDIR, self.server_info["path"])
 
-        splt = os.path.splitext(config)
+        splt = os.path.splitext(conf)
         mod = "{}_MOD.{}".format(splt[0], splt[1])
         if os.path.exists(mod):
-            config = mod
+            conf = mod
 
-        with open (config, "r") as config_edit:
+        with open (conf, "r") as config_edit:
             self.old_config = config_edit.readlines()
             for line in self.old_config:
                 self.configBrowser.append(line.split("\n")[0])

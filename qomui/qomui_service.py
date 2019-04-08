@@ -53,7 +53,7 @@ class QomuiDbus(dbus.service.Object):
     interface = "eth0"
 
     def __init__(self):
-        
+
         if not os.path.exists(LOGDIR):
             os.makedirs(LOGDIR)
 
@@ -161,7 +161,7 @@ class QomuiDbus(dbus.service.Object):
             fw = config.settings["firewall"]
             gui_only = config.settings["fw_gui_only"]
             block_lan=config.settings["block_lan"]
-            preserve=config.settings["preserve_rules"] 
+            preserve=config.settings["preserve_rules"]
 
             if fw == 1 and gui_only == 0:
                 opt = 1
@@ -180,7 +180,7 @@ class QomuiDbus(dbus.service.Object):
             if opt < 2:
                 firewall.apply_rules(
                                     opt,
-                                    block_lan=block_lan, 
+                                    block_lan=block_lan,
                                     preserve=preserve
                                     )
         except KeyError:
@@ -256,46 +256,6 @@ class QomuiDbus(dbus.service.Object):
 
             except CalledProcessError:
                 self.logger.debug("OS: process {} does not exist anymore".format(i))
-
-    #OBSOLETE - moved to update.py
-    #allow downloading from provider api/site even if firewall is activated and no connection is active
-    """
-    def allow_provider_ip(self, provider):
-        server = []
-
-        if provider == "Airvpn":
-            server.append("www.airvpn.org")
-
-        elif provider == "Mullvad":
-            server.append("www.mullvad.net")
-            server.append("api.mullvad.net")
-
-        elif provider == "PIA":
-            server.append("www.privateinternetaccess.com")
-
-        elif provider == "Windscribe":
-            server.append("www.windscribe.com")
-            server.append("assets.windscribe.com")
-
-        elif provider == "ProtonVPN":
-            server.append("api.protonmail.ch")
-
-        dns_manager.dns_request_exception("-I", config.settings["alt_dns1"], config.settings["alt_dns2"], "53")
-
-        if len(server) > 0:
-            for s in server:
-
-                try:
-                    dig_cmd = ["dig", "+time=2", "+tries=1", "{}".format(s), "+short"]
-                    answer = check_output(dig_cmd).decode("utf-8")
-                    parse = answer.split("\n")
-                    ip = parse[len(parse)-2]
-                    firewall.add_rule(['-I', 'OUTPUT', '1', '-d', '{}'.format(ip), '-j', 'ACCEPT'])
-                    self.logger.info("iptables: Allowing access to {}".format(s))
-
-                except CalledProcessError as e:
-                    self.logger.error("{}: Could not resolve {}".format(e, s))
-    """
 
     #save and restore content of /etc/resolv.conf
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
@@ -414,32 +374,35 @@ class QomuiDbus(dbus.service.Object):
         self.gw_6 = self.net["gateway_6"]
         default_interface_4 = self.net["interface"]
         default_interface_6 = self.net["interface_6"]
+        no_dnsmasq = config.settings["no_dnsmasq"]
+        print("nodnsmasq={}".format(no_dnsmasq))
 
         if self.gw != "None" or self.gw_6 != "None":
-            try:
 
-                if default_interface_6 != "None":
-                    self.interface = default_interface_6
+            if default_interface_6 != "None":
+                self.interface = default_interface_6
 
-                elif default_interface_4 != "None":
-                    self.interface = default_interface_4
+            elif default_interface_4 != "None":
+                self.interface = default_interface_4
 
-                else:
-                    self.interface = "None"
+            else:
+                self.interface = "None"
 
-                if config.settings["bypass"] == 1:
-                    bypass.create_cgroup(
-                        self.net["user"],
-                        self.net["group"],
-                        self.interface,
-                        gw=self.gw,
-                        gw_6=self.gw_6,
-                        default_int=self.interface
-                        )
+            if config.settings["bypass"] == 1:
+                bypass.create_cgroup(
+                    self.net["user"],
+                    self.net["group"],
+                    self.interface,
+                    gw=self.gw,
+                    gw_6=self.gw_6,
+                    default_int=self.interface,
+                    no_dnsmasq=no_dnsmasq
+                    )
 
-                    self.kill_dnsmasq()
+                self.kill_dnsmasq()
 
-                    #dnsmasq is needed to handle requests from bypass
+                #dnsmasq is needed to handle requests from bypass
+                if no_dnsmasq == 0:
                     dns_manager.dnsmasq(
                                         self.interface,
                                         "5354",
@@ -448,57 +411,17 @@ class QomuiDbus(dbus.service.Object):
                                         "_bypass"
                                         )
 
-                elif config.settings["bypass"] == 0:
+            elif config.settings["bypass"] == 0:
 
-                    try:
-                        bypass.delete_cgroup(self.interface)
-                    except AttributeError:
-                        pass
-
-            except KeyError:
-                self.logger.warning('Config file corrupted - bypass option does not exist')
-
-    #determine default ipv4/ipv6 routes and default network interface - moved to NetMon thread
-    """@dbus.service.method(BUS_NAME, in_signature='', out_signature='a{ss}')
-    def default_gateway_check(self):
-        try:
-            route_cmd = ["ip", "route", "show", "default", "0.0.0.0/0"]
-            default_route = check_output(route_cmd).decode("utf-8")
-            parse_route = default_route.split(" ")
-            default_gateway_4 = parse_route[2]
-            default_interface_4 = parse_route[4]
-
-        except (CalledProcessError, IndexError):
-            self.logger.info('Could not identify default gateway - no network connectivity')
-            default_gateway_4 = "None"
-            default_interface_4 = "None"
-
-        try:
-            route_cmd = ["ip", "-6", "route", "show", "default", "::/0"]
-            default_route = check_output(route_cmd).decode("utf-8")
-            parse_route = default_route.split(" ")
-            default_gateway_6 = parse_route[2]
-            default_interface_6 = parse_route[4]
-
-        except (CalledProcessError, IndexError):
-            self.logger.info('Could not identify default gateway for ipv6 - no network connectivity')
-            default_gateway_6 = "None"
-            default_interface_6 = "None"
-
-        self.logger.debug("Network interface - ipv4: {}".format(default_interface_4))
-        self.logger.debug("Default gateway - ipv4: {}".format(default_gateway_4))
-        self.logger.debug("Network interface - ipv6: {}".format(default_interface_6))
-        self.logger.debug("Default gateway - ipv6: {}".format(default_gateway_6))
-
-        return {
-            "gateway" : default_gateway_4,
-            "gateway_6" : default_gateway_6,
-            "interface" : default_interface_4,
-            "interface_6" : default_interface_6
-            }"""
+                try:
+                    bypass.delete_cgroup(self.interface)
+                except AttributeError:
+                    pass
 
     def cgroup_vpn(self):
         self.kill_dnsmasq()
+        no_dnsmasq = config.settings["no_dnsmasq"]
+        print("nodnsmasq={}".format(no_dnsmasq))
 
         if self.tun_bypass is not None:
             dev_bypass = self.tun_bypass
@@ -506,7 +429,8 @@ class QomuiDbus(dbus.service.Object):
                             self.net["user"],
                             self.net["group"],
                             dev_bypass,
-                            default_int=self.interface
+                            default_int=self.interface,
+                            no_dnsmasq=no_dnsmasq
                             )
 
             if self.tun is not None:
@@ -518,13 +442,15 @@ class QomuiDbus(dbus.service.Object):
             interface_bypass = self.tun_bypass
             if config.settings["dns_off"] == 0:
                 dns_manager.set_dns("127.0.0.1")
-            dns_manager.dnsmasq(
-                                interface,
-                                "53",
-                                self.dns,
-                                self.dns_2,
-                                ""
-                                )
+
+            if no_dnsmasq == 0:
+                dns_manager.dnsmasq(
+                                    interface,
+                                    "53",
+                                    self.dns,
+                                    self.dns_2,
+                                    ""
+                                    )
 
         else:
             dev_bypass = self.interface
@@ -532,13 +458,14 @@ class QomuiDbus(dbus.service.Object):
                 dns_manager.set_dns(self.dns, self.dns_2)
 
         if config.settings["bypass"] == 1:
-            dns_manager.dnsmasq(
-                                dev_bypass,
-                                "5354",
-                                self.dns_bypass,
-                                self.dns_2_bypass,
-                                "_bypass"
-                                )
+            if no_dnsmasq == 0:
+                dns_manager.dnsmasq(
+                                    dev_bypass,
+                                    "5354",
+                                    self.dns_bypass,
+                                    self.dns_2_bypass,
+                                    "_bypass"
+                                    )
 
             bypass.create_cgroup(
                                 self.net["user"],
@@ -546,7 +473,8 @@ class QomuiDbus(dbus.service.Object):
                                 dev_bypass,
                                 gw=self.gw,
                                 gw_6=self.gw_6,
-                                default_int=self.interface
+                                default_int=self.interface,
+                                no_dnsmasq=no_dnsmasq
                                 )
 
     def kill_dnsmasq(self):
