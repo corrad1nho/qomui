@@ -53,7 +53,9 @@ Once you added server configurations, you can browse and filter them in the serv
 - ***Disable IPv6:*** Completely disables the IPv6 stack systemwide. This is not recommended unless you know what you are doing.
 - ***Allow OpenVPN bypass:*** See bypass section below.
 - ***Activate Firewall:*** See firewall section below.
-- ***Alternative DNS Servers***: Enforces the usage of custom DNS servers instead of those by your provider. The DNS servers set here will also be used for bypass mode if you don't launch a secondary VPN tunnel.
+- ***Always use alternative DNS servers:*** Enforces the usage of custom DNS servers instead of those by your provider. The DNS servers set here will also be used for bypass mode if you don't launch a secondary VPN tunnel.
+- ***Never change DNS servers:*** Qomui won't overwrite DNS servers in /etc/resolv.conf. Warning: This might cause DNS leaks.
+- ***Use same DNS servers for bypass:*** Tick this option if you don't want to use dnsmasq for bypass. Be aware that DNS servers set via OpenVPN might not be reachable outside the tunnel. If you don't specify DNS servers explicitly, applications launched via bypass might not have access to DNS servers. 
 
 ### Firewall (Killswitch)
 It is highly recommended to activate the firewall to prevent against ipv6 and DNS leaks. By default, once qomui-service has been started, all internet connectivity outside the VPN tunnel will be blocked whether or not the gui is running. Hence, your system will be always protected if you enable qomui-service via systemd. Depending on your distribution, it might be necessary to disable preinstalled firewall services such as ufw or firewalld to avoid conflicts. Alternatively, the "Edit firewall" dialog in the options tab offers a setting to enable/disable the firewall only if you start/quit the gui. You can also add custom iptables rules there. 
