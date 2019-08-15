@@ -299,7 +299,7 @@ class AddServers(QtCore.QThread):
                 page = self.session.get('https://www.mullvad.net/en/servers/', timeout=2)
                 self.log.emit(("info", "Fetching server list for Mullvad"))
                 server_page = BeautifulSoup(page.content, "lxml")
-                server_parse = server_page.find_all("section", {"class": "content"})
+                server_parse = server_page.find_all("div", {"class": "table-container"})
 
                 for entry in server_parse[0].find_all("tr"):
                     info = entry.find_all("td")
