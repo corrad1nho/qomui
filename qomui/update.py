@@ -17,7 +17,7 @@ from PyQt5 import QtCore
 from bs4 import BeautifulSoup
 from subprocess import PIPE, Popen, check_output, CalledProcessError, run
 
-from qomui import firewall
+from qomui import config, firewall
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -25,13 +25,11 @@ except AttributeError:
     def _fromUtf8(s):
         return s
 
-ROOTDIR = "/usr/share/qomui"
 TEMPDIR = "/usr/share/qomui/temp"
-SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "PIA", "ProtonVPN", "Windscribe"]
 
 def country_translate(cc):
     try:
-        with open("{}/countries.json".format(ROOTDIR), "r") as c_json:
+        with open("{}/countries.json".format(config.ROOTDIR), "r") as c_json:
             cc_lib = json.load(c_json)
 
         country = cc_lib[cc.upper()]
@@ -70,7 +68,7 @@ class AddServers(QtCore.QThread):
             shutil.rmtree(self.temp_path)
 
         os.makedirs(self.temp_path)
-        if self.provider in SUPPORTED_PROVIDERS:
+        if self.provider in config.SUPPORTED_PROVIDERS:
             getattr(self, self.provider.lower())()
         else:
             self.add_folder()
@@ -110,7 +108,7 @@ class AddServers(QtCore.QThread):
                         }
 
         #Loading public RSA key
-        with open("{}/airvpn_api.pem".format(ROOTDIR), "rb") as pem:
+        with open("{}/airvpn_api.pem".format(config.ROOTDIR), "rb") as pem:
             rsa_pub_key = serialization.load_pem_public_key(
             pem.read(),
             backend=self.backend
@@ -268,7 +266,7 @@ class AddServers(QtCore.QThread):
             xml = requests.post(
                                 "http://54.93.175.114",
                                 data=payload,
-                                cert="{}/airvpn_cacert.pem".format(ROOTDIR),
+                                cert="{}/airvpn_cacert.pem".format(config.ROOTDIR),
                                 timeout=2
                                 )
             return xml
@@ -299,10 +297,12 @@ class AddServers(QtCore.QThread):
                 page = self.session.get('https://www.mullvad.net/en/servers/', timeout=2)
                 self.log.emit(("info", "Fetching server list for Mullvad"))
                 server_page = BeautifulSoup(page.content, "lxml")
-                server_parse = server_page.find_all("div", {"class":"section-content server-table"})
+                server_parse = server_page.find_all("div", {"class": "table-container"})
 
-                for entry in server_parse[0].find_all('tr'):
-                    info = entry.find_all('td')
+                for entry in server_parse[0].find_all("tr"):
+                    info = entry.find_all("td")
+                    if len(info) < 1:
+                        continue
                     name = info[0].string
 
                     if info[1].string != "Country":
@@ -910,8 +910,8 @@ class AddServers(QtCore.QThread):
             ip = 0
             protocol_found = 0
 
-            with open(conf_copy, "r") as config:
-                modify = config.readlines()
+            with open(conf_copy, "r") as conf_file:
+                modify = conf_file.readlines()
 
                 for index, line in enumerate(modify):
                     if line.startswith("remote "):
@@ -945,7 +945,7 @@ class AddServers(QtCore.QThread):
                             modify[index] = "#{}".format(line)
 
                     elif line.startswith("auth-user-pass"):
-                        auth_file = '{}/certs/{}-auth.txt'.format(ROOTDIR, self.provider)
+                        auth_file = '{}/certs/{}-auth.txt'.format(config.ROOTDIR, self.provider)
                         modify[index] = 'auth-user-pass {}\n'.format(auth_file)
 
                     elif line.startswith("verb "):
@@ -983,7 +983,7 @@ class AddServers(QtCore.QThread):
                 if protocol_found == 0:
                     modify.insert(0, "proto {}".format(protocol.lower()))
 
-                config.close()
+                conf_file.close()
 
                 with open (conf_copy, "w") as file_edit:
                     file_edit.writelines(modify)
@@ -1035,14 +1035,14 @@ class AddServers(QtCore.QThread):
 
         return unrelated_files
 
-    def gen_wg_key(self, config):
+    def gen_wg_key(self, conf_file):
         #check if key already exists
-        if os.path.exists("{}/{}/{}".format(ROOTDIR, self.provider, config)) and self.update == "0":
-            self.log.emit(("debug", "WireGuard keys for {} have already been generated".format(config.split("/")[-1])))
+        if os.path.exists("{}/{}/{}".format(config.ROOTDIR, self.provider, conf_file)) and self.update == "0":
+            self.log.emit(("debug", "WireGuard keys for {} have already been generated".format(conf_file.split("/")[-1])))
             wg_keys = None
 
         else:
-            self.log.emit(("info", "Generating WireGuard keys for {}".format(config.split("/")[-1])))
+            self.log.emit(("info", "Generating WireGuard keys for {}".format(conf_file.split("/")[-1])))
 
             try:
                 private_key = check_output(["wg", "genkey"]).decode("utf-8").split("\n")[0]
@@ -1068,7 +1068,7 @@ class AddServers(QtCore.QThread):
         for i in self.allowed_ips:
             firewall.allow_dest_ip(i, "-D")
 
-        provider_dir = "{}/{}".format(ROOTDIR, provider)
+        provider_dir = "{}/{}".format(config.ROOTDIR, provider)
         if not os.path.exists(provider_dir):
             os.makedirs(provider_dir)
 
@@ -1076,7 +1076,7 @@ class AddServers(QtCore.QThread):
         with open("{}/{}-auth.txt".format(provider_dir, self.provider) , "w") as passfile:
             passfile.write('{}\n{}\n'.format(self.username, self.password))
 
-        if provider in SUPPORTED_PROVIDERS:
+        if provider in config.SUPPORTED_PROVIDERS:
 
             for f in os.listdir(self.temp_path):
                 shutil.copyfile("{}/{}".format(self.temp_path, f), "{}/{}".format(provider_dir, f))
@@ -1084,8 +1084,8 @@ class AddServers(QtCore.QThread):
                 Popen(['chmod', '0600', '{}/{}'.format(provider_dir, f)])
 
             try:
-                openvpn_orig_conf = "{}/{}_config".format(ROOTDIR, provider)
-                openvpn_dest_conf = "{}/{}/openvpn.conf".format(ROOTDIR, provider)
+                openvpn_orig_conf = "{}/{}_config".format(config.ROOTDIR, provider)
+                openvpn_dest_conf = "{}/{}/openvpn.conf".format(config.ROOTDIR, provider)
                 if not os.path.exists(openvpn_dest_conf):
                     shutil.copyfile(openvpn_orig_conf, openvpn_dest_conf)
                     Popen(['chmod', '0655', openvpn_dest_conf])
@@ -1097,7 +1097,7 @@ class AddServers(QtCore.QThread):
             path = "{}/copy/".format(self.temp_path)
             for f in os.listdir(path):
                 f_source = "{}/{}".format(path, f)
-                f_dest = "{}/{}/{}".format(ROOTDIR, provider, f)
+                f_dest = "{}/{}/{}".format(config.ROOTDIR, provider, f)
                 if os.path.isfile(f_source):
 
                     try:
@@ -1105,8 +1105,8 @@ class AddServers(QtCore.QThread):
                         self.log.emit(("debug", "copied {} to {}".format(f, f_dest)))
 
                     except FileNotFoundError:
-                        if not os.path.exists("{}/{}".format(ROOTDIR, provider)):
-                            os.makedirs("{}/{}".format(ROOTDIR, provider))
+                        if not os.path.exists("{}/{}".format(config.ROOTDIR, provider)):
+                            os.makedirs("{}/{}".format(config.ROOTDIR, provider))
 
                         shutil.copyfile(f_source,f_dest)
                         self.log.emit(("debug", "copied {} to {}".format(f, f_dest)))

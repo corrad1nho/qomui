@@ -18,9 +18,6 @@ except AttributeError:
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig)
 
-ROOTDIR = "/usr/share/qomui"
-
-
 class ComboCheckBox(QtWidgets.QComboBox):
 
     def __init__(self, parent=None):

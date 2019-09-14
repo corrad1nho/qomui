@@ -9,10 +9,7 @@ import shlex
 from subprocess import Popen, PIPE, STDOUT, CalledProcessError, check_call, run
 import pexpect
 from PyQt5 import QtCore
-from qomui import firewall, dns_manager
-
-ROOTDIR = "/usr/share/qomui"
-SUPPORTED_PROVIDERS = ["Airvpn", "Mullvad", "ProtonVPN", "PIA", "Windscribe", "AzireVPN"]
+from qomui import config, firewall, dns_manager
 
 class TunnelThread(QtCore.QThread):
     log = QtCore.pyqtSignal(tuple)
@@ -25,12 +22,13 @@ class TunnelThread(QtCore.QThread):
     tun_hop = None
     tun_bypass = None
 
-    def __init__(self, server_dict, hop_dict, config):
+    def __init__(self, server_dict, hop_dict, settings, interface):
         QtCore.QThread.__init__(self)
         self.server_dict = server_dict
         self.hop = self.server_dict["hop"]
         self.hop_dict = hop_dict
-        self.config = config
+        self.config = settings
+        self.interface = interface
 
     def run(self):
         self.connect_status = 0
@@ -50,9 +48,9 @@ class TunnelThread(QtCore.QThread):
     def wireguard(self):
         #make sure temporary wg conf is not world readable
         oldmask = os.umask(0o077)
-        path = "{}/wg_qomui.conf".format(ROOTDIR)
+        path = "{}/wg_qomui.conf".format(config.ROOTDIR)
         if self.server_dict["provider"] == "Mullvad":
-            with open("{}/Mullvad/mullvad_wg.conf".format(ROOTDIR), "r") as wg:
+            with open("{}/Mullvad/mullvad_wg.conf".format(config.ROOTDIR), "r") as wg:
                 conf = wg.readlines()
                 conf.insert(8, "PublicKey = {}\n".format(self.server_dict["public_key"]))
                 conf.insert(9, "Endpoint = {}:{}\n".format(self.server_dict["ip"], self.server_dict["port"]))
@@ -60,7 +58,7 @@ class TunnelThread(QtCore.QThread):
                     temp_wg.writelines(conf)
 
         else:
-            shutil.copyfile("{}/{}".format(ROOTDIR, self.server_dict["path"]), path)
+            shutil.copyfile("{}/{}".format(config.ROOTDIR, self.server_dict["path"]), path)
 
         os.umask(oldmask)
         Popen(['chmod', '0600', path])
@@ -69,7 +67,7 @@ class TunnelThread(QtCore.QThread):
     def openvpn(self):
         self.air_ssl_port = "1413"
         self.ws_ssl_port = "1194"
-        path = "{}/temp.ovpn".format(ROOTDIR)
+        path = "{}/temp.ovpn".format(config.ROOTDIR)
         cwd_ovpn = None
         provider = self.server_dict["provider"]
         ip = self.server_dict["ip"]
@@ -82,17 +80,17 @@ class TunnelThread(QtCore.QThread):
             pass
 
         if "bypass" in self.server_dict.keys():
-            path = "{}/bypass.ovpn".format(ROOTDIR)
+            path = "{}/bypass.ovpn".format(config.ROOTDIR)
             time.sleep(2)
 
         else:
-            path = "{}/temp.ovpn".format(ROOTDIR)
+            path = "{}/temp.ovpn".format(config.ROOTDIR)
 
         if provider == "Airvpn":
 
             #create temp ssl config
             if protocol == "SSL":
-                with open("{}/ssl_config".format(ROOTDIR), "r") as ssl_edit:
+                with open("{}/ssl_config".format(config.ROOTDIR), "r") as ssl_edit:
                     ssl_config = ssl_edit.readlines()
                     for line, value in enumerate(ssl_config):
                         if value.startswith("connect") is True:
@@ -101,7 +99,7 @@ class TunnelThread(QtCore.QThread):
                             ssl_config[line] = "accept = 127.0.0.1:{}\n".format(self.air_ssl_port)
                     ssl_config.append("verify = 3\n")
                     ssl_config.append("CAfile = /usr/share/qomui/Airvpn/stunnel.crt")
-                    with open("{}/temp.ssl".format(ROOTDIR), "w") as ssl_dump:
+                    with open("{}/temp.ssl".format(config.ROOTDIR), "w") as ssl_dump:
                         ssl_dump.writelines(ssl_config)
                         ssl_dump.close()
                     ssl_edit.close()
@@ -130,14 +128,14 @@ class TunnelThread(QtCore.QThread):
 
             #create temp ssl config
             if protocol == "SSL":
-                with open("{}/ssl_config".format(ROOTDIR), "r") as ssl_edit:
+                with open("{}/ssl_config".format(config.ROOTDIR), "r") as ssl_edit:
                     ssl_config = ssl_edit.readlines()
                     for line, value in enumerate(ssl_config):
                         if value.startswith("connect") is True:
                             ssl_config[line] = "connect = {}:{}\n".format(ip, port)
                         elif value.startswith("accept") is True:
                             ssl_config[line] = "accept = 127.0.0.1:{}\n".format(self.ws_ssl_port)
-                    with open("{}/temp.ssl".format(ROOTDIR), "w") as ssl_dump:
+                    with open("{}/temp.ssl".format(config.ROOTDIR), "w") as ssl_dump:
                         ssl_dump.writelines(ssl_config)
                         ssl_dump.close()
                     ssl_edit.close()
@@ -155,14 +153,14 @@ class TunnelThread(QtCore.QThread):
             self.write_config(self.server_dict)
 
         else:
-            config_file = "{}/{}".format(ROOTDIR, self.server_dict["path"])
+            config_file = "{}/{}".format(config.ROOTDIR, self.server_dict["path"])
 
             try:
                 edit = "{}/temp".format(provider)
                 self.write_config(self.server_dict,
                                   edit=edit, path=config_file)
 
-                path = "{}/{}/temp.ovpn".format(ROOTDIR, provider)
+                path = "{}/{}/temp.ovpn".format(config.ROOTDIR, provider)
 
             except UnboundLocalError:
                 path = config_file
@@ -173,16 +171,16 @@ class TunnelThread(QtCore.QThread):
         if self.hop == "2":
             firewall.allow_dest_ip(self.hop_dict["ip"], "-I")
 
-            if self.hop_dict["provider"] in SUPPORTED_PROVIDERS:
-                hop_path = "{}/hop.ovpn".format(ROOTDIR)
+            if self.hop_dict["provider"] in config.SUPPORTED_PROVIDERS:
+                hop_path = "{}/hop.ovpn".format(config.ROOTDIR)
                 self.write_config(self.hop_dict, edit="hop")
 
             else:
-                config_file = "{}/{}".format(ROOTDIR, self.hop_dict["path"])
+                config_file = "{}/{}".format(config.ROOTDIR, self.hop_dict["path"])
                 try:
                     edit = "{}/hop".format(self.hop_dict["provider"])
                     self.write_config(self.hop_dict, edit=edit, path=config_file)
-                    hop_path = "{}/{}/temp.ovpn".format(ROOTDIR, self.hop_dict["provider"])
+                    hop_path = "{}/{}/temp.ovpn".format(config.ROOTDIR, self.hop_dict["provider"])
 
                 except (UnboundLocalError, KeyError):
                     hop_path = config_file
@@ -206,21 +204,21 @@ class TunnelThread(QtCore.QThread):
         compat = 1
 
         if path is None:
-            if os.path.exists("{}/{}/openvpn.conf".format(ROOTDIR, provider)):
-                ovpn_file = "{}/{}/openvpn.conf".format(ROOTDIR, provider)
+            if os.path.exists("{}/{}/openvpn.conf".format(config.ROOTDIR, provider)):
+                ovpn_file = "{}/{}/openvpn.conf".format(config.ROOTDIR, provider)
             else:
                 #Ensure compatibility with older versions
-                ovpn_file = "{}/{}_config_old".format(ROOTDIR, provider)
+                ovpn_file = "{}/{}_config_old".format(config.ROOTDIR, provider)
                 compat = 0
         else:
             ovpn_file = path
 
         with open(ovpn_file, "r") as ovpn_edit:
-            config = ovpn_edit.readlines()
+            conf = ovpn_edit.readlines()
 
             #additional routes need to be defined for OpenVPN over SSL/SSH
             if protocol == "SSL":
-                config.insert(13, "route {} 255.255.255.255 net_gateway\n".format(ip))
+                conf.insert(13, "route {} 255.255.255.255 net_gateway\n".format(ip))
                 ip = "127.0.0.1"
 
                 if provider == "Airvpn":
@@ -232,7 +230,7 @@ class TunnelThread(QtCore.QThread):
                 protocol = "tcp"
 
             elif protocol == "SSH":
-                config.insert(13, "route {} 255.255.255.255 net_gateway\n".format(ip))
+                conf.insert(13, "route {} 255.255.255.255 net_gateway\n".format(ip))
                 ip = "127.0.0.1"
                 port = "1412"
                 protocol = "tcp"
@@ -241,56 +239,56 @@ class TunnelThread(QtCore.QThread):
             if "bypass" in ovpn_dict:
                 edit = "bypass"
                 if ovpn_dict["bypass"] == "1":
-                    config.append("iproute {}/scripts/bypass_route.sh\n".format(ROOTDIR))
-                    config.append("script-security 2\n")
-                    config.append("route-up {}/scripts/bypass_up.sh\n".format(ROOTDIR))
+                    conf.append("iproute {}/scripts/bypass_route.sh\n".format(config.ROOTDIR))
+                    conf.append("script-security 2\n")
+                    conf.append("route-up {}/scripts/bypass_up.sh\n".format(config.ROOTDIR))
 
-            for line, value in enumerate(config):
+            for line, value in enumerate(conf):
                 if value.startswith("proto ") is True:
 
                     #ipv6 is currently Airvpn only
                     try:
                         if ovpn_dict["ipv6"] == "on":
-                            config.append("setenv UV_IPV6 yes \n")
-                            config[line] = "proto {}6 \n".format(protocol.lower())
+                            conf.append("setenv UV_IPV6 yes \n")
+                            conf[line] = "proto {}6 \n".format(protocol.lower())
 
                         else:
-                            config[line] = "proto {} \n".format(protocol.lower())
+                            conf[line] = "proto {} \n".format(protocol.lower())
 
                     except KeyError:
-                        config[line] = "proto {} \n".format(protocol.lower())
+                        conf[line] = "proto {} \n".format(protocol.lower())
 
                 elif value.startswith("remote ") is True:
-                    config[line] = "remote {} {} \n".format(ip.replace("\n", ""), port)
+                    conf[line] = "remote {} {} \n".format(ip.replace("\n", ""), port)
 
             #check if tls-crypt is used and update config accordingly
             if provider == "Airvpn":
                 try:
 
                     if ovpn_dict["tlscrypt"] == "on":
-                        config.append("tls-crypt {}/Airvpn/tls-crypt.key \n".format(ROOTDIR))
-                        config.append("auth sha512")
+                        conf.append("tls-crypt {}/Airvpn/tls-crypt.key \n".format(config.ROOTDIR))
+                        conf.append("auth sha512")
 
                     else:
-                        config.append("tls-auth {}/Airvpn/ta.key 1 \n".format(ROOTDIR))
+                        conf.append("tls-auth {}/Airvpn/ta.key 1 \n".format(config.ROOTDIR))
 
                 except KeyError:
-                    config.append("tls-auth {}/Airvpn/ta.key 1 \n".format(ROOTDIR))
+                    conf.append("tls-auth {}/Airvpn/ta.key 1 \n".format(config.ROOTDIR))
 
             elif provider == "AzireVPN":
-                ca = "ca {}/{}/{}.crt\n".format(ROOTDIR, provider, ovpn_dict["name"])
-                tls = "tls-auth {}/{}/{}.key 1\n".format(ROOTDIR, provider, ovpn_dict["name"])
-                config.append(ca)
-                config.append(tls)
+                ca = "ca {}/{}/{}.crt\n".format(conf.ROOTDIR, provider, ovpn_dict["name"])
+                tls = "tls-auth {}/{}/{}.key 1\n".format(config.ROOTDIR, provider, ovpn_dict["name"])
+                conf.append(ca)
+                conf.append(tls)
 
             #Ensure compatibility with older versions:
             if compat == 0:
-                for i, l in enumerate(config):
-                    config[i] = l.replace("{}/".format(provider), "certs/")
+                for i, l in enumerate(conf):
+                    conf[i] = l.replace("{}/".format(provider), "certs/")
 
 
-            with open("{}/{}.ovpn".format(ROOTDIR, edit), "w") as ovpn_dump:
-                    ovpn_dump.writelines(config)
+            with open("{}/{}.ovpn".format(config.ROOTDIR, edit), "w") as ovpn_dump:
+                    ovpn_dump.writelines(conf)
                     ovpn_dump.close()
 
             ovpn_edit.close()
@@ -319,7 +317,7 @@ class TunnelThread(QtCore.QThread):
             for line in cmd_wg.stdout:
                 self.log.emit(("info", "WireGuard: " + line.decode("utf-8").replace("\n", "")))
 
-            with open("{}/wg_qomui.conf".format(ROOTDIR), "r") as dns_check:
+            with open("{}/wg_qomui.conf".format(config.ROOTDIR), "r") as dns_check:
                 lines = dns_check.readlines()
 
                 for line in lines:
@@ -333,7 +331,8 @@ class TunnelThread(QtCore.QThread):
                         except IndexError:
                             self.dns_2 = None
 
-                dns_manager.set_dns(self.dns, self.dns_2)
+                if self.config["dns_off"] == 0:
+                    dns_manager.set_dns(self.dns, self.dns_2, tun="wg_qomui", main_int=self.interface)
                 self.dnsserver.emit(("", self.dns, self.dns_2))
 
             #Necessary, otherwise bypass mode breaks - need to investigate
@@ -354,7 +353,7 @@ class TunnelThread(QtCore.QThread):
                 except CalledProcessError:
                     self.log.emit(("warning", "Could not reset packet classification for bypass table"))
 
-            self.bypass.emit()
+                self.bypass.emit()
 
             #we can't be sure of that
             exe_custom_scripts("up", self.server_dict["provider"], self.config)
@@ -383,11 +382,11 @@ class TunnelThread(QtCore.QThread):
                         '--route-nopull',
                         '--script-security', '2',
                         '--up', '{}/scripts/hop.sh -f {} {}'.format(
-                                                                    ROOTDIR,
+                                                                    config.ROOTDIR,
                                                                     self.hop_dict["ip"],
                                                                     self.server_dict["ip"]
                                                                      ),
-                        '--down', '{}/scripts/hop_down.sh {}'.format(ROOTDIR, self.hop_dict["ip"])
+                        '--down', '{}/scripts/hop_down.sh {}'.format(config.ROOTDIR, self.hop_dict["ip"])
                         ]
 
         elif h == "2":
@@ -396,7 +395,7 @@ class TunnelThread(QtCore.QThread):
                         '--config', '{}'.format(ovpn_file),
                         '--route-nopull',
                         '--script-security', '2',
-                        '--up', '{}/scripts/hop.sh -s'.format(ROOTDIR)
+                        '--up', '{}/scripts/hop.sh -s'.format(config.ROOTDIR)
                         ]
 
         else:
@@ -433,9 +432,19 @@ class TunnelThread(QtCore.QThread):
                 if "bypass" not in self.server_dict and h != 1:
                      exe_custom_scripts("up", self.server_dict["provider"], self.config)
                 self.connect_status = 1
-                self.bypass.emit()
                 self.status.emit("connection_established{}".format(add))
                 self.log.emit(("info", "Successfully connected to {}".format(name)))
+
+                if self.config["dns_off"] == 0:
+
+                        dns_manager.set_dns(
+                            getattr(self, "dns{}".format(add)), 
+                            getattr(self, "dns_2{}".format(add)),
+                            tun=getattr(self, "tun{}".format(add)),
+                            main_int=self.interface
+                        )
+
+                self.dnsserver.emit((add, getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add))))
 
             elif line.find('TUN/TAP device') != -1:
                 setattr(self, "tun{}".format(add), line_format.split(" ")[3])
@@ -457,9 +466,6 @@ class TunnelThread(QtCore.QThread):
 
                     else:
                         setattr(self, "dns_2{}".format(add), None)
-
-                dns_manager.set_dns(getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add)))
-                self.dnsserver.emit((add, getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add))))
 
             #might be redundant as gui checks for timeout anyway
             elif line.find("Restart pause, 10 second(s)") != -1:
@@ -523,7 +529,7 @@ class TunnelThread(QtCore.QThread):
             self.dev.emit(("tun{}".format(add), getattr(self, "tun{}".format(add))))
 
     def ssl(self, ip):
-        cmd_ssl = ['stunnel', '{}'.format("{}/temp.ssl".format(ROOTDIR))]
+        cmd_ssl = ['stunnel', '{}'.format("{}/temp.ssl".format(config.ROOTDIR))]
         ssl_exe = Popen(cmd_ssl, stdout=PIPE, stderr=STDOUT, bufsize=1, universal_newlines=True)
         self.log.emit(("debug", "Stunnel pid: {}".format(ssl_exe.pid)))
         self.pid.emit((ssl_exe.pid, "stunnel"))
@@ -543,7 +549,7 @@ class TunnelThread(QtCore.QThread):
 
     #using pexpect instead of subprocess to accept SHA fingerprint
     def ssh(self, ip, port):
-        cmd_ssh = "ssh -i {}/Airvpn/sshtunnel.key -L 1412:127.0.0.1:2018 sshtunnel@{} -p {} -N -T -v".format(ROOTDIR, ip, port)
+        cmd_ssh = "ssh -i {}/Airvpn/sshtunnel.key -L 1412:127.0.0.1:2018 sshtunnel@{} -p {} -N -T -v".format(config.ROOTDIR, ip, port)
         ssh_exe = pexpect.spawn(cmd_ssh)
         ssh_newkey = b'Are you sure you want to continue connecting'
         ssh_success = 'Forced command'

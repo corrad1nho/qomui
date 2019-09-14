@@ -7,8 +7,7 @@ import shutil
 import getopt
 from subprocess import Popen
 
-ROOTDIR = "/usr/share/qomui"
-
+from qomui import config
 
 def copy(argv):
     try:
@@ -21,9 +20,9 @@ def copy(argv):
             try:
                 shutil.copyfile(
                     "{}/config_temp.json".format(homedir),
-                    "{}/config.json".format(ROOTDIR))
-                Popen(['chown', 'root', '{}/config.json'.format(ROOTDIR)])
-                Popen(['chmod', '644', '{}/config.json'.format(ROOTDIR)])
+                    "{}/config.json".format(config.ROOTDIR))
+                Popen(['chown', 'root', '{}/config.json'.format(config.ROOTDIR)])
+                Popen(['chmod', '644', '{}/config.json'.format(config.ROOTDIR)])
                 os.remove("{}/config_temp.json".format(homedir))
             except FileNotFoundError:
                 sys.exit(1)
@@ -31,9 +30,9 @@ def copy(argv):
             try:
                 shutil.copyfile(
                     "{}/firewall_temp.json".format(homedir),
-                    "{}/firewall.json".format(ROOTDIR))
-                Popen(['chown', 'root', '{}/firewall.json'.format(ROOTDIR)])
-                Popen(['chmod', '644', '{}/firewall.json'.format(ROOTDIR)])
+                    "{}/firewall.json".format(config.ROOTDIR))
+                Popen(['chown', 'root', '{}/firewall.json'.format(config.ROOTDIR)])
+                Popen(['chmod', '644', '{}/firewall.json'.format(config.ROOTDIR)])
                 os.remove("{}/firewall_temp.json".format(homedir))
             except FileNotFoundError:
                 pass

@@ -5,14 +5,14 @@ import grp
 import getpass
 import pwd
 
-SUPPORTED_PROVIDERS = ["Airvpn", "AzireVPN", "Mullvad", "ProtonVPN", "PIA", "Windscribe"]
+from qomui import config
 
 def get_user_group():
     username = getpass.getuser()
     group = grp.getgrgid(pwd.getpwnam(username).pw_gid).gr_name
     return {"user" : username, "group" : group}
 
-def create_server_dict(current_dict, protocol_dict):
+def create_server_dict(current_dict, protocol_dict, SUPPORTED_PROVIDERS):
     provider = current_dict["provider"]
     if provider in SUPPORTED_PROVIDERS:
 
@@ -27,7 +27,7 @@ def create_server_dict(current_dict, protocol_dict):
         if provider == "Airvpn":
             if protocol_dict["Airvpn"][mode]["ipv6"] == "ipv6":
                 ipv6 = "on"
-            else: 
+            else:
                 ipv6 = "off"
 
             try:
@@ -46,7 +46,7 @@ def create_server_dict(current_dict, protocol_dict):
             except KeyError:
                 ip = current_dict["ip1"]
 
-            current_dict.update({"ip" : ip, "port": port, "protocol": protocol, 
+            current_dict.update({"ip" : ip, "port": port, "protocol": protocol,
                                     "prot_index": mode, "ipv6" : ipv6, "tlscrypt" : tlscrypt})
 
         elif provider == "Mullvad":
@@ -70,7 +70,7 @@ def create_server_dict(current_dict, protocol_dict):
             current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})
 
     else:
-        try: 
+        try:
             port = protocol_dict[provider]["port"]
             protocol = protocol_dict[provider]["protocol"]
             current_dict.update({"port": port, "protocol": protocol})
