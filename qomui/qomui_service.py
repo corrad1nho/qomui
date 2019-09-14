@@ -133,7 +133,7 @@ class QomuiDbus(dbus.service.Object):
             self.wg_connect = 1
             self.wg_provider = ovpn_dict["provider"]
 
-        setattr(self, "{}_dict".format(name), tunnel.TunnelThread(ovpn_dict, self.hop_dict, config.settings))
+        setattr(self, "{}_dict".format(name), tunnel.TunnelThread(ovpn_dict, self.hop_dict, config.settings, self.interface))
         getattr(self, "{}_dict".format(name)).log.connect(self.log_thread)
         getattr(self, "{}_dict".format(name)).status.connect(self.reply)
         getattr(self, "{}_dict".format(name)).dev.connect(self.set_tun)
@@ -265,12 +265,22 @@ class QomuiDbus(dbus.service.Object):
 
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
     def restore_default_dns(self):
-        try:
-            shutil.copyfile("/etc/resolv.conf.qomui.bak", "/etc/resolv.conf")
-            self.logger.debug("Restored backup of /etc/resolv.conf")
+        try: 
+            Popen(["systemctl", "is-active", "--quiet", "systemd-resolved"])
+            Popen([
+                "systemd-resolve", 
+                "--interface={}".format(self.interface),
+                "--set-dns={}".format(config.settings["alt_dns1"]),
+                "--set-dns={}".format(config.settings["alt_dns2"])
+                ])
 
-        except FileNotFoundError:
-            self.logger.warning("Default DNS settings not restored. Could not find backup of /etc/resolv.conf")
+        except (CalledProcessError, FileNotFoundError):
+            try:
+                shutil.copyfile("/etc/resolv.conf.qomui.bak", "/etc/resolv.conf")
+                self.logger.debug("Restored backup of /etc/resolv.conf")
+
+            except FileNotFoundError:
+                self.logger.warning("Default DNS settings not restored. Could not find backup of /etc/resolv.conf")
 
     @dbus.service.method(BUS_NAME, in_signature='ss', out_signature='')
     def change_ovpn_config(self, provider, certpath):
@@ -375,7 +385,6 @@ class QomuiDbus(dbus.service.Object):
         default_interface_4 = self.net["interface"]
         default_interface_6 = self.net["interface_6"]
         no_dnsmasq = config.settings["no_dnsmasq"]
-        print("nodnsmasq={}".format(no_dnsmasq))
 
         if self.gw != "None" or self.gw_6 != "None":
 
@@ -421,7 +430,6 @@ class QomuiDbus(dbus.service.Object):
     def cgroup_vpn(self):
         self.kill_dnsmasq()
         no_dnsmasq = config.settings["no_dnsmasq"]
-        print("nodnsmasq={}".format(no_dnsmasq))
 
         if self.tun_bypass is not None:
             dev_bypass = self.tun_bypass

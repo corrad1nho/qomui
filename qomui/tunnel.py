@@ -22,12 +22,13 @@ class TunnelThread(QtCore.QThread):
     tun_hop = None
     tun_bypass = None
 
-    def __init__(self, server_dict, hop_dict, settings):
+    def __init__(self, server_dict, hop_dict, settings, interface):
         QtCore.QThread.__init__(self)
         self.server_dict = server_dict
         self.hop = self.server_dict["hop"]
         self.hop_dict = hop_dict
         self.config = settings
+        self.interface = interface
 
     def run(self):
         self.connect_status = 0
@@ -331,7 +332,7 @@ class TunnelThread(QtCore.QThread):
                             self.dns_2 = None
 
                 if self.config["dns_off"] == 0:
-                    dns_manager.set_dns(self.dns, self.dns_2)
+                    dns_manager.set_dns(self.dns, self.dns_2, tun="wg_qomui", main_int=self.interface)
                 self.dnsserver.emit(("", self.dns, self.dns_2))
 
             #Necessary, otherwise bypass mode breaks - need to investigate
@@ -352,7 +353,7 @@ class TunnelThread(QtCore.QThread):
                 except CalledProcessError:
                     self.log.emit(("warning", "Could not reset packet classification for bypass table"))
 
-            self.bypass.emit()
+                self.bypass.emit()
 
             #we can't be sure of that
             exe_custom_scripts("up", self.server_dict["provider"], self.config)
@@ -431,9 +432,19 @@ class TunnelThread(QtCore.QThread):
                 if "bypass" not in self.server_dict and h != 1:
                      exe_custom_scripts("up", self.server_dict["provider"], self.config)
                 self.connect_status = 1
-                self.bypass.emit()
                 self.status.emit("connection_established{}".format(add))
                 self.log.emit(("info", "Successfully connected to {}".format(name)))
+
+                if self.config["dns_off"] == 0:
+
+                        dns_manager.set_dns(
+                            getattr(self, "dns{}".format(add)), 
+                            getattr(self, "dns_2{}".format(add)),
+                            tun=getattr(self, "tun{}".format(add)),
+                            main_int=self.interface
+                        )
+
+                self.dnsserver.emit((add, getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add))))
 
             elif line.find('TUN/TAP device') != -1:
                 setattr(self, "tun{}".format(add), line_format.split(" ")[3])
@@ -455,10 +466,6 @@ class TunnelThread(QtCore.QThread):
 
                     else:
                         setattr(self, "dns_2{}".format(add), None)
-
-                if self.config["dns_off"] == 0:
-                    dns_manager.set_dns(getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add)))
-                self.dnsserver.emit((add, getattr(self, "dns{}".format(add)), getattr(self, "dns_2{}".format(add))))
 
             #might be redundant as gui checks for timeout anyway
             elif line.find("Restart pause, 10 second(s)") != -1:

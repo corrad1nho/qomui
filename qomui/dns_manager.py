@@ -7,19 +7,45 @@ from qomui import firewall
 from subprocess import CalledProcessError
 
 
-def set_dns(server_1, server_2=None):
-    resolv = open("/etc/resolv.conf", "w")
-    lines = [
-        "#modified by Qomui\n",
-        "nameserver {}\n".format(server_1)
-    ]
+def set_dns(server_1, server_2=None, tun=None, main_int=None):
 
-    if server_2 is not None:
-        lines.append("nameserver {}\n".format(server_2))
+    try: 
+        Popen(["systemctl", "is-active", "--quiet", "systemd-resolved"])
+        Popen(["systemd-resolve", "--flush-caches"])
+        dns_systemd_cmd = [
+            "systemd-resolve", 
+            "--interface={}".format(tun),
+            "--set-dns={}".format(server_1)
+            ]
 
-    resolv.writelines(lines)
-    logging.info(
-        "DNS: Overwriting /etc/resolv.conf with {} and {}".format(server_1, server_2))
+        if server_2 is not None:
+            dns_systemd_cmd.append("--set-dns={}".format(server_2))
+
+        dns_systemd_cmd = [
+            "systemd-resolve", 
+            "--interface={}".format(main_int),
+            "--set-dns={}".format(server_1)
+            ]
+        if server_2 is not None:
+            dns_systemd_cmd.append("--set-dns={}".format(server_2))
+        
+        Popen(dns_systemd_cmd)
+        logging.info("DNS: Set {} and {} as dns servers via systemd-resolve".format(server_1, server_2))
+
+
+    except (CalledProcessError, FileNotFoundError):
+        resolv = open("/etc/resolv.conf", "w")
+        lines = [
+            "#modified by Qomui\n",
+            "nameserver {}\n".format(server_1)
+        ]
+
+        if server_2 is not None:
+            lines.append("nameserver {}\n".format(server_2))
+
+        resolv.writelines(lines)
+        logging.info(
+            "DNS: Overwriting /etc/resolv.conf with {} and {}".format(server_1, server_2))
 
 
 def dnsmasq(interface, port, server_1, server_2, pid):
