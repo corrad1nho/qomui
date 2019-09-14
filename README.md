@@ -109,6 +109,18 @@ Qomui has been my first ever programming experience and a practical challenge fo
 
 ### Changelog
 
+#### version 0.8.3:
+- [new] status tab: added network chart 
+- [new] status tab: map showing VPN server location
+- [new] status tab: DNS leak test via ipleak.net
+- [new] option to not change DNS servers
+- [change] settings now read from config.py
+- [change] started making qomui pep8/flake8 compliant 
+- [bugfix] installation fails on Debian 10
+- [bugfix] importing Mullvad configs fails 
+- [bugfix] corrected paths in Windscribe configs
+- [bugfix] fixed wrong directory in hop scripts
+
 #### version 0.8.2:
 - [new] added AzireVPN
 - [new] option to specify key for Airvpn
@@ -132,10 +144,3 @@ Qomui has been my first ever programming experience and a practical challenge fo
 ##### Additional notes:
 - Re-importing config files from supported providers is strongly recommended as they are now saved in a different location. 
 - If you are using Debian/Ubuntu packages Qomui must be removed (sudo apt purge qomui) and then installed again due to a bug in the postrm script. 
-
-#### version 0.8.1:
-- [change] option to restart qomui-service from gui if it crashes
-- [change] added exceptions for all DBus calls
-- [change] improved support for non-systemd distributions
-- [change] detecting and closing simultaneously running instances
-- [bugfix] Airvpn auto-download fixed
