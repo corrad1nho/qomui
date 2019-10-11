@@ -1,9 +1,7 @@
 #!/usr/bin/python3
 
 from setuptools import setup, find_packages
-from setuptools.command.install import install
 import glob
-import os
 
 VERSION = "0.8.2"
 
@@ -44,25 +42,6 @@ data_files = [
         ('/usr/share/qomui/flags/', glob.glob('resources/flags/*'))
         ]
 
-def post_install(i):
-    try:
-        for f in data_files:
-            for o in f[1]:
-                fmod = os.path.join(f[0], os.path.basename(o))
-                if os.path.splitext(fmod)[1] == ".sh":
-                    os.chmod(fmod, 0o774)
-                else:
-                    os.chmod(fmod, 0o664)
-
-    except (FileNotFoundError, PermissionError) as e:
-        pass
-
-
-class CustomInstall(install):
-    def run(self):
-        install.run(self)
-        self.execute(post_install, (self.install_lib,), msg="Running post-install script to fix file permissions")
-
 
 setup(name="qomui",
       version=VERSION,
@@ -88,11 +67,10 @@ setup(name="qomui",
       license='GPLv3+',
       entry_points={
         'gui_scripts': [
-            'qomui-gui=qomui.qomui_gui:main' 
+            'qomui-gui=qomui.qomui_gui:main'
             ],
         'console_scripts': [
             'qomui-service=qomui.qomui_service:main',
             'qomui-cli=qomui.qomui_cli:main'
             ]},
-      cmdclass={'install': CustomInstall}
       )
