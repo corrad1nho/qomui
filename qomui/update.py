@@ -597,8 +597,11 @@ class AddServers(QtCore.QThread):
                     windflix = 1
 
                 for n in s["nodes"]:
-                    city = n["group"].split("-")[0]
-                    group = n["group"].split("- ")[1]
+                    if "-" in n["group"]:
+                        city = n["group"].split("-")[0]
+                        group = n["group"].split("- ")[1]
+                    else:
+                        city = group = n["group"]
                     ip = n["ip2"]
                     ip2 = n["ip3"]
 
