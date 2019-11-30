@@ -15,7 +15,7 @@ import logging
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 try:
-    from PyQt5 import QtWebEngineWidgetsas
+    from PyQt5 import QtWebEngineWidgets
     webengine_available = 1
 
 except ImportError:

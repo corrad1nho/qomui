@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 
 import logging
-from subprocess import Popen
+from subprocess import Popen, check_call
 
 from qomui import firewall
 from subprocess import CalledProcessError
 
 
 def set_dns(server_1, server_2=None, tun=None, main_int=None):
-
-    try: 
+    try:
+        resolver_check = check_call(["systemctl", "is-active", "systemd-resolved"])
+    except (CalledProcessError, FileNotFoundError):
+        resolver_check = 1
+    
+    if resolver_check == 0:
         Popen(["systemctl", "is-active", "--quiet", "systemd-resolved"])
         Popen(["systemd-resolve", "--flush-caches"])
         dns_systemd_cmd = [
@@ -26,19 +30,19 @@ def set_dns(server_1, server_2=None, tun=None, main_int=None):
             "--interface={}".format(main_int),
             "--set-dns={}".format(server_1)
             ]
+
         if server_2 is not None:
             dns_systemd_cmd.append("--set-dns={}".format(server_2))
         
         Popen(dns_systemd_cmd)
         logging.info("DNS: Set {} and {} as dns servers via systemd-resolve".format(server_1, server_2))
 
-
-    except (CalledProcessError, FileNotFoundError):
+    else:
         resolv = open("/etc/resolv.conf", "w")
         lines = [
             "#modified by Qomui\n",
             "nameserver {}\n".format(server_1)
-        ]
+            ]
 
         if server_2 is not None:
             lines.append("nameserver {}\n".format(server_2))

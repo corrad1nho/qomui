@@ -12,7 +12,7 @@ cls_id = "0x00110011"
 interface = None
 
 def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None, no_dnsmasq=0):
-    print("nodnsmasq={}".format(no_dnsmasq))
+
     logging.info("Creating bypass for {}".format(interface))
     delete_cgroup(default_int)
     cgroup_iptables = [
@@ -43,14 +43,17 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None,
             setcid.close()
             logging.debug("Bypass: Created cgroup 'net_cls:bypass_qomui'")
 
-    try:
-        check_call(["ip", "route", "show", "table", "bypass_qomui"])
-        logging.debug("Bypass: No routing table added - table bypass_qomui already exists")
+    
+    with open("/etc/iproute2/rt_tables") as rt_check:
+        if "11 bypass_qomui" not in rt_check.read():
+            rt_check.close()
+            with open("/etc/iproute2/rt_tables", "a") as rt_tables:
+                rt_tables.write("11 bypass_qomui\n")
+            logging.debug("Bypass: Created new routing table")
 
-    except CalledProcessError:
-        with open("/etc/iproute2/rt_tables", "a") as rt_tables:
-            rt_tables.write("11 bypass_qomui\n")
-        logging.debug("Bypass: Created new routing table")
+        else:
+            rt_check.close()
+            logging.debug("Bypass: No routing table added - table bypass_qomui already exists")
 
     firewall.batch_rule(cgroup_iptables)
     if gw_6 != "None" and default_int == interface:
@@ -76,7 +79,7 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None,
                         "{}".format(gw), "dev", "{}".format(interface), "table", "bypass_qomui"])
             logging.debug("Bypass: Set ipv4 route 'default via {} dev {}'".format(gw, interface))
     except CalledProcessError:
-        logging.error("Bypass: Setting ipv4 route 'default via {} dev {}'".format(gw, interface))
+        logging.error("Bypass: Failed to set ipv4 route 'default via {} dev {}'".format(gw, interface))
 
     try:
         check_call(["ip", "-6", "rule", "add", "fwmark", "11", "table", "bypass_qomui"])
@@ -86,7 +89,7 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None,
                         "{}".format(gw_6), "dev", "{}".format(interface), "table", "bypass_qomui"])
             logging.debug("Bypass: Set ipv6 route 'default via {} dev {}'".format(gw_6, interface))
     except CalledProcessError:
-        logging.error("Bypass: Setting ipv6 route 'default via {} dev {}' failed".format(gw, interface))
+        logging.error("Bypass: Failed to set ipv6 route 'default via {} dev {}' failed".format(gw, interface))
 
     with open("/proc/sys/net/ipv4/conf/all/rp_filter", 'w') as rp_edit_all:
         rp_edit_all.write("2")

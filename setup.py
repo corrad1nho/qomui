@@ -5,7 +5,7 @@ from setuptools.command.install import install
 import glob
 import os
 
-VERSION = "0.8.2"
+VERSION = "0.8.3"
 
 data_files = [
         ('/usr/share/qomui', ['resources/countries.json']),

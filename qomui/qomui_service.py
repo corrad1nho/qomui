@@ -265,8 +265,12 @@ class QomuiDbus(dbus.service.Object):
 
     @dbus.service.method(BUS_NAME, in_signature='', out_signature='')
     def restore_default_dns(self):
-        try: 
-            Popen(["systemctl", "is-active", "--quiet", "systemd-resolved"])
+        try:
+            resolver_check = check_call(["systemctl", "is-active", "systemd-resolved"])
+        except (CalledProcessError, FileNotFoundError):
+            resolver_check = 1
+    
+        if resolver_check == 0:
             Popen([
                 "systemd-resolve", 
                 "--interface={}".format(self.interface),
@@ -274,7 +278,7 @@ class QomuiDbus(dbus.service.Object):
                 "--set-dns={}".format(config.settings["alt_dns2"])
                 ])
 
-        except (CalledProcessError, FileNotFoundError):
+        else:
             try:
                 shutil.copyfile("/etc/resolv.conf.qomui.bak", "/etc/resolv.conf")
                 self.logger.debug("Restored backup of /etc/resolv.conf")
