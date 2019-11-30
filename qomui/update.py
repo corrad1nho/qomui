@@ -948,7 +948,7 @@ class AddServers(QtCore.QThread):
                             modify[index] = "#{}".format(line)
 
                     elif line.startswith("auth-user-pass"):
-                        auth_file = '{}/certs/{}-auth.txt'.format(config.ROOTDIR, self.provider)
+                        auth_file = '{}/{}/{}-auth.txt'.format(config.ROOTDIR, self.provider, self.provider)
                         modify[index] = 'auth-user-pass {}\n'.format(auth_file)
 
                     elif line.startswith("verb "):
