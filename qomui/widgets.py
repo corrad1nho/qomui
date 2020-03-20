@@ -893,7 +893,7 @@ class AppSelector(QtWidgets.QDialog):
                 for f in os.listdir(d):
                     if f.endswith(".desktop"):
                         desktop_file = os.path.join(d, f)
-                        c = configparser.ConfigParser()
+                        c = configparser.ConfigParser(strict=False)
                         c.read(desktop_file)
 
                         try:
