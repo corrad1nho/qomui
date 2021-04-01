@@ -12,11 +12,13 @@ except AttributeError:
 try:
     _encoding = QtWidgets.QApplication.UnicodeUTF8
 
+
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig)
+
 
 class ComboCheckBox(QtWidgets.QComboBox):
 
@@ -138,7 +140,7 @@ class EditProfile(QtWidgets.QDialog):
         if cols >= 1:
             self.choiceTable.setSpan(0, 0, 1, cols)
         self.choiceTable.setItem(0, 0, item)
-        r+=1
+        r += 1
         for provider in self.providers:
             item = QtWidgets.QTableWidgetItem()
             item.setText(provider)
@@ -149,7 +151,7 @@ class EditProfile(QtWidgets.QDialog):
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
             self.choiceTable.setItem(r, c, item)
-            if c == cols-1:
+            if c == cols - 1:
                 r += 1
                 c = 0
             else:
@@ -175,7 +177,7 @@ class EditProfile(QtWidgets.QDialog):
             else:
                 item.setCheckState(QtCore.Qt.Unchecked)
             self.choiceTable.setItem(r, c, item)
-            if c == cols-1:
+            if c == cols - 1:
                 r += 1
                 c = 0
             else:
@@ -199,13 +201,12 @@ class EditProfile(QtWidgets.QDialog):
             pass
 
     def confirm(self):
-        profile_dict = {}
-        profile_dict["name"] = self.profileLine.text()
-        profile_dict["providers"] = sorted(self.providers_selected)
-        profile_dict["countries"] = sorted(self.countries_selected)
-        profile_dict["mode"] = self.modeBox.currentText()
-        profile_dict["protocol"] = self.chooseProtocolBox.currentText()
-        profile_dict["filters"] = self.filterLine.text().split(";")[:-1]
+        profile_dict = {"name": self.profileLine.text(),
+                        "providers": sorted(self.providers_selected),
+                        "countries": sorted(self.countries_selected),
+                        "mode": self.modeBox.currentText(),
+                        "protocol": self.chooseProtocolBox.currentText(),
+                        "filters": self.filterLine.text().split(";")[:-1]}
 
         if self.selected != 0:
             profile_dict["number"] = self.selected["number"]
@@ -216,7 +217,7 @@ class EditProfile(QtWidgets.QDialog):
                 "Profile incomplete",
                 "Set a profile name & select at least one country and provider",
                 QtWidgets.QMessageBox.Ok
-                )
+            )
         else:
             self.save_profile.emit(profile_dict)
             self.hide()

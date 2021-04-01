@@ -27,6 +27,7 @@ except AttributeError:
     def _fromUtf8(s):
         return s
 
+
 class QomuiCli(QtCore.QObject):
     hop_server_dict = None
     hop_active = 0
@@ -62,7 +63,7 @@ class QomuiCli(QtCore.QObject):
             provider = args["set_protocol"]
 
             try:
-                for k,v in protocol_dict[provider].items():
+                for k, v in protocol_dict[provider].items():
                     if k != "selected":
                         number = k.split("_")[1]
                         attrs = ", ".join(v.values())
@@ -75,7 +76,7 @@ class QomuiCli(QtCore.QObject):
                 if prot_chosen in protocol_dict[provider].keys():
                     protocol_dict[provider]["selected"] = prot_chosen
 
-                    with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
+                    with open("{}/protocol.json".format(HOMEDIR), "w") as p:
                         json.dump(protocol_dict, p)
 
                     print("Port/Protocol for {} successfully changed".format(provider))
@@ -115,7 +116,7 @@ class QomuiCli(QtCore.QObject):
 
         if args["list"] is not None:
             server_dict = self.load_json("{}/server.json".format(HOMEDIR))
-            for k,v in server_dict.items():
+            for k, v in server_dict.items():
                 v_lower = [v.lower() for v in v.values()]
                 a_lower = [a.lower() for a in args["list"]]
                 check = all(i in v_lower for i in a_lower)
@@ -172,7 +173,7 @@ class QomuiCli(QtCore.QObject):
                 pass
 
             self.qomui_service.delete_provider(provider)
-            with open ("{}/server.json".format(HOMEDIR), "w") as s:
+            with open("{}/server.json".format(HOMEDIR), "w") as s:
                 json.dump(self.server_dict, s)
 
             print("{} deleted".format(provider))
@@ -194,13 +195,13 @@ class QomuiCli(QtCore.QObject):
 
     def establish_connection(self, server):
         self.ovpn_dict = utils.create_server_dict(self.server_dict[server],
-                                                                self.protocol_dict
-                                                                )
+                                                  self.protocol_dict
+                                                  )
 
         if self.hop_server_dict is not None:
-            self.ovpn_dict.update({"hop":"2"})
+            self.ovpn_dict.update({"hop": "2"})
         else:
-            self.ovpn_dict.update({"hop":"0"})
+            self.ovpn_dict.update({"hop": "0"})
 
         self.kill()
         self.qomui_service.connect_to_server(self.ovpn_dict)
@@ -214,14 +215,15 @@ class QomuiCli(QtCore.QObject):
 
     def set_hop(self, server):
         self.hop_server_dict = utils.create_server_dict(self.server_dict[server],
-                                                                    self.protocol_dict
-                                                                    )
+                                                        self.protocol_dict
+                                                        )
         self.qomui_service.set_hop(self.hop_server_dict)
-
 
     def add_server(self, provider):
         path = "None"
-        print("Automatic download is available for the following providers: Airvpn, Mullvad, PIA, Windscribe and ProtonVPN")
+        print(
+            "Automatic download is available for the following providers: Airvpn, Mullvad, PIA, Windscribe and "
+            "ProtonVPN")
         if provider not in SUPPORTED_PROVIDERS:
             path = input("Enter path of folder containing config files of {}:\n".format(provider))
             if not os.path.exists(path):
@@ -243,12 +245,12 @@ class QomuiCli(QtCore.QObject):
         print("Please wait....")
 
         credentials = {
-                        "provider" : provider,
-                        "username" : username,
-                        "password" : password,
-                        "folderpath" : path,
-                        "homedir" : HOMEDIR
-                        }
+            "provider": provider,
+            "username": username,
+            "password": password,
+            "folderpath": path,
+            "homedir": HOMEDIR
+        }
 
         self.qomui_service.import_thread(credentials)
 
@@ -306,10 +308,10 @@ class QomuiCli(QtCore.QObject):
             except KeyError:
                 pass
 
-            with open ("{}/server.json".format(HOMEDIR), "w") as s:
+            with open("{}/server.json".format(HOMEDIR), "w") as s:
                 json.dump(self.server_dict, s)
 
-            with open ("{}/protocol.json".format(HOMEDIR), "w") as p:
+            with open("{}/protocol.json".format(HOMEDIR), "w") as p:
                 json.dump(self.protocol_dict, p)
 
             os.remove("{}/{}.json".format(HOMEDIR, msg))
@@ -321,8 +323,8 @@ class QomuiCli(QtCore.QObject):
 
     def show_config(self, config):
         print("Current configuration:")
-        for k,v in config.items():
-            print("{} : {}".format(k,v))
+        for k, v in config.items():
+            print("{} : {}".format(k, v))
 
         sys.exit(0)
 
@@ -345,30 +347,29 @@ class QomuiCli(QtCore.QObject):
 
     def load_json(self, json_file):
         try:
-            with open (json_file, 'r') as j:
+            with open(json_file, 'r') as j:
                 return json.load(j)
 
         except FileNotFoundError:
             if json_file == "/usr/share/qomui/config.json":
                 try:
-                    with open ("{}/default_config.json".format(ROOTDIR), 'r') as j:
+                    with open("{}/default_config.json".format(ROOTDIR), 'r') as j:
                         print("Loading default configuration")
                         return json.load(j)
                 except FileNotFoundError:
                     print("{} does not exist".format(json_file))
                     return {}
             else:
-                return {}
                 print("{} does not exist".format(json_file))
-
+                return {}
 
     def applyoptions(self, temp_config):
 
-        with open ('{}/config_temp.json'.format(HOMEDIR), 'w') as config:
+        with open('{}/config_temp.json'.format(HOMEDIR), 'w') as config:
             json.dump(temp_config, config)
 
         update_cmd = ['sudo', sys.executable, '-m', 'qomui.mv_config',
-                        '-d', '{}'.format(HOMEDIR)]
+                      '-d', '{}'.format(HOMEDIR)]
 
         update = Popen(update_cmd, stdin=PIPE, stdout=PIPE, universal_newlines=True)
         prompt = update.communicate("" + '\n')[1]
@@ -437,6 +438,7 @@ def main():
     mainloop = DBusQtMainLoop(set_as_default=True)
     ex = QomuiCli(args=args)
     sys.exit(app.exec_())
+
 
 if __name__ == '__main__':
     main()

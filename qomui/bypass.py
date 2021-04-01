@@ -11,7 +11,8 @@ cgroup_path = "/sys/fs/cgroup/net_cls/bypass_qomui"
 cls_id = "0x00110011"
 interface = None
 
-def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None, no_dnsmasq=0):
+
+def create_cgroup(user, group, interface, gw=None, gw_6=None, default_int=None, no_dnsmasq=0):
     print("nodnsmasq={}".format(no_dnsmasq))
     logging.info("Creating bypass for {}".format(interface))
     delete_cgroup(default_int)
@@ -24,17 +25,17 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None,
          "--cgroup", "0x00110011", "-j", "ACCEPT"],
         ["-I", "INPUT", "1", "-m", "cgroup",
          "--cgroup", "0x00110011", "-j", "ACCEPT"]
-        ]
+    ]
 
     if no_dnsmasq == 0:
         cgroup_iptables.append(
             ["-t", "nat", "-A", "OUTPUT", "-m", "cgroup", "--cgroup",
-            "0x00110011", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
-            )
+             "0x00110011", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
+        )
         cgroup_iptables.append(
             ["-t", "nat", "-A", "OUTPUT", "-m", "cgroup", "--cgroup",
-            "0x00110011", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
-            )
+             "0x00110011", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
+        )
 
     if not os.path.exists(cgroup_path):
         os.makedirs(cgroup_path)
@@ -99,15 +100,16 @@ def create_cgroup(user, group, interface, gw=None,  gw_6=None, default_int=None,
         logging.error("Failed to disable reverse path filtering for {}".format(interface))
 
     try:
-        check_call(["cgcreate", "-t", "{}:{}".format(user, group), "-a" "{}:{}".format(user, group), "-g", "net_cls:bypass_qomui"])
+        check_call(["cgcreate", "-t", "{}:{}".format(user, group), "-a" "{}:{}".format(user, group), "-g",
+                    "net_cls:bypass_qomui"])
         logging.debug("Bypass: Configured cgroup access for {}".format(user))
         logging.info("Successfully created cgroup for {}".format(interface))
 
     except (CalledProcessError, FileNotFoundError) as e:
         logging.error("Creating cgroup failed - is libcgroup installed?")
 
-def delete_cgroup(interface):
 
+def delete_cgroup(interface):
     cgroup_iptables_del = [
         ["-t", "mangle", "-D", "OUTPUT", "-m", "cgroup",
          "--cgroup", "0x00110011", "-j", "MARK", "--set-mark", "11"],
@@ -121,7 +123,7 @@ def delete_cgroup(interface):
          "0x00110011", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"],
         ["-t", "nat", "-D", "OUTPUT", "-m", "cgroup", "--cgroup",
          "0x00110011", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", "5354"]
-        ]
+    ]
 
     try:
         check_call(["ip", "rule", "del", "fwmark", "11", "table", "bypass_qomui"])
@@ -139,19 +141,18 @@ def delete_cgroup(interface):
 
     logging.info("Deleted cgroup")
 
+
 def set_bypass_vpn(interface, interface_cmd, tun, tun_cmd):
-    postroutes =   [[
-                    "-t", "nat", tun_cmd, "POSTROUTING",
-                    "-m", "cgroup", "--cgroup", "0x00110011",
-                    "-o", tun, "-j", "MASQUERADE"
-                    ],
-                    [
-                    "-t", "nat", interface_cmd, "POSTROUTING",
-                    "-m", "cgroup", "--cgroup", "0x00110011",
-                    "-o", interface, "-j", "MASQUERADE"
-                    ]]
+    postroutes = [[
+        "-t", "nat", tun_cmd, "POSTROUTING",
+        "-m", "cgroup", "--cgroup", "0x00110011",
+        "-o", tun, "-j", "MASQUERADE"
+    ],
+        [
+            "-t", "nat", interface_cmd, "POSTROUTING",
+            "-m", "cgroup", "--cgroup", "0x00110011",
+            "-o", interface, "-j", "MASQUERADE"
+        ]]
 
     firewall.batch_rule(postroutes)
     firewall.batch_rule_6(postroutes)
-
-

@@ -7,10 +7,12 @@ import pwd
 
 from qomui import config
 
+
 def get_user_group():
     username = getpass.getuser()
     group = grp.getgrgid(pwd.getpwnam(username).pw_gid).gr_name
-    return {"user" : username, "group" : group}
+    return {"user": username, "group": group}
+
 
 def create_server_dict(current_dict, protocol_dict, SUPPORTED_PROVIDERS):
     provider = current_dict["provider"]
@@ -46,8 +48,8 @@ def create_server_dict(current_dict, protocol_dict, SUPPORTED_PROVIDERS):
             except KeyError:
                 ip = current_dict["ip1"]
 
-            current_dict.update({"ip" : ip, "port": port, "protocol": protocol,
-                                    "prot_index": mode, "ipv6" : ipv6, "tlscrypt" : tlscrypt})
+            current_dict.update({"ip": ip, "port": port, "protocol": protocol,
+                                 "prot_index": mode, "ipv6": ipv6, "tlscrypt": tlscrypt})
 
         elif provider == "Mullvad":
             try:
@@ -62,7 +64,7 @@ def create_server_dict(current_dict, protocol_dict, SUPPORTED_PROVIDERS):
         elif provider == "Windscribe":
             if protocol == "SSL":
                 ip = current_dict["ip2"]
-                current_dict.update({"port": port, "protocol": protocol, "prot_index": mode, "ip" : ip})
+                current_dict.update({"port": port, "protocol": protocol, "prot_index": mode, "ip": ip})
 
             else:
                 current_dict.update({"port": port, "protocol": protocol, "prot_index": mode})

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 import sys
 import os
 import shutil
@@ -8,6 +7,7 @@ import getopt
 from subprocess import Popen
 
 from qomui import config
+
 
 def copy(argv):
     try:
