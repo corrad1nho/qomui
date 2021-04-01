@@ -16,6 +16,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 
 try:
     from PyQt5 import QtWebEngineWidgetsas
+
     webengine_available = 1
 
 except ImportError:
@@ -31,11 +32,14 @@ except AttributeError:
 
 try:
     _encoding = QtWidgets.QApplication.UnicodeUTF8
+
+
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig, _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig)
+
 
 class favouriteButton(QtWidgets.QAbstractButton):
     def __init__(self, parent=None):
@@ -52,11 +56,11 @@ class favouriteButton(QtWidgets.QAbstractButton):
         palette = self.palette()
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
         painter.setPen(QtCore.Qt.NoPen)
-        if self.isChecked() == True:
+        if self.isChecked():
             painter.setBrush(palette.highlight())
         else:
             painter.setBrush(palette.buttonText())
-        yOffset = (rect.height() - 25) /2
+        yOffset = (rect.height() - 25) / 2
         painter.translate(rect.x(), rect.y() + yOffset)
         painter.scale(25, 25)
         painter.drawPolygon(self.star, QtCore.Qt.WindingFill)
@@ -71,12 +75,13 @@ class favouriteButton(QtWidgets.QAbstractButton):
     def sizeHint(self):
         return QtCore.QSize(25, 25)
 
+
 class ServerWidget(QtWidgets.QWidget):
     server_chosen = QtCore.pyqtSignal(str)
     set_hop_signal = QtCore.pyqtSignal(str)
     changed_favourite_signal = QtCore.pyqtSignal(tuple)
 
-    def __init__ (self, show=None, parent=None):
+    def __init__(self, show=None, parent=None):
         super(ServerWidget, self).__init__(parent=None)
         self.hidden = False
         self.fav = 0
@@ -119,7 +124,7 @@ class ServerWidget(QtWidgets.QWidget):
         self.hop_bt.clicked.connect(self.hop_signal)
         self.favouriteButton.toggled.connect(self.fav_change)
 
-    def setText(self, name, provider, country, city, button = "connect", fav = 0):
+    def setText(self, name, provider, country, city, button="connect", fav=0):
         self.name = name
         self.provider = provider
         self.city = city
@@ -140,7 +145,7 @@ class ServerWidget(QtWidgets.QWidget):
                 self.iconLabel.setPixmap(pixmap)
         else:
             icon = QtGui.QIcon.fromTheme(country)
-            self.iconLabel.setPixmap(icon.pixmap(25,25))
+            self.iconLabel.setPixmap(icon.pixmap(25, 25))
 
         bold_font = QtGui.QFont()
         bold_font.setBold(True)
@@ -168,7 +173,7 @@ class ServerWidget(QtWidgets.QWidget):
 
     def hide_button(self, choice=None):
         self.choice = choice
-        #self.horizontalLayout.removeWidget(self.hop_bt)
+        # self.horizontalLayout.removeWidget(self.hop_bt)
         self.hop_bt = None
 
         if choice == 1:
@@ -196,7 +201,7 @@ class ServerWidget(QtWidgets.QWidget):
                 self.favouriteButton.setVisible(True)
 
     def leaveEvent(self, event):
-        if self.show == None:
+        if self.show is None:
 
             try:
                 self.connect_bt.setVisible(False)
@@ -240,10 +245,11 @@ class ServerWidget(QtWidgets.QWidget):
     def sizeHint(self):
         return QtCore.QSize(100, 50)
 
+
 class HopWidget(QtWidgets.QWidget):
     clear = QtCore.pyqtSignal()
 
-    def __init__ (self, parent=None):
+    def __init__(self, parent=None):
         super(HopWidget, self).__init__(parent)
         self.setupUi(self)
 
@@ -277,17 +283,18 @@ class HopWidget(QtWidgets.QWidget):
             city = None
 
         self.activeHopWidget.setText(server_dict["name"], server_dict["provider"],
-                               server_dict["country"], city, button="clear")
+                                     server_dict["country"], city, button="clear")
 
         self.activeHopWidget.hide_button(0)
 
     def signal(self):
         self.clear.emit()
 
+
 class ProgressBarWidget(QtWidgets.QWidget):
     abort = QtCore.pyqtSignal(str)
 
-    def __init__ (self, parent=None):
+    def __init__(self, parent=None):
         super(ProgressBarWidget, self).__init__(parent)
         self.setupUi(self)
 
@@ -322,12 +329,13 @@ class ProgressBarWidget(QtWidgets.QWidget):
     def cancel(self):
         self.abort.emit(self.action)
 
+
 class ActiveWidget(QtWidgets.QWidget):
     disconnect = QtCore.pyqtSignal()
     reconnect = QtCore.pyqtSignal()
     check_update = QtCore.pyqtSignal()
 
-    def __init__ (self, text, parent=None):
+    def __init__(self, text, parent=None):
         super(ActiveWidget, self).__init__(parent)
         self.setupUi(self)
         self.text = text
@@ -349,7 +357,7 @@ class ActiveWidget(QtWidgets.QWidget):
         self.vLayoutActive.addWidget(self.statusLabel)
         bold_font.setPointSize(11)
         self.hopCountryLabel = QtWidgets.QLabel(ConnectionWidget)
-        self.hopCountryLabel.setFixedSize(30,30)
+        self.hopCountryLabel.setFixedSize(30, 30)
         self.hopCountryLabel.setLayoutDirection(QtCore.Qt.RightToLeft)
         self.hopCountryLabel.setVisible(False)
         self.hLayoutActive.addWidget(self.hopCountryLabel)
@@ -373,7 +381,7 @@ class ActiveWidget(QtWidgets.QWidget):
         self.statusLabel.setText(self.text)
         city = self.city_port_label(server_dict)
         self.ServerWidget.setText(server_dict["name"], server_dict["provider"],
-                               server_dict["country"], city, button="disconnect")
+                                  server_dict["country"], city, button="disconnect")
 
         if hop_dict is not None:
             flag = '{}/flags/{}.png'.format(config.ROOTDIR, hop_dict["country"])
@@ -419,19 +427,21 @@ class ActiveWidget(QtWidgets.QWidget):
     def signal(self):
         self.disconnect.emit()
 
+
 class LineWidget(QtWidgets.QWidget):
 
-    def __init__ (self, parent=None):
+    def __init__(self, parent=None):
         super(LineWidget, self).__init__(parent)
         self.setupUi(self)
 
     def setupUi(self, LineWidget):
         self.setAutoFillBackground(True)
         self.setFixedHeight(1)
-        #self.setBackgroundRole(self.palette().Highlight)
+        # self.setBackgroundRole(self.palette().Highlight)
+
 
 class StatusOffWidget(QtWidgets.QWidget):
-    def __init__ (self, parent=None):
+    def __init__(self, parent=None):
         super(StatusOffWidget, self).__init__(parent=None)
         self.setupUi(self)
 
@@ -450,7 +460,7 @@ class StatusOffWidget(QtWidgets.QWidget):
         self.vLayoutStatus.addSpacing(40)
         self.qIconLabel = QtWidgets.QLabel(Form)
         self.qIconLabel.setObjectName("qIconLabel")
-        self.qIconLabel.setMinimumSize(300,300)
+        self.qIconLabel.setMinimumSize(300, 300)
         self.qIconLabel.setAlignment(QtCore.Qt.AlignCenter)
         self.vLayoutStatus.addWidget(self.qIconLabel)
         self.vLayoutStatus.addSpacing(40)
@@ -463,24 +473,26 @@ class StatusOffWidget(QtWidgets.QWidget):
         Form.setWindowTitle(_translate("Form", "Form"))
         self.offLabel.setText(_translate("Form", "You are currently not connected to any VPN server "))
         icon = QtGui.QIcon.fromTheme("qomui_off")
-        self.qIconLabel.setPixmap(icon.pixmap(300,300))
+        self.qIconLabel.setPixmap(icon.pixmap(300, 300))
+
 
 class ColoredRect(QtWidgets.QFrame):
-    def __init__ (self, color, parent=None):
+    def __init__(self, color, parent=None):
         super(ColoredRect, self).__init__(parent)
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(color)
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Window, brush)
         self.setPalette(palette)
-        self.setFixedSize(10,10)
+        self.setFixedSize(10, 10)
         self.setAutoFillBackground(True)
+
 
 class StatusOnWidget(QtWidgets.QWidget):
     reconnect = QtCore.pyqtSignal()
     check_update = QtCore.pyqtSignal()
 
-    def __init__ (self, parent=None):
+    def __init__(self, parent=None):
         super(StatusOnWidget, self).__init__(parent=None)
         self.setupUi(self)
 
@@ -499,7 +511,7 @@ class StatusOnWidget(QtWidgets.QWidget):
             self.webView = QtWebEngineWidgets.QWebEngineView(Form)
             self.webView.setUrl(QtCore.QUrl("about:blank"))
             self.webView.setObjectName("webView")
-            self.webView.setMinimumSize(300,300)
+            self.webView.setMinimumSize(300, 300)
             self.webView.setMaximumSize(16000, 16000)
             self.vLayoutStatus.addWidget(self.webView)
             self.hLayoutStatus = QtWidgets.QHBoxLayout()
@@ -544,19 +556,19 @@ class StatusOnWidget(QtWidgets.QWidget):
         self.vLayoutStatus.addLayout(self.hLayoutStatus_2)
         self.netGraph = plotter.PlotArea(Form)
         self.netGraph.setObjectName("netGraph")
-        self.netGraph.setMinimumSize(100,100)
+        self.netGraph.setMinimumSize(100, 100)
         self.vLayoutStatus.addWidget(self.netGraph)
         self.hLayoutStatus_3 = QtWidgets.QHBoxLayout()
         self.hLayoutStatus_3.setObjectName("hLayoutStatus_3")
         spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.hLayoutStatus_3.addItem(spacerItem2)
-        self.downRect = ColoredRect(QtGui.QColor(255,127,42,255), parent=Form)
+        self.downRect = ColoredRect(QtGui.QColor(255, 127, 42, 255), parent=Form)
         self.hLayoutStatus_3.addWidget(self.downRect)
         self.downLabel = QtWidgets.QLabel(Form)
         self.downLabel.setObjectName("downLabel")
         self.downLabel.setFont(font)
         self.hLayoutStatus_3.addWidget(self.downLabel)
-        self.upRect = ColoredRect(QtGui.QColor(44,162,216,255), parent=Form)
+        self.upRect = ColoredRect(QtGui.QColor(44, 162, 216, 255), parent=Form)
         self.hLayoutStatus_3.addWidget(self.upRect)
         self.upLabel = QtWidgets.QLabel(Form)
         self.upLabel.setObjectName("upLabel")
@@ -609,7 +621,7 @@ class StatusOnWidget(QtWidgets.QWidget):
             logging.error("Import Error: QtWebEngine is not available")
 
     def show_location(self):
-        formatting = {"lat":self.ip_data["lat"], "lon":self.ip_data["lon"], "server":self.server}
+        formatting = {"lat": self.ip_data["lat"], "lon": self.ip_data["lon"], "server": self.server}
         loc_html = """
         <!DOCTYPE html>
         <html>
@@ -691,15 +703,16 @@ class StatusOnWidget(QtWidgets.QWidget):
     def check_for_update(self):
         self.check_update.emit()
 
+
 class FirewallEditor(QtWidgets.QDialog):
     fw_change = QtCore.pyqtSignal(dict)
     options = [
-            "block_lan",
-            "preserve_rules",
-            "fw_gui_only"
-            ]
+        "block_lan",
+        "preserve_rules",
+        "fw_gui_only"
+    ]
 
-    def __init__ (self, settings, parent=None):
+    def __init__(self, settings, parent=None):
         super(FirewallEditor, self).__init__(parent)
         try:
             with open('{}/firewall.json'.format(config.ROOTDIR), 'r') as fload:
@@ -830,16 +843,16 @@ class FirewallEditor(QtWidgets.QDialog):
         new_ipv6_rules = []
 
         for line in self.ipv4Edit.toPlainText().split("\n"):
-                new_ipv4_rules.append(shlex.split(line))
+            new_ipv4_rules.append(shlex.split(line))
 
         for line in self.ipv6Edit.toPlainText().split("\n"):
-                new_ipv6_rules.append(shlex.split(line))
+            new_ipv6_rules.append(shlex.split(line))
 
         self.firewall_dict["ipv4rules"] = new_ipv4_rules
         self.firewall_dict["ipv6rules"] = new_ipv6_rules
 
-        with open ("{}/firewall_temp.json".format(config.HOMEDIR), "w") as firedump:
-                json.dump(self.firewall_dict, firedump)
+        with open("{}/firewall_temp.json".format(config.HOMEDIR), "w") as firedump:
+            json.dump(self.firewall_dict, firedump)
 
         for option in self.options:
             if getattr(self, "{}_check".format(option)).checkState() == 2:
@@ -857,7 +870,7 @@ class FirewallEditor(QtWidgets.QDialog):
 class AppSelector(QtWidgets.QDialog):
     app_chosen = QtCore.pyqtSignal(tuple)
 
-    def __init__ (self, parent=None):
+    def __init__(self, parent=None):
         super(AppSelector, self).__init__(parent)
         self.setupUi(self)
         self.get_desktop_files()
@@ -932,10 +945,11 @@ class AppSelector(QtWidgets.QDialog):
         self.app_chosen.emit(self.bypassAppList[self.appListWidget.currentRow()])
         self.hide()
 
+
 class ModifyServer(QtWidgets.QDialog):
     modified = QtCore.pyqtSignal(dict)
 
-    def __init__ (self, key=None, server_info=None, parent=None):
+    def __init__(self, key=None, server_info=None, parent=None):
         super(ModifyServer, self).__init__(parent)
         self.key = key
         self.server_info = server_info
@@ -997,7 +1011,7 @@ class ModifyServer(QtWidgets.QDialog):
         self.verticalLayout.addWidget(self.configBrowser)
         self.buttonBox = QtWidgets.QDialogButtonBox(Dialog)
         self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
         self.retranslateUi(Dialog)
@@ -1014,7 +1028,7 @@ class ModifyServer(QtWidgets.QDialog):
         self.nameEdit.setText(self.server_info["name"])
         self.iconLabel.setText(_translate("Dialog", "Country:"))
         self.countryHintLabel.setText(_translate("Dialog", "Preferably use country codes\n"
-                                                 "Example: US for United States"))
+                                                           "Example: US for United States"))
         self.countryEdit.setText(self.server_info["country"])
         self.configLabel.setText(_translate("Dialog", "Edit Configuration File:"))
         self.changeAllBox.setText(_translate("Dialog",
@@ -1050,7 +1064,7 @@ class ModifyServer(QtWidgets.QDialog):
         if os.path.exists(mod):
             conf = mod
 
-        with open (conf, "r") as config_edit:
+        with open(conf, "r") as config_edit:
             self.old_config = config_edit.readlines()
             for line in self.old_config:
                 self.configBrowser.append(line.split("\n")[0])
@@ -1107,14 +1121,13 @@ class ModifyServer(QtWidgets.QDialog):
             remote_index = 0
             new_config = []
 
-        if self.changeAllBox.isChecked() == True:
+        if self.changeAllBox.isChecked():
             change_all = 1
 
-        change_dict = {"info_update" : self.server_info, "key" : self.key,
-                       "config_change" : new_config,
-                       "index" : remote_index, "apply_all" : change_all
+        change_dict = {"info_update": self.server_info, "key": self.key,
+                       "config_change": new_config,
+                       "index": remote_index, "apply_all": change_all
                        }
 
         self.modified.emit(change_dict)
         self.hide()
-
