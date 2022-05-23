@@ -118,10 +118,10 @@ class QomuiGui(QtWidgets.QWidget):
                                 )
 
             if ret == 0:
-                self.initalize_service("enable", "--now")
+                self.initialize_service("enable", "--now")
 
             elif ret == 1:
-                self.initalize_service("start")
+                self.initialize_service("start")
 
             elif ret == 2:
                 sys.exit(1)
